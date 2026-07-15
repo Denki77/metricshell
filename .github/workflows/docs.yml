@@ -1,0 +1,76 @@
+name: Documentation
+
+on:
+    pull_request:
+        paths:
+            - '**/*.md'
+            - '.github/workflows/docs.yml'
+    push:
+        branches:
+            - main
+        paths:
+            - '**/*.md'
+            - '.github/workflows/docs.yml'
+
+permissions:
+    contents: read
+
+concurrency:
+    group: documentation-${{ github.ref }}
+    cancel-in-progress: true
+
+jobs:
+    markdown:
+        name: Markdown lint
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Set up Node.js
+              uses: actions/setup-node@v4
+              with:
+                  node-version: '22'
+
+            - name: Install markdownlint
+              run: npm install --global markdownlint-cli2
+
+            - name: Check Markdown files
+              run: |
+                  markdownlint-cli2 \
+                    "**/*.md" \
+                    "#node_modules"
+
+    links:
+        name: Check links
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Check documentation links
+              uses: lycheeverse/lychee-action@v2
+              with:
+                  args: >-
+                      --verbose
+                      --no-progress
+                      --accept 200,204,206,429
+                      "./**/*.md"
+                  fail: true
+
+    secrets:
+        name: Secret scan
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout full repository history
+              uses: actions/checkout@v4
+              with:
+                  fetch-depth: 0
+
+            - name: Scan repository for secrets
+              uses: gitleaks/gitleaks-action@v2
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
