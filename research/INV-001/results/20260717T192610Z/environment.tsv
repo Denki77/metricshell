@@ -1,0 +1,24 @@
+key	value
+run_date_utc	2026-07-17T19:26:20Z
+repository_head_sha	92b3cf6182a3417ac558307881c2b802a91d75d8
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb
+host_uname_sanitized	Darwin <hostname> 25.5.0 Darwin Kernel Version 25.5.0: Mon Apr 27 20:39:09 PDT 2026; root:xnu-12377.121.6~2/RELEASE_ARM64_T6020 arm64
+host_kernel_name	Darwin
+host_kernel_release	25.5.0
+host_kernel_version	Darwin Kernel Version 25.5.0: Mon Apr 27 20:39:09 PDT 2026; root:xnu-12377.121.6~2/RELEASE_ARM64_T6020
+host_architecture	arm64
+docker_client_version	29.4.3
+docker_server_version	29.4.3
+docker_os_type	linux
+docker_architecture	aarch64
+docker_cgroup_version	2
+docker_security_options	["name=seccomp,profile=builtin","name=cgroupns"]
+docker_ncpu	6
+docker_mem_total_bytes	8322269184
+container_architecture	aarch64
+container_kernel	Linux f74cb8e95082 6.12.76-linuxkit #1 SMP Fri May  1 14:35:41 UTC 2026 aarch64 GNU/Linux
+container_nproc	6
+container_mem_total_kb	8127216
+container_clk_tck	100

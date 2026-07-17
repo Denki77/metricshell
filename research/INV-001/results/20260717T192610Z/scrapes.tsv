@@ -1,0 +1,6 @@
+case	iteration	http_code	value
+external_scrape_post_exit	1	200	17
+external_scrape_post_exit	2	200	17
+external_scrape_post_exit	3	200	17
+external_scrape_post_exit	4	200	17
+external_scrape_post_exit	5	200	17

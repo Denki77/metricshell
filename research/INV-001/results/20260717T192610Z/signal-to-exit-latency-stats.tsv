@@ -1,0 +1,12 @@
+case	count	p50_ms	p95_ms	p99_ms	min_ms	max_ms
+repeat_signal_direct_pg	30	0.434	0.581	0.625	0.326	0.943
+shutdown_grace_forced_kill	1	506.627	506.627	506.627	506.627	506.627
+signal_bash_pg	1	1.582	1.582	1.582	1.582	1.582
+signal_direct_pg	1	0.539	0.539	0.539	0.539	0.539
+signal_direct_pg_init	1	0.472	0.472	0.472	0.472	0.472
+signal_direct_pg_init_subreaper	1	0.382	0.382	0.382	0.382	0.382
+signal_direct_pid1	1	0.441	0.441	0.441	0.441	0.441
+signal_shell_no_pg	1	0.139	0.139	0.139	0.139	0.139
+signal_shell_pg	1	0.164	0.164	0.164	0.164	0.164
+signal_shell_pg_init	1	0.151	0.151	0.151	0.151	0.151
+signal_shell_script_pg	1	2.006	2.006	2.006	2.006	2.006
