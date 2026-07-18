@@ -1,0 +1,24 @@
+key	value
+run_date_utc	2026-07-18T08:53:36Z
+repository_head_sha	b650639f5465cf26f318840d13c5f7ffb8cfdec1
+benchmark_scope_diff_clean	true
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb
+host_uname_sanitized	Linux <hostname> 6.8.0-60-generic #63~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Apr 22 19:00:15 UTC 2 x86_64 x86_64 x86_64 GNU/Linux
+host_kernel_name	Linux
+host_kernel_release	6.8.0-60-generic
+host_kernel_version	#63~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue Apr 22 19:00:15 UTC 2
+host_architecture	x86_64
+docker_client_version	27.5.1
+docker_server_version	27.4.0
+docker_os_type	linux
+docker_architecture	x86_64
+docker_cgroup_version	2
+docker_security_options	["name=seccomp,profile=unconfined","name=cgroupns"]
+docker_ncpu	8
+docker_mem_total_bytes	3937562624
+container_architecture	x86_64
+container_kernel	Linux b3fc51319cc5 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 GNU/Linux
+container_nproc	8
+container_mem_total_kb	3845276
+container_clk_tck	100

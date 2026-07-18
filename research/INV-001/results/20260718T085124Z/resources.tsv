@@ -1,0 +1,7 @@
+case	phase	pid	clk_tck	cpu_ticks_delta	cpu_pct_one_core	rss_kb	hwm_kb
+resource_idle_post_exit	active	1	100	0	0,000	8732	8732
+resource_idle_post_exit	post_exit	1	100	0	0,000	8732	8732
+resource_active_cpu	active	1	100	0	0,000	8728	8728
+resource_active_cpu	post_exit	1	100	0	0,000	8728	8728
+resource_child_churn	active	1	100	0	0,000	10740	10740
+resource_child_churn	post_exit	1	100	0	0,000	10740	10740
