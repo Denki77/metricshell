@@ -1,10 +1,11 @@
 # INV-001 Report — Process and PID 1 Model
 
-Run date: 2026-07-17  
-Docker Server: 29.4.3  
-Docker platform: linux/aarch64  
-Final run: `results/20260717T192610Z`  
-Summary: `results/20260717T192610Z/summary.tsv`
+Status: completed  
+Run dates: 2026-07-17, 2026-07-18  
+Docker Servers: 29.4.3, 27.4.0  
+Docker platforms: linux/aarch64, linux/x86_64  
+Reference runs: `results/20260717T192610Z`, `results/20260718T085124Z`  
+Summaries: `results/20260717T192610Z/summary.tsv`, `results/20260718T085124Z/summary.tsv`
 
 ## Goal
 
@@ -85,10 +86,28 @@ docker run --rm --init metricshell-inv001:prototype --http=:9090 --subreaper -- 
 
 ## Run Environments
 
-| Environment             | Date       | Docker server | Platform | Architecture | Result set                 | Summary                                             | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
-|-------------------------|------------|---------------|----------|--------------|----------------------------|-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| Docker Desktop on macOS | 2026-07-17 | 29.4.3        | linux    | aarch64      | `results/20260717T192610Z` | [summary.tsv](results/20260717T192610Z/summary.tsv) | Current reference run; benchmark fingerprint `35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb`; see also [assertions.tsv](results/20260717T192610Z/assertions.tsv), [environment.tsv](results/20260717T192610Z/environment.tsv), [signal-delivery.tsv](results/20260717T192610Z/signal-delivery.tsv), [events.jsonl](results/20260717T192610Z/events.jsonl), [signal-to-exit-latency-stats.tsv](results/20260717T192610Z/signal-to-exit-latency-stats.tsv), [resources.tsv](results/20260717T192610Z/resources.tsv), [scrapes.tsv](results/20260717T192610Z/scrapes.tsv), [zombies.tsv](results/20260717T192610Z/zombies.tsv). |
-| Native Ubuntu Docker    | TBD        | TBD           | linux    | TBD          | TBD                        | TBD                                                 | Add the Ubuntu run here after executing `./research/INV-001/run-bench.sh` in that environment.                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| Environment                                | Date       | Docker server | Platform | Architecture | Result set                 | Summary                                             | Notes                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                           |
+|--------------------------------------------|------------|---------------|----------|--------------|----------------------------|-----------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| Docker Desktop on macOS                    | 2026-07-17 | 29.4.3        | linux    | aarch64      | `results/20260717T192610Z` | [summary.tsv](results/20260717T192610Z/summary.tsv) | Current reference run; benchmark fingerprint `35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb`; see also [assertions.tsv](results/20260717T192610Z/assertions.tsv), [environment.tsv](results/20260717T192610Z/environment.tsv), [signal-delivery.tsv](results/20260717T192610Z/signal-delivery.tsv), [events.jsonl](results/20260717T192610Z/events.jsonl), [signal-to-exit-latency-stats.tsv](results/20260717T192610Z/signal-to-exit-latency-stats.tsv), [resources.tsv](results/20260717T192610Z/resources.tsv), [scrapes.tsv](results/20260717T192610Z/scrapes.tsv), [zombies.tsv](results/20260717T192610Z/zombies.tsv). |
+| Docker Desktop on Ubuntu / LinuxKit x86_64 | 2026-07-18 | 27.4.0        | linux    | x86_64       | `results/20260718T085124Z` | [summary.tsv](results/20260718T085124Z/summary.tsv) | Current reference run; benchmark fingerprint `35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb`; see also [assertions.tsv](results/20260718T085124Z/assertions.tsv), [environment.tsv](results/20260718T085124Z/environment.tsv), [signal-delivery.tsv](results/20260718T085124Z/signal-delivery.tsv), [events.jsonl](results/20260718T085124Z/events.jsonl), [signal-to-exit-latency-stats.tsv](results/20260718T085124Z/signal-to-exit-latency-stats.tsv), [resources.tsv](results/20260718T085124Z/resources.tsv), [scrapes.tsv](results/20260718T085124Z/scrapes.tsv), [zombies.tsv](results/20260718T085124Z/zombies.tsv). |
+
+Both reference runs used the same benchmark fingerprint:
+`35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb`. This fingerprint is calculated only from
+`research/INV-001/prototype` and `research/INV-001/run-bench.sh`; documentation-only commits do not change the
+benchmark identity.
+
+## Cross-Environment Confirmation
+
+| Metric                                    |   macOS/LinuxKit aarch64 |   Ubuntu/LinuxKit x86_64 |
+|-------------------------------------------|-------------------------:|-------------------------:|
+| Passed summary cases                      |                       52 |                       52 |
+| Passed assertions                         |                      141 |                      141 |
+| Explicit signal-delivery observations     |                       42 |                       42 |
+| Aggregated structured events              |                      597 |                      598 |
+| Successful post-exit HTTP scrapes         |                        5 |                        5 |
+| Zero-zombie samples before container exit |                       25 |                       27 |
+| `repeat_signal_direct_pg` p50 / p95 / p99 | 0.434 / 0.581 / 0.625 ms | 0.468 / 1.894 / 2.155 ms |
+| Forced shutdown signal-to-exit latency    |               506.627 ms |               502.317 ms |
 
 ## Results
 
@@ -121,14 +140,18 @@ Key observations:
 
 - `summary.tsv` now reports a case as `pass` only when all case assertions pass. Assertions include exit code,
   startup readiness, signal receipt, process-tree behavior and post-exit HTTP/metric checks where applicable.
+- All case-level assertions passed in both reference environments.
 - Direct child signal forwarding works both by child PID and by process group.
 - The 30-run signal-to-exit latency benchmark for `repeat_signal_direct_pg` measured p50 `0.434 ms`, p95 `0.581 ms`,
-  p99 `0.625 ms`, min `0.326 ms`, max `0.943 ms` for `signal_forwarded -> workload_exited`.
+  p99 `0.625 ms`, min `0.326 ms`, max `0.943 ms` on macOS/LinuxKit aarch64.
+- The same 30-run benchmark on Ubuntu/LinuxKit x86_64 measured p50 `0.468 ms`, p95 `1.894 ms`, p99 `2.155 ms`,
+  min `0.373 ms`, max `7.326 ms`.
 - Signal receipt is explicitly recorded in `signal-delivery.tsv`, not inferred from exit code alone. Direct workload,
   shell parent, grandchild and stubborn-workload signal observations were all present in the expected cases.
 - `assertions.tsv` explicitly checks descendant signal receipt, double-fork reaping expectations and post-exit
   `/metrics` availability.
-- `events.jsonl` contains 597 aggregated structured events across the final run, keyed by benchmark case.
+- `events.jsonl` contains 597 aggregated structured events in the macOS/LinuxKit run and 598 in the Ubuntu/LinuxKit
+  run, keyed by benchmark case.
 - `environment.tsv` records `benchmark_code_fingerprint_sha256` for the benchmark scope
   (`research/INV-001/prototype` and `research/INV-001/run-bench.sh`). The `repository_head_sha` is retained as context
   only; documentation-only commits should be compared through the benchmark fingerprint instead.
@@ -141,19 +164,21 @@ Key observations:
   MetricShell after workload exit; Docker init/Tini owns the reaping.
 - When Docker init/Tini is PID 1 and MetricShell enables `PR_SET_CHILD_SUBREAPER`, MetricShell reaps the daemonized
   descendant and observes exit `23`.
-- The shutdown grace scenario force-killed a TERM-ignoring workload after `506.627 ms` and preserved signal exit `137`.
+- The shutdown grace scenario force-killed a TERM-ignoring workload after `506.627 ms` on macOS/LinuxKit and
+  `502.317 ms` on Ubuntu/LinuxKit, preserving signal exit `137` in both environments.
 - Child churn completed for 200, 1k and 10k short-lived children. The 10k zombie scan observed `0` zombies in all
   successful samples before the container exited.
-- MetricShell RSS/HWM samples stayed in the `8296-8380 KiB` range across idle post-exit, CPU workload and child churn
-  scenarios in this Docker Desktop run.
+- MetricShell RSS/HWM samples stayed in the `8296-8380 KiB` range on macOS/LinuxKit and `8728-10740 KiB` on
+  Ubuntu/LinuxKit across idle post-exit, CPU workload and child churn scenarios.
 - Post-workload survival preserved the workload exit code. External host scrapes during the configured post-exit window
-  returned HTTP `200` and `metricshell_workload_exit_code 17` in all five samples.
+  returned HTTP `200` and `metricshell_workload_exit_code 17` in all five samples in both environments.
 
 ## Hypothesis Evaluation
 
 ### MetricShell must own workload lifecycle even when Tini is present
 
-Provisionally supported by the Docker Desktop macOS run; final ADR confidence requires the native Ubuntu Docker repeat.
+Supported by matching benchmark-fingerprint runs on Docker Desktop macOS/LinuxKit aarch64 and Docker Desktop
+Ubuntu/LinuxKit x86_64.
 
 Tini/Docker init can sit above MetricShell and reap processes that MetricShell does not adopt, but it does not preserve
 MetricShell-level knowledge of daemonized descendants. MetricShell still needs to start workload, forward signals, wait
@@ -161,7 +186,8 @@ for workload exit, preserve exit status and own post-exit behavior.
 
 ### Tini may reduce PID 1 edge cases but adds another binary and signal layer
 
-Provisionally supported by the Docker Desktop macOS run; final ADR confidence requires the native Ubuntu Docker repeat.
+Supported by matching benchmark-fingerprint runs on Docker Desktop macOS/LinuxKit aarch64 and Docker Desktop
+Ubuntu/LinuxKit x86_64.
 
 With Docker init/Tini, MetricShell runs as PID 7 instead of PID 1 in this environment. Tini can act as the namespace
 init, but MetricShell loses orphan descendant ownership unless it uses `PR_SET_CHILD_SUBREAPER`. This adds an
@@ -169,7 +195,8 @@ operational mode and another process layer without removing supervisor responsib
 
 ### A correct single-binary implementation may be simpler operationally
 
-Provisionally supported by the Docker Desktop macOS run; final ADR confidence requires the native Ubuntu Docker repeat.
+Supported by matching benchmark-fingerprint runs on Docker Desktop macOS/LinuxKit aarch64 and Docker Desktop
+Ubuntu/LinuxKit x86_64.
 
 MetricShell as PID 1 successfully handled direct signals, exit codes, KILL semantics, start failure, internal failure,
 post-exit metrics and daemonized descendant reaping in this prototype. The implementation still needs production-grade
@@ -177,7 +204,8 @@ shutdown budgets and tests, but no hard blocker appeared for a single-binary PID
 
 ### Process-group and orphaned-descendant behavior are the main correctness risks
 
-Provisionally supported by the Docker Desktop macOS run; final ADR confidence requires the native Ubuntu Docker repeat.
+Supported by matching benchmark-fingerprint runs on Docker Desktop macOS/LinuxKit aarch64 and Docker Desktop
+Ubuntu/LinuxKit x86_64.
 
 The most important negative result is shell behavior: process-group TERM reaches children but may produce exit `143`
 from `/bin/sh -c` or shell scripts with foreground children. The most important Tini result is orphan adoption: under
@@ -211,8 +239,9 @@ Recommended baseline for MetricShell:
 ## Prototype Limits
 
 - The prototype is not a production MetricShell implementation.
-- The reference run was performed on Docker Desktop linux/aarch64; native Linux amd64/arm64 repeats are required before
-  converting provisional conclusions into ADR-level conclusions.
+- Both reference runs were performed in Docker Desktop container environments that use LinuxKit container kernels. This
+  covers macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64, but it is not evidence for native non-LinuxKit Linux or
+  Kubernetes runtime behavior.
 - Docker `--init` is used as the Tini-compatible layer; standalone Tini, dumb-init and s6 versions were not compared.
 - Timing is measured from JSONL events and runner wall-clock duration; it is useful for architecture evidence but is
   still not a full performance benchmark.
@@ -239,7 +268,8 @@ The current prototype now covers most local Docker benchmarks that were listed a
 | PID 1, Docker `--init`, no-subreaper and subreaper comparison               | Covered for Docker `--init`; standalone init binaries were not downloaded         | `summary.tsv`                                                                       |
 | Shell variants                                                              | Covered for exec-form, `/bin/sh -c`, `/bin/bash -c` and shell-script wrapper      | `summary.tsv`, `signal-delivery.tsv`                                                |
 | External Prometheus-like scrape during post-exit                            | Covered with host-side HTTP scrapes                                               | `scrapes.tsv`                                                                       |
-| Linux amd64 and Kubernetes Job/CronJob repeats                              | Still open                                                                        | Requires another runtime environment                                                |
+| Ubuntu/LinuxKit x86_64 repeat                                               | Covered with the same benchmark fingerprint as the macOS reference run            | `results/20260718T085124Z/summary.tsv`, `results/20260718T085124Z/assertions.tsv`   |
+| Native non-LinuxKit Linux and Kubernetes Job/CronJob repeats                | Still open                                                                        | Requires another runtime environment                                                |
 | Standalone Tini, dumb-init and s6 comparison                                | Still open                                                                        | Requires adding those binaries/images intentionally                                 |
 
 To run the heavy 100k child churn case:
@@ -250,7 +280,7 @@ INV001_RUN_HEAVY=1 ./research/INV-001/run-bench.sh
 
 ## Conclusion
 
-The INV-001 assumption is provisionally supported and sufficient to choose a direction before the native Linux repeat:
+The INV-001 assumption is confirmed within the tested Docker Desktop/LinuxKit container environments:
 
 - MetricShell can run as PID 1 and implement supervisor/init responsibilities itself.
 - Tini/Docker init does not replace MetricShell lifecycle ownership.

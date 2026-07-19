@@ -1,7 +1,7 @@
 # INV-001 — Process and PID 1 Model
 
-Status: prototype completed  
-Last run: `results/20260717T192610Z`  
+Status: completed  
+Reference runs: `results/20260717T192610Z`, `results/20260718T085124Z`  
 Report: [report.md](report.md)
 
 ## Question
@@ -90,23 +90,32 @@ Implemented with `--post-exit=3s`; `/metrics` remains available and exposes the 
 
 ## Results
 
-The final Docker run passed all defined expectations in `results/20260717T192610Z/summary.tsv`.
+The final macOS and Ubuntu/LinuxKit Docker runs passed all defined expectations:
+
+| Environment                                | Date       | Result set                 | Summary                                             | Benchmark fingerprint                                              |
+|--------------------------------------------|------------|----------------------------|-----------------------------------------------------|--------------------------------------------------------------------|
+| Docker Desktop on macOS / LinuxKit aarch64 | 2026-07-17 | `results/20260717T192610Z` | [summary.tsv](results/20260717T192610Z/summary.tsv) | `35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb` |
+| Docker Desktop on Ubuntu / LinuxKit x86_64 | 2026-07-18 | `results/20260718T085124Z` | [summary.tsv](results/20260718T085124Z/summary.tsv) | `35dc9c63a0a9f6dedf56a1c6c80b582919d5961b8f233c49ef1aed55652b71fb` |
 
 Key findings:
 
 - MetricShell as PID 1 correctly forwarded signals, preserved exit codes, reaped an orphaned double-fork descendant and
   served post-exit metrics.
+- All case-level assertions passed in both environments. The assertion set covers exit codes, startup readiness,
+  signal receipt, descendant reaping expectations and post-exit HTTP/metrics availability.
 - Docker init/Tini without `PR_SET_CHILD_SUBREAPER` reaped daemonized descendants outside MetricShell visibility.
 - Docker init/Tini with `PR_SET_CHILD_SUBREAPER` allowed MetricShell to reap daemonized descendants.
 - Process-group signaling reached shell descendants, but shell wrappers can still resolve to exit `143`.
+- The 30-run `repeat_signal_direct_pg` signal-to-exit latency benchmark measured p50/p95/p99 `0.434/0.581/0.625 ms`
+  on macOS/LinuxKit aarch64 and `0.468/1.894/2.155 ms` on Ubuntu/LinuxKit x86_64.
 - The extended benchmark run measured 30 signal-to-exit repetitions for `repeat_signal_direct_pg`, single-run
   signal-to-exit smoke samples for other signal cases, explicit signal delivery events, CPU/RSS samples, 1k/10k child
   churn, zombie scan samples, forced shutdown grace, external post-exit scrapes and environment metadata.
 
 ## Conclusion
 
-Provisionally accept the direction "MetricShell as PID 1 by default" for the next design step, pending native Linux
-repeat evidence.
+Accept the direction "MetricShell as PID 1 by default" for the next design step. The assumption is confirmed within the
+tested Docker Desktop/LinuxKit container environments on macOS aarch64 and Ubuntu x86_64.
 
 Retain Tini/Docker init as a compatibility mode, not as a replacement for MetricShell lifecycle ownership. If
 MetricShell runs below an init process and must manage daemonized descendants, it should enable
@@ -119,7 +128,7 @@ clean exit-code preservation depends on workload wrapper behavior.
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Raw evidence: `results/20260717T192610Z/`
+- Raw evidence: `results/20260717T192610Z/`, `results/20260718T085124Z/`
 - Report: [report.md](report.md)
 - Recommended ADR input: MetricShell runs as PID 1 by default; optional init-process compatibility requires subreaper
   mode for descendant ownership.
@@ -172,8 +181,8 @@ docker run --rm --init metricshell-inv001:prototype --http=:9090 --subreaper -- 
 ## Prototype Limits
 
 - The prototype is research code, not production MetricShell.
-- Results were collected on Docker Desktop linux/aarch64; native Linux repeat evidence is still required before
-  ADR-level conclusions.
+- Results were collected in Docker Desktop container environments that both use LinuxKit container kernels. This covers
+  macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64, but not native non-LinuxKit Linux or Kubernetes runtime behavior.
 - Docker `--init` was used as the Tini-compatible model; standalone init binaries were not compared.
 - Timing values are suitable for architectural evidence, not performance promises.
 - Shell behavior depends on the actual shell and workload wrapper.
@@ -198,4 +207,4 @@ Still open:
 
 - 100k child churn as a heavy opt-in run: `INV001_RUN_HEAVY=1 ./research/INV-001/run-bench.sh`.
 - Standalone Tini, dumb-init and s6 comparison.
-- Linux amd64 and Kubernetes Job/CronJob repeats.
+- Native non-LinuxKit Linux and Kubernetes Job/CronJob repeats.
