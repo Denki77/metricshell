@@ -85,7 +85,7 @@ Verify that MetricShell can continue serving metrics after workload exit while p
 
 ### Status
 
-[Validation in progress](../../research/INV-001/report.md).
+[Completed](../../research/INV-001/report.md).
 
 ---
 

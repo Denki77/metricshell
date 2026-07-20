@@ -95,23 +95,23 @@ Architecture investigation may refine how these capabilities are implemented.
 
 ## 6. Investigation Tracking
 
-| ID      | Topic                                                       | Status                 | Evidence | Decision |
-|---------|-------------------------------------------------------------|------------------------|----------|----------|
-| INV-001 | [PID 1 and process model](architecture-research.md#INV-001) | Validation in progress | —        | —        |
-| INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | Not started            | —        | —        |
-| INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Not started            | —        | —        |
-| INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Not started            | —        | —        |
-| INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Not started            | —        | —        |
-| INV-006 | [File ingestion](architecture-research.md#INV-006)          | Not started            | —        | —        |
-| INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Not started            | —        | —        |
-| INV-008 | [Local push](architecture-research.md#INV-008)              | Not started            | —        | —        |
-| INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Not started            | —        | —        |
-| INV-010 | [Exposition](architecture-research.md#INV-010)              | Not started            | —        | —        |
-| INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | Not started            | —        | —        |
-| INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | Not started            | —        | —        |
-| INV-013 | [Distribution](architecture-research.md#INV-013)            | Not started            | —        | —        |
-| INV-014 | [Security and limits](architecture-research.md#INV-014)     | Not started            | —        | —        |
-| INV-015 | [Benchmarks](architecture-research.md#INV-015)              | Not started            | —        | —        |
+| ID      | Topic                                                       | Status      | Evidence                                    | Decision                                     |
+|---------|-------------------------------------------------------------|-------------|---------------------------------------------|----------------------------------------------|
+| INV-001 | [PID 1 and process model](architecture-research.md#INV-001) | Completed   | [INV-001](../../research/INV-001/README.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
+| INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | Not started | —                                           | —                                            |
+| INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Not started | —                                           | —                                            |
+| INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Not started | —                                           | —                                            |
+| INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Not started | —                                           | —                                            |
+| INV-006 | [File ingestion](architecture-research.md#INV-006)          | Not started | —                                           | —                                            |
+| INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Not started | —                                           | —                                            |
+| INV-008 | [Local push](architecture-research.md#INV-008)              | Not started | —                                           | —                                            |
+| INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Not started | —                                           | —                                            |
+| INV-010 | [Exposition](architecture-research.md#INV-010)              | Not started | —                                           | —                                            |
+| INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | Not started | —                                           | —                                            |
+| INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | Not started | —                                           | —                                            |
+| INV-013 | [Distribution](architecture-research.md#INV-013)            | Not started | —                                           | —                                            |
+| INV-014 | [Security and limits](architecture-research.md#INV-014)     | Not started | —                                           | —                                            |
+| INV-015 | [Benchmarks](architecture-research.md#INV-015)              | Not started | —                                           | —                                            |
 
 ## 7. Completion Criteria
 
