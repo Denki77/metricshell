@@ -1,0 +1,7 @@
+benchmark	status	reason
+native_linux_x86_64	not_run	current container environment is LinuxKit aarch64, not native Linux
+native_linux_arm64	not_run	current container environment is LinuxKit aarch64, not native Linux
+kubernetes_job	not_run	configured cluster OAuth refresh token is invalid
+docker_daemon_restart	not_run	would disrupt unrelated local containers and requires explicit separate authorization
+disk_full	not_run	out of INV-002 lifecycle scope and unsafe on shared Docker daemon
+network_partition	not_run	prototype has no remote network dependency

@@ -1,0 +1,4 @@
+attempts	duration_ms	exit_code	log_bytes	result
+10	4438.787	17	1977	pass
+100	4379.017	17	18894	pass
+1000	6263.921	17	194501	pass

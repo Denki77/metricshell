@@ -1,16 +1,5 @@
 .idea
-research/INV*/latest-results.txt
+research/INV*/latest-*results.txt
 
 research/INV*/results/*/*
-!research/INV*/results/*/summary.tsv
-!research/INV*/results/*/environment.tsv
-!research/INV*/results/*/events.jsonl
-!research/INV*/results/*/assertions.tsv
-!research/INV*/results/*/signal-delivery.tsv
-!research/INV*/results/*/signal-to-exit-latency.tsv
-!research/INV*/results/*/signal-to-exit-latency-stats.tsv
-!research/INV*/results/*/resources.tsv
-!research/INV*/results/*/scrapes.tsv
-!research/INV*/results/*/zombies.tsv
-!research/INV*/results/*/latency.tsv
-!research/INV*/results/*/latency-stats.tsv
+!research/INV*/results/*/*.tsv

@@ -1,0 +1,9 @@
+case	expected_exit	actual_exit	attempts	final_counter	result
+single_success	0	0	1	5	pass
+single_failure	17	17	1	5	pass
+internal_reset	0	0	2	2	pass
+internal_preserve	0	0	2	7	pass
+restart_limit	17	17	3	3	pass
+start_failure	127	127	0	0	pass
+external_docker_restart	0	0	2	2	pass
+post_exit_endpoint	17	17	1	5	pass

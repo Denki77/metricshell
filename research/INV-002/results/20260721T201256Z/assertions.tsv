@@ -1,0 +1,7 @@
+case	assertion	expected	actual	result
+post_exit_endpoint	actual_exit	17	17	pass
+post_exit_endpoint	attempt_started_count	1	1	pass
+post_exit_endpoint	lifecycle_finalized_count	1	1	pass
+post_exit_endpoint	final_counter	5	5	pass
+post_exit_endpoint	metrics_available_during_window	true	true	pass
+post_exit_endpoint	internal_bounded_window_2000ms_to_2250ms	true	true	pass
