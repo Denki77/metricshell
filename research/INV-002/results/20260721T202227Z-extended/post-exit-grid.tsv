@@ -1,0 +1,7 @@
+configured_seconds	internal_elapsed_ms	host_lifecycle_ms	exit_code	result
+0	0.053	19862.405	17	pass
+1	1000.364	20647.169	17	pass
+2	2002.330	22932.557	17	pass
+5	5005.304	24566.249	17	pass
+10	10003.573	24872.534	17	pass
+30	30030.048	50899.065	17	pass

@@ -1,0 +1,5 @@
+assertion	expected	actual	result
+container_exit	137	137	pass
+container_oom_killed	true	true	pass
+metricshell_observed_exit_137	true	true	pass
+lifecycle_finalized_137	true	true	pass
