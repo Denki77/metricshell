@@ -1,0 +1,2 @@
+assertion	expected	actual	result
+post_exit_wait_during_termination	0	0	pass

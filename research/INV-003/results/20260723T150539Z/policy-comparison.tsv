@@ -1,0 +1,5 @@
+case	policy	total_ms	workload_ms	reserve_ms	exit_code	result
+fixed	fixed	5000	4000	1000	0	pass
+percentage	percentage	5000	4000	1000	0	pass
+explicit	explicit	5000	4000	1000	0	pass
+overflow	explicit	1000	rejected	200	64	pass

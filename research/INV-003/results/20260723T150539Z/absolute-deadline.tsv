@@ -1,0 +1,6 @@
+case	deadline_offset_ms	pre_term_delay_ms	reserve_ms	remaining_ms	workload_budget_ms	exit_code	result
+full	5000	0	1000	4955	3955	0	pass
+partially_spent	5000	1000	1000	3930	2930	0	pass
+nearly_expired	500	250	1000	194	0	137	pass
+already_expired	-100	0	1000	0	0	137	pass
+reserve_exceeds_remaining	700	200	1000	421	0	137	pass
