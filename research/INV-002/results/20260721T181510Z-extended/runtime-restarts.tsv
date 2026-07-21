@@ -1,0 +1,2 @@
+implementation	status	restart_count	exit_code	lifecycles	result
+compose	exited	1	0	2	pass

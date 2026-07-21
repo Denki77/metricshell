@@ -1,0 +1,4 @@
+case	expected_exit	actual_exit	result
+term	143	143	pass
+kill	137	137	pass
+container_oom	137	137	pass

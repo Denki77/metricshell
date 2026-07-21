@@ -1,0 +1,20 @@
+services:
+  metricshell:
+    image: metricshell-inv002:prototype
+    deploy:
+      restart_policy:
+        condition: on-failure
+        max_attempts: 2
+    command:
+      - --policy=single
+      - --
+      - /usr/local/bin/workload
+      - --state=/state/attempt
+      - --exits=17,0
+      - --increments=5,2
+      - --hold=100ms
+    volumes:
+      - state:/state
+
+volumes:
+  state: {}

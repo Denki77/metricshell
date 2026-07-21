@@ -1,0 +1,6 @@
+observation	value
+restart_gap_observed	true
+first_epoch_observed	true
+second_epoch_observed	false
+http_200_count	5
+http_gap_count	145

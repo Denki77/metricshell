@@ -98,7 +98,7 @@ Architecture investigation may refine how these capabilities are implemented.
 | ID      | Topic                                                       | Status      | Evidence                                    | Decision                                     |
 |---------|-------------------------------------------------------------|-------------|---------------------------------------------|----------------------------------------------|
 | INV-001 | [PID 1 and process model](architecture-research.md#INV-001) | Completed   | [INV-001](../../research/INV-001/README.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
-| INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | Not started | —                                           | —                                            |
+| INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | In progress | —                                           | —                                            |
 | INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Not started | —                                           | —                                            |
 | INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Not started | —                                           | —                                            |
 | INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Not started | —                                           | —                                            |

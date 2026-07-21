@@ -1,0 +1,10 @@
+key	value
+run_date_utc	2026-07-21T20:05:27Z
+repository_head_sha	78f1e2e0f94c1ea02a54140c7e42daba0ead9951
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	a8042a6b12b8d659f701125584223373a934186d45fdeae2e64f89f6362c05f2
+docker_server_version	29.4.3
+docker_info	linux/aarch64 ncpu=6 memory=8322269184
+container_kernel	Linux 5010fc2dde23 6.12.76-linuxkit #1 SMP Fri May  1 14:35:41 UTC 2026 aarch64 Linux
+repeat_count	30

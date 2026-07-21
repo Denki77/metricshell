@@ -1,0 +1,7 @@
+configured_seconds	observed_ms	exit_code	result
+0	390.423	17	pass
+1	1398.393	17	pass
+2	2414.523	17	pass
+5	5401.858	17	pass
+10	10470.272	17	pass
+30	30488.858	17	pass

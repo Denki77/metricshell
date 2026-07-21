@@ -1,0 +1,6 @@
+assertion	expected	actual	result
+two_lifecycles_completed	2	2	pass
+first_lifecycle_exit	17	17	pass
+second_lifecycle_exit	0	0	pass
+each_metricshell_process_executed_once	2	2	pass
+runtime_restart_count	1	1	pass
