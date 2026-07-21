@@ -143,7 +143,7 @@ MetricShell should run exactly one workload execution. Restart policy should rem
 
 ### Status
 
-In progress.
+[Completed](../../research/INV-002/report.md).
 
 ---
 

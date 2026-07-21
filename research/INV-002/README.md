@@ -1,10 +1,12 @@
 # INV-002 — Workload Lifecycle and Exit Semantics
 
-Status: validation in progress
+Status: completed
 
 Reference run: `results/20260721T200345Z`
 
 Extended reference run: `results/20260721T200406Z-extended`
+
+Ubuntu reference runs: `results/20260721T201256Z`, `results/20260721T202227Z-extended`
 
 Report: [report.md](report.md)
 
@@ -45,7 +47,12 @@ Each case records resolved exit code, execution count and final `app_events_tota
 
 ## Results
 
-All 8 case-level expectations passed on Docker 29.4.3, LinuxKit 6.12.76, aarch64:
+All core and extended expectations passed in both Docker Desktop/LinuxKit environments: macOS/aarch64 and
+Ubuntu/x86_64.
+
+All four runs used benchmark fingerprint
+`a8042a6b12b8d659f701125584223373a934186d45fdeae2e64f89f6362c05f2`; all recorded assertions passed in both
+environments. Signal-to-exit p50/p95/p99 was `0.594/1.194/2.010 ms` on macOS and `1.767/2.137/2.187 ms` on Ubuntu.
 
 | Case                        |  Executions | Exit | Counter sequence      | Result |
 |-----------------------------|------------:|-----:|-----------------------|--------|
@@ -64,12 +71,8 @@ single-execution lifecycles and retained the runtime's visible restart count.
 
 ## Conclusion
 
-The hypothesis is confirmed in the corrected macOS/LinuxKit aarch64 run. Status remains `validation in progress`
-until Ubuntu/LinuxKit x86_64 repeats fingerprint
-`a8042a6b12b8d659f701125584223373a934186d45fdeae2e64f89f6362c05f2`. The submitted Ubuntu run used the preceding
-fingerprint and exposed locale/host-timing defects in the runner, so it is diagnostic rather than confirming evidence.
-MetricShell should execute the workload exactly
-once;
+The hypothesis is confirmed in matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs.
+MetricShell should execute the workload exactly once;
 retry count and backoff are outside its configuration surface. Runtime restart creates a new metric-state epoch.
 
 Kubernetes behavior was evaluated structurally, not executed: a Pod `restartPolicy: OnFailure` restarts the container,
@@ -128,8 +131,8 @@ written to a new UTC timestamp directory; `latest-results.txt` points to it.
 ## Prototype Limits
 
 - Research code, not a production supervisor; it intentionally omits ingestion protocols and production hardening.
-- One Docker Desktop/LinuxKit aarch64 environment was measured. Native Linux, x86_64, containerd/CRI-O and Kubernetes
-  were not executed.
+- Two Docker Desktop/LinuxKit environments were measured: macOS/aarch64 and Ubuntu/x86_64. Native non-LinuxKit Linux,
+  containerd/CRI-O and Kubernetes were not executed.
 - The synthetic counter is line-based and tests lifecycle semantics, not ingestion throughput.
 - The tested `0–30s` range validates bounded post-exit behavior only. INV-003 must determine the production budget.
 - TERM, KILL, container-OOM, restart storms and concurrent restart scrapes are covered. Daemon restart, host reboot and
@@ -143,8 +146,8 @@ written to a new UTC timestamp directory; `latest-results.txt` points to it.
 The extended run covers 30 repetitions with p50/p95/p99, Compose restart, 150 restart-boundary scrape samples,
 TERM/KILL/container-OOM, post-exit values `0, 1, 2, 5, 10, 30s`, and 10/100/1000-attempt internal restart storms.
 
-Native Linux/x86_64 was unavailable. Kubernetes could not run because the configured cluster OAuth refresh token is
-invalid. Docker daemon restart and disk-full injection were not performed because they could disrupt unrelated
+Native non-LinuxKit Linux was unavailable. Kubernetes could not run because the configured cluster OAuth refresh token
+is invalid. Docker daemon restart and disk-full injection were not performed because they could disrupt unrelated
 workloads. Exact statuses are recorded in
 [`coverage.tsv`](results/20260721T200406Z-extended/coverage.tsv).
 
@@ -156,5 +159,6 @@ Both currently available container environments use LinuxKit. Native non-LinuxKi
 - Runners: `run-bench.sh`, `run-extended-bench.sh`
 - Raw evidence: `results/20260721T200345Z/`
 - Extended evidence: `results/20260721T200406Z-extended/`
+- Ubuntu evidence: `results/20260721T201256Z/`, `results/20260721T202227Z-extended/`
 - Detailed analysis: [report.md](report.md)
 - ADR input: exactly one workload execution; external restart ownership; one metric-state epoch per execution.

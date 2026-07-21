@@ -1,6 +1,6 @@
 # INV-002 Report — Workload Lifecycle and Exit Semantics
 
-Status: validation in progress
+Status: completed
 
 Run date: 2026-07-21
 
@@ -8,9 +8,11 @@ Docker server: 29.4.3
 
 Docker platform: linux/aarch64
 
-Reference runs: `results/20260721T200345Z`, `results/20260721T200406Z-extended`
+Reference runs: `results/20260721T200345Z`, `results/20260721T200406Z-extended`, `results/20260721T201256Z`,
+`results/20260721T202227Z-extended`
 
-Summaries: `results/20260721T200345Z/summary.tsv`, `results/20260721T200406Z-extended/latency-stats.tsv`
+Summaries: `results/20260721T200345Z/summary.tsv`, `results/20260721T201256Z/summary.tsv`,
+`results/20260721T200406Z-extended/latency-stats.tsv`, `results/20260721T202227Z-extended/latency-stats.tsv`
 
 ## Goal
 
@@ -80,19 +82,23 @@ Set `INV002_REPEAT_COUNT=100` to increase the default 30 repetitions.
 |--------------------------|------------|--------------:|------------------|--------------|-------------------------------------|--------------------------------------------------------------------------|-----------------------------------------------------|
 | Docker Desktop on macOS  | 2026-07-21 |        29.4.3 | LinuxKit 6.12.76 | aarch64      | `results/20260721T200345Z`          | [summary.tsv](results/20260721T200345Z/summary.tsv)                      | Path-independent core run, 8/8 pass.                |
 | Docker Desktop on macOS  | 2026-07-21 |        29.4.3 | LinuxKit 6.12.76 | aarch64      | `results/20260721T200406Z-extended` | [latency-stats.tsv](results/20260721T200406Z-extended/latency-stats.tsv) | Path-independent extended run; all assertions pass. |
-| Docker Desktop on Ubuntu | -          |        27.4.0 | LinuxKit 6.10.14 | x86_64       | -                                   | -                                                                        | -                                                   |
+| Docker Desktop on Ubuntu | 2026-07-21 |        27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260721T201256Z`          | [summary.tsv](results/20260721T201256Z/summary.tsv)                      | Core run, 8/8 and all assertions pass.              |
+| Docker Desktop on Ubuntu | 2026-07-21 |        27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260721T202227Z-extended` | [latency-stats.tsv](results/20260721T202227Z-extended/latency-stats.tsv) | Extended run; all assertions pass.                  |
 
-Ubuntu/LinuxKit x86_64 is available, but it must be rerun with the corrected benchmark. A Kubernetes context exists,
-but its cluster rejected authentication because the OAuth refresh token is invalid. Gaps are recorded in
-[`coverage.tsv`](results/20260721T200406Z-extended/coverage.tsv).
+Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. This provides
+cross-architecture confirmation but does not cover a native non-LinuxKit Linux kernel. A Kubernetes context exists, but
+its cluster rejected authentication because the OAuth refresh token is invalid. Remaining gaps are recorded in
+[`coverage.tsv`](results/20260721T202227Z-extended/coverage.tsv).
 
-Both corrected macOS reference runs used benchmark fingerprint
+All four reference runs used benchmark fingerprint
 `a8042a6b12b8d659f701125584223373a934186d45fdeae2e64f89f6362c05f2`. The fingerprint covers `prototype/`,
-`run-bench.sh`, `run-extended-bench.sh` and `compose.yml`; it is the required identity for the pending Ubuntu run.
-`benchmark_scope_diff_clean=false` records that the benchmark changes were not committed at collection time, while
-`benchmark_scope_untracked_count=0` confirms that no benchmark-scope file was omitted as untracked. The submitted
-Ubuntu run used the previous fingerprint `7515b5d373b0228cdd58860c64498a16f96b24c98e7e0d8319e3477c05792075`
-and therefore cannot be compared to the corrected reference run.
+`run-bench.sh`, `run-extended-bench.sh` and `compose.yml`. macOS recorded `benchmark_scope_diff_clean=false`; Ubuntu
+recorded `true`. Both recorded `benchmark_scope_untracked_count=0`. Fingerprint equality, rather than repository HEAD,
+establishes benchmark-code identity.
+
+All recorded assertions passed in both environments: core post-exit assertions, external-restart lifecycle assertions,
+container-OOM assertions, 30 lifecycle repetitions, 30 signal-to-exit repetitions, Compose restart, fault cases and the
+complete post-exit grid.
 
 ## Results
 
@@ -116,11 +122,14 @@ window. See `assertions.tsv`, `post-exit.log` and `post-exit-duration.tsv` in th
 
 ### Repetitions and latency
 
-| Count | Passed |        p50 |        p95 |        p99 |        Min |        Max |
-|------:|-------:|-----------:|-----------:|-----------:|-----------:|-----------:|
-|    30 |     30 | 285.287 ms | 392.271 ms | 410.242 ms | 222.859 ms | 660.293 ms |
+| Environment            | Count | Passed |         p50 |         p95 |         p99 |         Min |         Max |
+|------------------------|------:|-------:|------------:|------------:|------------:|------------:|------------:|
+| macOS/LinuxKit aarch64 |    30 |     30 |  285.287 ms |  392.271 ms |  410.242 ms |  222.859 ms |  660.293 ms |
+| Ubuntu/LinuxKit x86_64 |    30 |     30 | 5142.922 ms | 6166.546 ms | 6280.791 ms | 4274.080 ms | 6547.394 ms |
 
-This is end-to-end `docker run` latency, including container startup and a 1 ms workload, not only supervisor overhead.
+This is end-to-end `docker run` latency, including container startup, Docker CLI/daemon transport and a 1 ms workload,
+not only supervisor overhead. Ubuntu's much larger values are operational environment measurements and do not appear in
+the internal signal-to-exit distribution.
 
 ### Signal-to-exit latency
 
@@ -130,11 +139,32 @@ transport latency:
 | Environment            | Count | Passed |      p50 |      p95 |      p99 |      Min |      Max |
 |------------------------|------:|-------:|---------:|---------:|---------:|---------:|---------:|
 | macOS/LinuxKit aarch64 |    30 |     30 | 0.594 ms | 1.194 ms | 2.010 ms | 0.330 ms | 2.194 ms |
-| Ubuntu/LinuxKit x86_64 |     — |      — |        — |        — |        — |        — |        — |
+| Ubuntu/LinuxKit x86_64 |    30 |     30 | 1.767 ms | 2.137 ms | 2.187 ms | 0.612 ms | 2.398 ms |
 
-Ubuntu signal-to-exit statistics are not present in the submitted result set because that run predates this measurement.
-They must be collected by rerunning `run-extended-bench.sh` with fingerprint
-`a8042a6b12b8d659f701125584223373a934186d45fdeae2e64f89f6362c05f2`.
+The same internal signal-to-exit measurement passed all 30 samples in both environments. Ubuntu was slower at p50/p95,
+but both distributions remained below 2.4 ms maximum in these LinuxKit runs.
+
+### Cross-environment confirmation
+
+| Metric                                   | macOS/LinuxKit aarch64 | Ubuntu/LinuxKit x86_64 |
+|------------------------------------------|-----------------------:|-----------------------:|
+| Core cases passed                        |                    8/8 |                    8/8 |
+| Core post-exit assertions passed         |                    6/6 |                    6/6 |
+| Lifecycle repetitions passed             |                  30/30 |                  30/30 |
+| Signal-to-exit repetitions passed        |                  30/30 |                  30/30 |
+| Configured 2s post-exit internal elapsed |            2005.003 ms |            2001.432 ms |
+| Compose restart count / lifecycles       |                  1 / 2 |                  1 / 2 |
+| Restart scrape invariant assertions      |                    5/5 |                    5/5 |
+| Restart scrapes HTTP 200 / gaps          |                5 / 145 |                6 / 144 |
+| Restart first / second epoch observed    |           true / false |           true / false |
+| TERM / KILL / container-OOM exit         |        143 / 137 / 137 |        143 / 137 / 137 |
+| Container-OOM assertions                 |                    4/4 |                    4/4 |
+| Post-exit grid cases                     |                    6/6 |                    6/6 |
+| 1000-attempt storm duration              |            1137.820 ms |            6263.921 ms |
+| 1000-attempt storm log size              |              175,585 B |              194,501 B |
+
+Timing-dependent scrape visibility is included as an observation only. It is not required to match across environments
+and does not determine scenario pass/fail.
 
 ### Runtime restart behavior
 
@@ -198,7 +228,7 @@ intentional restart delay/backoff.
 
 ### MetricShell should run exactly one workload execution
 
-Supported in the current environment. Single execution preserved success, failure, TERM, KILL, container-OOM and
+Supported in both tested environments. Single execution preserved success, failure, TERM, KILL, container-OOM and
 start-failure outcomes. All 30 repeated
 single-execution cases passed.
 
@@ -236,7 +266,7 @@ Recommended baseline:
 ## Prototype Limits
 
 - Research code, not production MetricShell.
-- Results cover Docker Desktop/LinuxKit aarch64 only; native Linux and x86_64 remain unverified.
+- Results cover Docker Desktop/LinuxKit on aarch64 and x86_64. Native non-LinuxKit Linux remains unverified.
 - Kubernetes could not run because the configured context has an invalid OAuth refresh token.
 - Docker daemon restart was not attempted because it could disrupt unrelated containers.
 - Disk-full injection was excluded as unsafe and outside focused INV-002 scope.
@@ -252,6 +282,7 @@ Recommended baseline:
 | Benchmark item                          | Status                                                | Evidence                                                           |
 |-----------------------------------------|-------------------------------------------------------|--------------------------------------------------------------------|
 | 30 repetitions with p50/p95/p99         | Covered                                               | `repetitions.tsv`, `latency-stats.tsv`                             |
+| 30 signal-to-exit repetitions           | Covered in both environments                          | `signal-to-exit-latency.tsv`, `signal-to-exit-latency-stats.tsv`   |
 | Docker external restart                 | Covered                                               | core `external_docker_restart.log`                                 |
 | Compose external restart                | Covered                                               | `runtime-restarts.tsv`, `compose-restart.log`                      |
 | Scrapes across restart boundary         | Covered; timing observations separate from invariants | `restart-scrape-assertions.tsv`, `restart-scrape-observations.tsv` |
@@ -259,19 +290,20 @@ Recommended baseline:
 | Post-exit 0, 1, 2, 5, 10 and 30 seconds | Covered                                               | `post-exit-grid.tsv`                                               |
 | Storms at 10, 100 and 1000 attempts     | Covered for rejected internal model                   | `restart-storm.tsv`, `storm-*.log`                                 |
 | Environment metadata                    | Covered                                               | `environment.tsv`                                                  |
-| Native Linux arm64/x86_64               | Not run                                               | Current environment is LinuxKit/aarch64                            |
+| Native Linux arm64/x86_64               | Not run                                               | Both environments use LinuxKit                                     |
 | Kubernetes Job/OnFailure                | Not run                                               | Cluster OAuth token invalid                                        |
 | Docker daemon restart                   | Not run                                               | Unsafe without separate authorization                              |
 | Disk-full injection                     | Not run                                               | Unsafe and outside INV-002 scope                                   |
 | Network partition                       | Not applicable                                        | No remote dependency                                               |
 
 Machine-readable statuses and blockers are in
-[`coverage.tsv`](results/20260721T200406Z-extended/coverage.tsv).
+[`coverage.tsv`](results/20260721T200406Z-extended/coverage.tsv) and
+[`coverage.tsv`](results/20260721T202227Z-extended/coverage.tsv).
 
 ## Conclusion
 
-The INV-002 assumption is confirmed in Docker Desktop/LinuxKit aarch64, but investigation status remains
-`validation in progress` until the corrected fingerprint is confirmed on Ubuntu/LinuxKit x86_64:
+The INV-002 assumption is confirmed by matching-fingerprint Docker Desktop/LinuxKit runs on macOS aarch64 and Ubuntu
+x86_64:
 
 - MetricShell executes exactly one workload per process.
 - One MetricShell process owns one application metric-state epoch.
