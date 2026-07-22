@@ -281,7 +281,7 @@ Equivalent client semantics do not require identical transport semantics.
 
 ### Status
 
-In progress.
+Validation in progress.
 
 ---
 

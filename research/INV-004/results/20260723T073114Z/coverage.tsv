@@ -1,0 +1,8 @@
+benchmark	status	reason
+ubuntu_same_fingerprint	prepared	run the same script unchanged and compare benchmark_code_fingerprint_sha256
+native_linux	not_run	current daemon platform is recorded in environment.tsv
+kubernetes	not_applicable	metric-state semantics are transport/runtime independent in this experiment
+crash_between_operations	covered	operations_receiver_restart scenario
+dropped_reordered_duplicate_updates	covered	semantics.tsv
+producer_restart_stale_conflict_multi_producer	covered	semantics.tsv
+scale_and_distribution	covered	benchmarks.tsv and benchmark-stats.tsv
