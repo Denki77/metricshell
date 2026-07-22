@@ -1,0 +1,4 @@
+candidate	count	p50_updates_per_second	p95_updates_per_second	p99_updates_per_second	p50_bytes_per_update
+hybrid_amortized	30	4314971.332	4991317.105	5044581.489	19
+operations	30	4482102.472	5325475.204	5397698.076	6
+snapshot	30	28107.976	36506.903	37231.815	25890

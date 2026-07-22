@@ -1,0 +1,34 @@
+scenario	candidate	topic	expected	actual	result
+snapshot_drop_recovery	snapshot	dropped update	30	30	pass
+snapshot_producer_restart	snapshot	producer epoch	2	2	pass
+snapshot_stale_removal	snapshot	stale series	false	false	pass
+snapshot_multi_producer_counter	snapshot	counter aggregation	12	12	pass
+snapshot_duplicate_sequence	snapshot	ordering	false	false	pass
+snapshot_counter_decrease_rejected	snapshot	counter monotonicity	false	false	pass
+snapshot_type_change_rejected	snapshot	type stability	false	false	pass
+snapshot_new_epoch_lower_counter	snapshot	epoch reset	2	2	pass
+snapshot_histogram_schema_change_rejected	snapshot	histogram schema	false	false	pass
+snapshot_histogram_cumulative_decrease_rejected	snapshot	histogram monotonicity	false	false	pass
+snapshot_histogram_new_epoch_reset	snapshot	histogram epoch reset	true	true	pass
+multi_histogram_compatible	snapshot	component-wise histogram aggregation	buckets=1,4,6 count=6 sum=16	buckets=1,4,6 count=6 sum=16	pass
+multi_histogram_schema_mismatch_rejected	snapshot	histogram collision	false	false	pass
+multi_gauge_without_policy_rejected	snapshot	gauge collision	false	false	pass
+multi_gauge_sum_policy	snapshot	explicit gauge policy	3	3	pass
+multi_owner_type_conflict_rejected	snapshot	owner type conflict	false	false	pass
+absolute_drop_recovery	absolute	later absolute value	9	9	pass
+absolute_counter_decrease	absolute	counter monotonicity	>=10	7	fail
+absolute_multi_producer_collision	absolute	last writer wins	3	2	fail
+operations_drop	operations	lost increment	3	2	fail
+operations_gap_detected	operations	sequence gap	true	true	pass
+operations_late_does_not_repair_gap	operations	late operation	false	false	pass
+operations_duplicate_no_gap	operations	duplicate	false	false	pass
+operations_conflict_sequence_reusable	operations	transactional sequence	2	2	pass
+operations_receiver_restart	operations	state recovery	5	0	fail
+operations_multi_producer	operations	commutative increments	5	5	pass
+operation_old_epoch_rejected	operations	producer epoch	false	false	pass
+operation_new_epoch_requires_snapshot	operations	initial snapshot gate	false	false	pass
+operation_after_new_epoch_snapshot_accepted	operations	initial snapshot gate	1	1	pass
+hybrid_snapshot_clears_incomplete	hybrid	snapshot reconciliation	false	false	pass
+hybrid_loss_reconciliation	hybrid	snapshot repair	3	3	pass
+hybrid_receiver_restart	hybrid	snapshot recovery	3	3	pass
+hybrid_stale_removal	hybrid	complete owner snapshot	false	false	pass
