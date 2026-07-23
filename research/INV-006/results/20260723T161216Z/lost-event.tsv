@@ -1,0 +1,7 @@
+filesystem	strategy	initial_observed	event_dropped	final_observed	expected_final_observed	result
+layer	inotify	true	true	false	false	pass
+layer	hybrid	true	true	true	true	pass
+tmpfs	inotify	true	true	false	false	pass
+tmpfs	hybrid	true	true	true	true	pass
+volume	inotify	true	true	false	false	pass
+volume	hybrid	true	true	true	true	pass

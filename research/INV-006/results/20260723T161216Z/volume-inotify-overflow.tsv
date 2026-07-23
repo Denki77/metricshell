@@ -1,0 +1,2 @@
+updates	final_observed	produce_ms	total_ms	cpu_ms	reads	parse_errors	watch_invalidations	queue_overflows	result
+20000	true	1476.801	1478.010	2114.692	27974	0	0	1	pass
