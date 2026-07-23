@@ -1,0 +1,12 @@
+key	value
+run_date_utc	2026-07-23T15:30:05Z
+repository_head_sha	11bc6e3111e81dfd1a81a03aa4e6bea27968300b
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	71eb92f8d9eb1fd400f040706197d2d8edd7f84c9580bf61cbdf66621d0002b1
+docker_server_version	29.4.3
+docker_os	Docker Desktop
+docker_architecture	aarch64
+container_kernel	Linux 4ce68882d8f7 6.12.76-linuxkit #1 SMP Fri May  1 14:35:41 UTC 2026 aarch64 Linux
+cpu_limit	2
+memory_limit_mib	512

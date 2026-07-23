@@ -326,7 +326,7 @@ Which ingestion transports should be supported in the first stable release, and 
 
 ### Status
 
-Not started.
+In progress.
 
 ---
 
