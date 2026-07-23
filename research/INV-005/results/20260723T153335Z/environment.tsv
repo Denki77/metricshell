@@ -1,0 +1,12 @@
+key	value
+run_date_utc	2026-07-23T15:34:21Z
+repository_head_sha	e55cd27987c584cc2246e4796c0e5111ecdf29f7
+benchmark_scope_diff_clean	true
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	71eb92f8d9eb1fd400f040706197d2d8edd7f84c9580bf61cbdf66621d0002b1
+docker_server_version	27.4.0
+docker_os	Docker Desktop
+docker_architecture	x86_64
+container_kernel	Linux 3ed00d1e470f 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+cpu_limit	2
+memory_limit_mib	512
