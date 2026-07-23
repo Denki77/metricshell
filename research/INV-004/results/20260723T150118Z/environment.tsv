@@ -1,0 +1,13 @@
+key	value
+run_date_utc	2026-07-23T15:12:40Z
+repository_head_sha	8e3e97f6da9ecd72c72ea839807b6901b085934d
+benchmark_code_fingerprint_sha256	e52784470ff33e35fb58ab142be26a345bb6a373bd2eac58666b269f56875fd6
+benchmark_scope_diff_clean	true
+benchmark_scope_untracked_count	0
+docker_server_version	27.4.0
+docker_platform	linux/x86_64 ncpu=8 memory=3937574912
+container_kernel	Linux 5eceb979c1ee 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+container_go_version	Usage of /usr/local/bin/inv004:
+image_id	sha256:387374eb2738c927e4aaacad7556ff4e36fb3802f2d854866478f58f427ef955
+image_repo_digest	metricshell-inv004@sha256:387374eb2738c927e4aaacad7556ff4e36fb3802f2d854866478f58f427ef955
+repeat_count	30
