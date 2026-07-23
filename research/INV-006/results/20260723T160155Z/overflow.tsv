@@ -1,0 +1,7 @@
+filesystem	strategy	updates	final_observed	queue_overflows	result
+layer	inotify	20000	true	1	pass
+layer	hybrid	20000	true	1	pass
+tmpfs	inotify	20000	true	0	pass
+tmpfs	hybrid	20000	true	0	pass
+volume	inotify	20000	true	1	pass
+volume	hybrid	20000	true	1	pass

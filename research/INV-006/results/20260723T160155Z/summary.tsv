@@ -1,0 +1,9 @@
+metric	value
+correctness_cases	162
+correctness_passed	162
+correctness_failed	0
+performance_rows_with_misses	1
+burst_rows_failed	0
+overflow_rows_failed	0
+overflow_rows_observed	4
+lost_event_rows_failed	0
