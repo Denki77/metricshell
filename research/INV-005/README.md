@@ -1,7 +1,7 @@
 # INV-005 — Ingestion Transport Comparison
 
-Status: in progress  
-Reference run: `results/20260723T152957Z`
+Status: completed
+Reference runs: `results/20260723T152957Z`, `results/20260723T153335Z`
 Report: [report.md](report.md)
 
 ## Question
@@ -40,11 +40,17 @@ by scenario wall time; percentiles remain per-operation latency.
 
 ## Results
 
-The macOS Docker Desktop/LinuxKit aarch64 run emitted all 52 cells. All publish-only and acknowledged API operations
-completed. Consumer-observed delivered 17,482/17,500 exact publications. The 18 superseded publications were six each
-in the four-producer file, shared-memory and mmap snapshot cells; Unix stream and datagram observed every publication.
+Both matching-fingerprint Docker Desktop/LinuxKit runs emitted all 52 cells and passed all 15/15 assertions and 20/20
+observation contracts. All publish-only and acknowledged API operations completed. Consumer-observed delivered
+17,482/17,500 exact publications in each environment. The 18 superseded publications were six each in the
+four-producer file, shared-memory and mmap snapshot cells; Unix stream and datagram observed every publication.
 
-64 B, single-producer results:
+| Environment              | Architecture | Docker | Kernel           | Result set         | Fingerprint     |
+|--------------------------|--------------|--------|------------------|--------------------|-----------------|
+| Docker Desktop on macOS  | aarch64      | 29.4.3 | LinuxKit 6.12.76 | `20260723T152957Z` | `71eb92f8…02b1` |
+| Docker Desktop on Ubuntu | x86_64       | 27.4.0 | LinuxKit 6.10.14 | `20260723T153335Z` | `71eb92f8…02b1` |
+
+64 B, single-producer macOS results:
 
 | Transport     | Profile           |     ops/s | p50 µs | p95 µs |  p99 µs |
 |---------------|-------------------|----------:|-------:|-------:|--------:|
@@ -62,21 +68,24 @@ in the four-producer file, shared-memory and mmap snapshot cells; Unix stream an
 | mmap          | publish-only      | 5,943,536 |  0.042 |  0.084 |   0.084 |
 | mmap          | consumer-observed | 1,030,486 |  0.500 |  1.417 |   7.458 |
 
+Ubuntu 64 B single-producer figures and every payload/multi-producer cell are recorded in
+`results/20260723T153335Z/summary.tsv`.
+
 ## Conclusion
 
-Provisional: retain file snapshot, Unix stream and loopback HTTP as serious first-release candidates. Unix datagram is
-an optional unacknowledged adapter. Do not choose gRPC, shared memory or mmap from throughput alone. Snapshot
-transports need explicit “latest state may supersede intermediate state” semantics.
+Support file snapshot, Unix stream and loopback HTTP in the first stable release. Treat Unix datagram as an optional,
+explicitly unacknowledged adapter. Do not include gRPC, shared memory or mmap in the first stable transport set.
+Snapshot transports use latest-state semantics and may supersede intermediate concurrent publications.
 
-Status remains in progress until an identical-fingerprint Ubuntu run and deeper crash/backpressure tests are recorded.
+The conclusion is confirmed across matching-fingerprint LinuxKit aarch64 and x86_64 environments.
 
 ## Decision Output
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Raw evidence: `results/20260723T152957Z/`
+- Raw evidence: `results/20260723T152957Z/`, `results/20260723T153335Z/`
 - Report: [report.md](report.md)
-- No ADR before Ubuntu confirmation.
+- ADR: [ADR-005](../../docs/06-architecture/adr/ADR-005.md)
 
 ## Running the Prototype
 
@@ -100,7 +109,7 @@ incomplete.
 
 ## Prototype Limits
 
-- Current evidence is macOS/LinuxKit aarch64; Ubuntu remains pending.
+- Both tested container environments use LinuxKit. Native non-LinuxKit Linux remains unverified.
 - The independent consumer is a separate goroutine, not a separate OS process.
 - Consumer-observed uses a benchmark control-plane tracker; it is not a transport acknowledgement.
 - File polling is a tight research loop, not the INV-006 inotify/reconciliation design.
@@ -122,9 +131,8 @@ Covered:
 - benchmark fingerprint including `prototype/` and `run-bench.sh`;
 - dirty/untracked benchmark-scope metadata.
 
-Still required:
+Future follow-up:
 
-- unchanged-fingerprint Ubuntu run;
 - separate-process consumer confirmation;
 - producer/consumer crash, restart, slow consumer, backlog saturation and sustained datagram-loss injection;
 - CPU/RSS/cgroup sampling and repeated cold/warm runs;
