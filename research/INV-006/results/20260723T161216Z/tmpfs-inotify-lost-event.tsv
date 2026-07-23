@@ -1,0 +1,2 @@
+strategy	initial_observed	event_dropped	final_observed	expected_final_observed	result
+inotify	true	true	false	false	pass

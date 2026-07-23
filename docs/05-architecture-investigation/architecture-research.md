@@ -406,7 +406,7 @@ invalidation and atomic rename behavior.
 
 ### Status
 
-Not started.
+Completed.
 
 ---
 

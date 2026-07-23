@@ -1,0 +1,2 @@
+updates	observed	missed	p50_ms	p95_ms	p99_ms	max_ms	wall_ms	cpu_ms	cpu_percent	reads	parse_errors	watch_invalidations	queue_overflows
+30	30	0	99.994	100.138	100.581	101.677	2901.342	20.640	0.711	30	0	0	0

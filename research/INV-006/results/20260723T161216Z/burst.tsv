@@ -1,0 +1,13 @@
+filesystem	strategy	interval_ms	updates	final_observed	produce_ms	total_ms	cpu_ms	reads	parse_errors	watch_invalidations	queue_overflows	result
+layer	poll	100ms	10000	true	852.735	901.945	853.459	10	0	0	0	pass
+layer	inotify	1s	10000	true	916.126	917.555	1668.471	26400	0	0	0	pass
+layer	hybrid	100ms	10000	true	998.234	999.605	1671.334	26575	0	0	0	pass
+layer	hybrid	1s	10000	true	912.745	914.088	1642.373	27269	0	0	0	pass
+tmpfs	poll	100ms	10000	true	231.975	301.393	239.292	4	0	0	0	pass
+tmpfs	inotify	1s	10000	true	256.453	257.906	524.058	11873	0	0	0	pass
+tmpfs	hybrid	100ms	10000	true	244.172	245.317	496.125	11849	0	0	0	pass
+tmpfs	hybrid	1s	10000	true	248.043	249.132	505.394	11603	0	0	0	pass
+volume	poll	100ms	10000	true	742.065	801.732	742.292	9	0	0	0	pass
+volume	inotify	1s	10000	true	874.664	875.785	1571.787	26069	0	0	0	pass
+volume	hybrid	100ms	10000	true	794.387	795.736	1444.418	25738	0	0	0	pass
+volume	hybrid	1s	10000	true	937.803	938.921	1631.554	25587	0	0	0	pass

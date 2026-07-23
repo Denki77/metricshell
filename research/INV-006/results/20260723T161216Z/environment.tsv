@@ -1,0 +1,14 @@
+key	value
+run_date_utc	2026-07-23T16:33:29Z
+repository_head_sha	721f8fc5be80e6cbe0aaeda8d8ab49110e158de9
+benchmark_scope_diff_clean	true
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	4238d6e1be961e2d864ccfc95c763c1c9a03365c74d9c868e38f1b0d96eb1580
+image_id	sha256:9e4b8c008d8cbe2a14564ca81c85cbbeaea46477693b27c801c82acc0bb5f207
+docker_server_version	27.4.0
+docker_os	Docker Desktop
+docker_architecture	x86_64
+container_kernel	Linux c936ae331ae0 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+container_image_architecture	amd64
+repetitions	3
+require_real_overflow	0
