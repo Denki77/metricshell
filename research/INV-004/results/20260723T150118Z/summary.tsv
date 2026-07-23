@@ -1,0 +1,6 @@
+metric	value
+scenarios	33
+confirmations	29
+counterexamples	4
+assertions_failed	0
+benchmark_rows	129
