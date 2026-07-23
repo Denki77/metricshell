@@ -1,0 +1,3 @@
+case	scrape_delay_ms	http_result	http_elapsed_ms	post_term_http_code	normal_post_term_scrape	shutdown_ms	result
+fits	100	drained	0.102	000	false	422.082	pass
+overruns	1500	timeout	700.585	000	false	700.945	pass

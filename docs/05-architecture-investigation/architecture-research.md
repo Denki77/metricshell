@@ -220,7 +220,7 @@ Measure:
 
 ### Status
 
-Not started.
+[Completed](../../research/INV-003/report.md).
 
 ---
 

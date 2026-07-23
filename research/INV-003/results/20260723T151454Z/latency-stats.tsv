@@ -1,0 +1,2 @@
+count	passed	p50_ms	p95_ms	p99_ms	min_ms	max_ms
+30	30	7.767	8.682	8.941	6.275	9.168

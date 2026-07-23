@@ -99,7 +99,7 @@ Architecture investigation may refine how these capabilities are implemented.
 |---------|-------------------------------------------------------------|-------------|---------------------------------------------|----------------------------------------------|
 | INV-001 | [PID 1 and process model](architecture-research.md#INV-001) | Completed   | [INV-001](../../research/INV-001/README.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
 | INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | Completed   | [INV-002](../../research/INV-002/README.md) | [ADR-002](../06-architecture/adr/ADR-002.md) |
-| INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Not started | —                                           | —                                            |
+| INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Completed   | [INV-003](../../research/INV-003/README.md) | [ADR-003](../06-architecture/adr/ADR-003.md) |
 | INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Not started | —                                           | —                                            |
 | INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Not started | —                                           | —                                            |
 | INV-006 | [File ingestion](architecture-research.md#INV-006)          | Not started | —                                           | —                                            |

@@ -1,0 +1,14 @@
+benchmark	status	evidence_or_reason
+mandatory_shutdown_grid	covered	generated TSV and raw logs
+grid_explicit_assertions	covered	generated TSV and raw logs
+policy_comparison	covered	generated TSV and raw logs
+absolute_deadline	covered	generated TSV and raw logs
+budget_overflow	covered	generated TSV and raw logs
+repeated_latency	covered	generated TSV and raw logs
+http_admission_and_active_drain	covered	generated TSV and raw logs
+forced_kill	covered	generated TSV and raw logs
+finalization_timing	covered	generated TSV and raw logs
+external_docker_deadline	covered	generated TSV and raw logs
+termination_post_exit_policy	covered	generated TSV and raw logs
+native_ubuntu	prepared_not_run	run the same run-bench.sh command; current daemon fingerprint is recorded
+kubernetes	not_run	INV-003 asks for Docker; Kubernetes deadline injection is runtime-specific

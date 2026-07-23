@@ -1,0 +1,11 @@
+key	value
+run_date_utc	2026-07-23T15:07:03Z
+host_os	Darwin
+repository_head_sha	611261f1752f1ed3afb218d3b06001b3a84b8192
+benchmark_code_fingerprint_sha256	27e8a991546667f92abb5965c044b834c1583f710cbb060dfef81174b29bb53c
+docker_server_version	29.4.3
+docker_info	linux/aarch64 kernel=6.12.76-linuxkit ncpu=6 memory=8322269184 driver=overlay2
+container_kernel	Linux e7e45422cf54 6.12.76-linuxkit #1 SMP Fri May  1 14:35:41 UTC 2026 aarch64 Linux
+image_id	sha256:bf98ebc29381b8b040dc6a645ac0e739a55d0848cf1292676132d03ecdf744ce
+image_repo_digest	
+repeat_count	30
