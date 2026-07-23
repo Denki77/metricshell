@@ -1,7 +1,7 @@
 # INV-006 — File-Based Ingestion
 
-Status: in progress  
-Reference run: `results/20260723T160155Z`
+Status: completed
+Reference runs: `results/20260723T160155Z`, `results/20260723T161216Z`
 Report: [report.md](report.md)
 
 ## Question
@@ -43,29 +43,46 @@ paced matrix covers 128 B, 4 KiB and 1 MiB files and three repetitions.
 
 ## Results
 
-The macOS/LinuxKit aarch64 reference run passed 162/162 correctness assertions. One inotify-only 1 MiB paced sample
-missed one update; hybrid paced tests had no misses. All 10,000-update bursts and all overflow-pressure cases recovered
-the final state. The kernel reported a real queue overflow in four of six overflow-pressure cases. Real overflow count
-is an observation, not a portable pass criterion.
+| Environment           | Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
+|-----------------------|-------:|------------------|--------------|----------------------------|--------------------------------------------------------------------|
+| macOS Docker Desktop  | 29.4.3 | LinuxKit 6.12.76 | aarch64      | `results/20260723T160155Z` | `4238d6e1be961e2d864ccfc95c763c1c9a03365c74d9c868e38f1b0d96eb1580` |
+| Ubuntu Docker Desktop | 27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260723T161216Z` | `4238d6e1be961e2d864ccfc95c763c1c9a03365c74d9c868e38f1b0d96eb1580` |
+
+The macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 reference runs used the same fingerprint and passed every
+portable assertion:
+
+- correctness: 162/162 in each environment;
+- controlled lost-event A/B: 6/6 in each environment;
+- 10,000-update burst convergence: 12/12 in each environment;
+- overflow-pressure final-state recovery: 6/6 in each environment.
+
+Each environment had one inotify-only paced row with one missed intermediate version; hybrid paced tests had no misses.
+The kernel reported a real queue overflow in four of six pressure cases in each environment. Intermediate-version and
+overflow counts are observations, not portable pass criteria.
 
 For 4 KiB files, mean-of-three p95 detection latency was:
 
-| Filesystem | Poll 10 ms | Poll 100 ms |  inotify | Hybrid, reconcile 100 ms | Hybrid, reconcile 1 s |
-|------------|-----------:|------------:|---------:|-------------------------:|----------------------:|
-| Layer      |  11.670 ms |  103.560 ms | 0.879 ms |                 0.825 ms |              1.001 ms |
-| tmpfs      |  11.570 ms |  103.353 ms | 0.604 ms |                 0.489 ms |              0.707 ms |
-| Volume     |  11.786 ms |  103.679 ms | 0.608 ms |                 0.755 ms |              0.646 ms |
+| Environment     | Filesystem | Poll 10 ms | Poll 100 ms |  inotify | Hybrid 100 ms | Hybrid 1 s |
+|-----------------|------------|-----------:|------------:|---------:|--------------:|-----------:|
+| macOS/LinuxKit  | Layer      |  11.670 ms |  103.560 ms | 0.879 ms |      0.825 ms |   1.001 ms |
+| macOS/LinuxKit  | tmpfs      |  11.570 ms |  103.353 ms | 0.604 ms |      0.489 ms |   0.707 ms |
+| macOS/LinuxKit  | Volume     |  11.786 ms |  103.679 ms | 0.608 ms |      0.755 ms |   0.646 ms |
+| Ubuntu/LinuxKit | Layer      |  10.810 ms |  100.778 ms | 1.202 ms |      0.988 ms |   0.785 ms |
+| Ubuntu/LinuxKit | tmpfs      |  10.709 ms |  100.914 ms | 0.896 ms |      0.835 ms |   1.083 ms |
+| Ubuntu/LinuxKit | Volume     |  10.793 ms |  100.889 ms | 0.927 ms |      0.848 ms |   0.843 ms |
 
-Five-second idle CPU was 0.272–0.418% for hybrid with 1 s reconciliation, 0.427–0.553% for hybrid with 100 ms
-reconciliation and 2.593–3.014% for 10 ms polling. These are short container-process measurements, not production
-resource promises.
+Five-second hybrid/1s idle CPU was 0.272–0.418% on macOS/LinuxKit and 0.402–0.438% on Ubuntu/LinuxKit. Polling every
+10 ms measured 2.593–3.014% and 4.496–5.085%, respectively. These are short container-process measurements, not
+production resource promises.
+
+INV-006 has no signal-to-exit metric because the file-ingestion prototype does not supervise or signal a workload.
+Its latency statistic is producer timestamp to observed file update, reported above as p50/p95/p99 detection latency.
 
 ## Hypothesis Evaluation
 
-Provisionally supported on macOS/LinuxKit aarch64. Directory-level inotify gives sub-millisecond p95 detection for
-most 4 KiB cases. In controlled lost-event tests, inotify-only failed to recover without a subsequent event on all
-three filesystems, while hybrid recovered on its reconciliation interval. The Ubuntu matching-fingerprint run is still
-required before the investigation can be completed or an ADR can be accepted.
+Confirmed in matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs. Directory-level inotify gives
+event-speed detection. In controlled lost-event tests, inotify-only failed to recover without a subsequent event on all
+three filesystems in both environments, while hybrid recovered on its reconciliation interval.
 
 ## Acceptable Values
 
@@ -80,9 +97,9 @@ required before the investigation can be completed or an ADR can be accepted.
 
 ## Decision Output
 
-Provisional ADR input: use directory-level inotify plus 1 s reconciliation for container-local files; require
-same-directory atomic rename and last-valid-state retention. Keep status in progress until the identical fingerprint
-is run on Ubuntu and the ADR is prepared.
+Accepted ADR input: use directory-level inotify plus 1 s reconciliation for container-local files; require
+same-directory atomic rename and last-valid-state retention. See
+[ADR-006](../../docs/06-architecture/adr/ADR-006.md).
 
 ## Running the Prototype
 
@@ -123,7 +140,8 @@ docker rm inv006-manual
 ## Prototype Limits
 
 - Research code, not production MetricShell.
-- Current evidence is Docker Desktop/LinuxKit aarch64 only; Ubuntu is not yet recorded.
+- Evidence covers Docker Desktop/LinuxKit on aarch64 and x86_64. Both container environments use LinuxKit; native
+  non-LinuxKit Linux remains unverified.
 - Bind mounts and their host filesystem semantics are intentionally excluded.
 - The runner does not require host bind mounts: evidence is written inside each container and extracted with
   `docker cp`.
@@ -152,7 +170,6 @@ Covered:
 
 Recommended follow-ups:
 
-- run the unchanged fingerprint on Ubuntu with the same command;
 - use 30–100 repetitions on a dedicated idle runner for confidence intervals;
 - add realistic parser/cardinality payloads after the file format is selected;
 - use cgroup CPU and RSS sampling for long 5–15 minute steady-state runs;

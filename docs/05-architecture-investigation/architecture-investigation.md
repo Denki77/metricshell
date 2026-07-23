@@ -102,7 +102,7 @@ Architecture investigation may refine how these capabilities are implemented.
 | INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Completed   | [INV-003](../../research/INV-003/README.md) | [ADR-003](../06-architecture/adr/ADR-003.md) |
 | INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Completed   | [INV-004](../../research/INV-004/README.md) | [ADR-004](../06-architecture/adr/ADR-004.md) |
 | INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Completed   | [INV-005](../../research/INV-005/README.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
-| INV-006 | [File ingestion](architecture-research.md#INV-006)          | In progress | —                                           | —                                            |
+| INV-006 | [File ingestion](architecture-research.md#INV-006)          | Completed   | [INV-006](../../research/INV-006/README.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
 | INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Not started | —                                           | —                                            |
 | INV-008 | [Local push](architecture-research.md#INV-008)              | Not started | —                                           | —                                            |
 | INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Not started | —                                           | —                                            |
