@@ -1,16 +1,16 @@
 # INV-004 Report — Metric-state Ownership and Semantics
 
-Status: validation in progress
+Status: completed
 
-Run date: 2026-07-22
+Run dates: 2026-07-23
 
-Docker server: 29.4.3
+Docker servers: 29.4.3, 27.4.0
 
-Docker platform: linux/aarch64, LinuxKit 6.12.76
+Docker platforms: linux/aarch64, linux/x86_64
 
-Reference run: `results/20260723T073114Z`
+Reference runs: `results/20260723T073114Z`, `results/20260723T150118Z`
 
-Summary: `results/20260723T073114Z/summary.tsv`
+Summaries: `results/20260723T073114Z/summary.tsv`, `results/20260723T150118Z/summary.tsv`
 
 ## Goal
 
@@ -38,13 +38,17 @@ The same command is used on macOS and Ubuntu. Increase repetitions with `INV004_
 
 ## Run Environment
 
-| Environment             |              Date | Docker | Platform         | Result set                 | Fingerprint                                                        |                Result |
-|-------------------------|------------------:|-------:|------------------|----------------------------|--------------------------------------------------------------------|----------------------:|
-| Docker Desktop on macOS |        2026-07-23 | 29.4.3 | LinuxKit/aarch64 | `results/20260723T073114Z` | `e52784470ff33e35fb58ab142be26a345bb6a373bd2eac58666b269f56875fd6` | 34/34 assertions pass |
-| Ubuntu                  | pending execution |      — | —                | —                          | must equal reference                                               |              prepared |
+| Environment             |       Date | Docker | Platform         | Result set                 | Fingerprint                                                        |                Result |
+|-------------------------|-----------:|-------:|------------------|----------------------------|--------------------------------------------------------------------|----------------------:|
+| Docker Desktop on macOS | 2026-07-23 | 29.4.3 | LinuxKit/aarch64 | `results/20260723T073114Z` | `e52784470ff33e35fb58ab142be26a345bb6a373bd2eac58666b269f56875fd6` | 34/34 assertions pass |
+| Ubuntu / LinuxKit       | 2026-07-23 | 27.4.0 | LinuxKit/x86_64  | `results/20260723T150118Z` | `e52784470ff33e35fb58ab142be26a345bb6a373bd2eac58666b269f56875fd6` | 34/34 assertions pass |
 
 The fingerprint covers only benchmark source and runner content with relative names, so it is invariant to checkout
-path and repository HEAD. Environment and image identifiers are separately recorded in `environment.tsv`.
+path and repository HEAD. Both environments recorded the same fingerprint. Environment and image identifiers are
+separately recorded in each `environment.tsv`.
+
+Both runs produced identical `semantics.tsv` and `assertions.tsv`: all 33 named semantic scenarios had their expected
+result and the scenario-set cardinality assertion passed, for 34/34 assertions in each environment.
 
 ## Results
 
@@ -86,6 +90,30 @@ At 4 producers / 1,000 series, intervals 100/1,000/10,000 produced 0.48M/2.30M/2
 shares 85.6%/35.7%/5.9%. These are single sensitivity observations; the non-monotonic 10,000 result demonstrates host
 noise and must not be treated as a stable throughput ordering. Hybrid is measured as an amortized model.
 
+### Cross-environment benchmark statistics
+
+| Candidate                        | Environment            | Repetitions | p50 updates/s | p95 updates/s | p99 updates/s | p50 bytes/update |
+|----------------------------------|------------------------|------------:|--------------:|--------------:|--------------:|-----------------:|
+| Snapshot                         | macOS/LinuxKit aarch64 |          30 |        28,108 |        36,507 |        37,232 |           25,890 |
+| Snapshot                         | Ubuntu/LinuxKit x86_64 |          30 |         6,402 |        16,391 |        20,877 |           25,892 |
+| Operation fast path              | macOS/LinuxKit aarch64 |          30 |     4,482,102 |     5,325,475 |     5,397,698 |                6 |
+| Operation fast path              | Ubuntu/LinuxKit x86_64 |          30 |     2,208,350 |     2,987,775 |     3,274,232 |                6 |
+| Hybrid amortized, interval 1,000 | macOS/LinuxKit aarch64 |          30 |     4,314,971 |     4,991,317 |     5,044,581 |               19 |
+| Hybrid amortized, interval 1,000 | Ubuntu/LinuxKit x86_64 |          30 |     1,970,287 |     2,391,584 |     2,954,448 |               19 |
+
+| Scale/sensitivity case                           |                         macOS/LinuxKit |                        Ubuntu/LinuxKit |
+|--------------------------------------------------|---------------------------------------:|---------------------------------------:|
+| Snapshot, 16 producers / 10k series              |      249 updates/s; 3,822,541 B/update |      216 updates/s; 3,822,694 B/update |
+| Operation fast path, 16 producers / 10k series   |           4.16M updates/s; 34 B/update |           1.81M updates/s; 34 B/update |
+| Hybrid interval 1,000, 16 producers / 10k series | 0.335M updates/s; 83.1% reconciliation | 0.331M updates/s; 85.3% reconciliation |
+| Hybrid interval 100, 4 producers / 1k series     | 0.476M updates/s; 85.6% reconciliation | 0.331M updates/s; 84.7% reconciliation |
+| Hybrid interval 1,000, 4 producers / 1k series   |  2.30M updates/s; 35.7% reconciliation |  1.15M updates/s; 34.5% reconciliation |
+| Hybrid interval 10,000, 4 producers / 1k series  |   2.05M updates/s; 5.9% reconciliation |   2.10M updates/s; 7.2% reconciliation |
+
+Signal-to-exit latency is not an INV-004 metric: this prototype does not launch or signal a workload and generates no
+signal-to-exit evidence. That lifecycle measurement belongs to INV-001/INV-002. The Ubuntu statistics relevant to
+INV-004 are the throughput, allocation and reconciliation measurements above.
+
 ## Evaluation Against Criteria
 
 | Criterion                    | Snapshot                | Absolute           | Operations                          | Hybrid                         |
@@ -118,7 +146,7 @@ state, transactional conflict rejection, operation epoch transitions, snapshot m
 aggregation, gauge/type/histogram ownership conflicts, and hybrid reconciliation intervals 100/1,000/10,000.
 `semantics.tsv` and `assertions.tsv` record the individual contracts; `coverage.tsv` records the high-level groups.
 
-The next higher-confidence run should use a quiet native Ubuntu host with 100 repetitions and fixed CPU/memory. Real
+For higher-confidence performance sizing, use a quiet native Linux host with 100 repetitions and fixed CPU/memory. Real
 transport encodings, histogram bucket scaling, crash-safe persistence, disk-full behavior and hostile cardinality are
 not hidden agreements: they are explicit follow-up measurements for INV-005–009 because they cannot be measured
 honestly by a transport-free semantic model.
@@ -126,7 +154,11 @@ honestly by a transport-free semantic model.
 ## Limitations
 
 - Research-only in-memory Go model; no production protocol or durable store.
-- Current timing evidence is one macOS-hosted LinuxKit/aarch64 Docker environment.
+- Both measured container environments use LinuxKit: macOS/LinuxKit `linux/aarch64` and Ubuntu/LinuxKit
+  `linux/x86_64`. Native non-LinuxKit Linux, containerd/CRI-O and Kubernetes remain unverified.
+- The runner recorded the prototype help banner in `container_go_version` rather than the build-stage Go version in
+  both environments. This malformed informational field is excluded from all evidence comparisons; source identity is
+  established by the matching benchmark fingerprint.
 - Docker image tags may resolve to different base image digests later; compare benchmark fingerprint and recorded image
   provenance, or archive/promote the built image for byte-identical reruns.
 - Synthetic throughput isolates ownership data structures and excludes serialization, syscalls and network/filesystem
@@ -134,9 +166,10 @@ honestly by a transport-free semantic model.
 
 ## Conclusion
 
-The macOS/LinuxKit evidence partially confirms the original hypothesis. Different transports may use different
-representations, but they must converge on one authoritative semantic model. Provisionally select hybrid semantics:
+The matching-fingerprint macOS/LinuxKit and Ubuntu/LinuxKit evidence confirms the refined hypothesis. Different
+transports may use different representations, but they must converge on one authoritative semantic model. Select hybrid
+semantics:
 versioned complete per-producer snapshots own truth; sequenced/deduplicated operations are optional acceleration;
 reconciliation is mandatory after gaps and restart and for final state. Operations-only ownership and unowned absolute
-counters are rejected by the current evidence. Completion and final ADR input remain gated on the matching-fingerprint
-Ubuntu validation run.
+counters are rejected by the evidence in both environments. The decision is recorded in
+[ADR-004](../../docs/06-architecture/adr/ADR-004.md).

@@ -1,8 +1,8 @@
 # INV-004 — Metric-state Ownership and Semantics
 
-Status: validation in progress
+Status: completed
 
-Reference run: `results/20260723T073114Z`
+Reference runs: `results/20260723T073114Z`, `results/20260723T150118Z`
 
 Report: [report.md](report.md)
 
@@ -36,9 +36,14 @@ runs all candidate combinations at 1/4/16 producers and 1/100/1,000/10,000 serie
 
 ## Results
 
-Reference run `results/20260723T073114Z` recorded 33 scenarios, 29 confirmed invariants and four expected
-counterexamples, with 0 failed per-scenario assertions and 129 benchmark rows. The benchmark-code fingerprint is
+Both reference runs recorded 33 scenarios, 29 confirmed invariants and four expected counterexamples, with 0 failed
+per-scenario assertions and 129 benchmark rows each. The shared benchmark-code fingerprint is
 `e52784470ff33e35fb58ab142be26a345bb6a373bd2eac58666b269f56875fd6`.
+
+| Environment       | Result set                 | Docker platform | Assertions | Snapshot p50 | Operation p50 | Hybrid p50 |
+|-------------------|----------------------------|-----------------|-----------:|-------------:|--------------:|-----------:|
+| macOS / LinuxKit  | `results/20260723T073114Z` | `linux/aarch64` | 34/34 pass |     28,108/s |       4.48M/s |    4.31M/s |
+| Ubuntu / LinuxKit | `results/20260723T150118Z` | `linux/x86_64`  | 34/34 pass |      6,402/s |       2.21M/s |    1.97M/s |
 
 - Complete per-producer snapshots recovered from a dropped intermediate update and receiver/producer epoch changes,
   removed stale series, rejected duplicate sequence numbers and aggregated two owners deterministically.
@@ -66,9 +71,9 @@ counterexamples, with 0 failed per-scenario assertions and 129 benchmark rows. T
 
 ## Conclusion
 
-The macOS/LinuxKit evidence partially confirms and refines the initial hypothesis: transport representation may differ,
-but application-level truth must not. Provisionally select the hybrid model with **complete, versioned, per-producer
-snapshots as the authoritative state**, pending the matching-fingerprint Ubuntu validation run.
+The matching-fingerprint macOS/LinuxKit and Ubuntu/LinuxKit evidence confirms and refines the initial hypothesis:
+transport representation may differ, but application-level truth must not. Select the hybrid model with **complete,
+versioned, per-producer snapshots as the authoritative state**.
 Operations may be supported only as a performance adapter between snapshots; they cannot be the sole durable truth.
 
 Reject unowned absolute counter values and operation-only recovery. Gauges may use absolute `set`, but still require an
@@ -132,12 +137,12 @@ docker run --rm metricshell-inv004:prototype \
 Set `INV004_REPEAT_COUNT=100` for a longer distribution run. The runner only removes containers named `inv004-*` and
 writes a fresh UTC result directory.
 
-## Ubuntu Fingerprint
+## Cross-environment Fingerprint
 
 The runner hashes normalized relative names and contents of `prototype/` plus `run-bench.sh`; it does not include the
-host path, repository HEAD, timestamps or results. Therefore the same unmodified checkout produces one
-`benchmark_code_fingerprint_sha256` on macOS and Ubuntu. Compare that field in `environment.tsv` before comparing
-measurements. `container_kernel`, Docker platform, image ID and repository HEAD remain provenance, not code identity.
+host path, repository HEAD, timestamps or results. Both completed runs produced fingerprint
+`e52784470ff33e35fb58ab142be26a345bb6a373bd2eac58666b269f56875fd6`. `container_kernel`, Docker platform, image ID
+and repository HEAD remain provenance, not code identity.
 
 ## Prototype Limits
 
@@ -146,8 +151,10 @@ measurements. `container_kernel`, Docker platform, image ID and repository HEAD 
   not service SLOs.
 - Crash-safe disk persistence, wire encoding, authentication and hostile cardinality are deferred to transport/security
   investigations.
-- The current measured host is Docker Desktop/LinuxKit aarch64. An Ubuntu run is prepared with the same fingerprint but
-  must be executed on that environment before claiming cross-host timing parity.
+- Both measured container environments use LinuxKit: macOS/LinuxKit `linux/aarch64` and Ubuntu/LinuxKit
+  `linux/x86_64`. Native non-LinuxKit Linux, containerd/CRI-O and Kubernetes remain unverified.
+- `container_go_version` in both historical `environment.tsv` files contains the prototype help banner rather than a
+  Go toolchain version; it is not used for fingerprint, correctness or performance comparisons.
 - Gauge aggregation is intentionally rejected unless configured because sum/last/max have different meanings.
 
 ## Additional Benchmarks
@@ -158,7 +165,7 @@ counter/gauge/histogram behavior; explicit gap state; transactional conflict rej
 100/1,000/10,000; 30-run p50/p95/p99 throughput; allocation per update; and the
 macOS/Ubuntu path-independent fingerprint.
 
-For stronger follow-up evidence, run `INV004_REPEAT_COUNT=100` on a quiet native Ubuntu host, pin CPU/memory, record
+For stronger performance evidence, run `INV004_REPEAT_COUNT=100` on a quiet native Linux host, pin CPU/memory, record
 `docker stats`, and add real encodings/transports. Histogram bucket-count scaling, fsync/WAL recovery, cardinality
 limits, payload compression and concurrent ingestion belong in INV-005–009 because this prototype deliberately
 isolates semantics from transport.
@@ -167,7 +174,7 @@ isolates semantics from transport.
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Raw evidence: `results/20260723T073114Z/`
+- Raw evidence: `results/20260723T073114Z/`, `results/20260723T150118Z/`
 - Detailed report: [report.md](report.md)
-- Provisional ADR input: authoritative versioned per-producer snapshots with optional sequenced operations and
-  mandatory reconciliation; finalize after Ubuntu validation.
+- Decision: [ADR-004](../../docs/06-architecture/adr/ADR-004.md) — authoritative versioned per-producer snapshots with
+  optional sequenced operations and mandatory reconciliation.
