@@ -1,0 +1,6 @@
+probe	expected	actual	result
+missing_unix_socket_rejected	error	true	pass
+http_connection_refused	error	true	pass
+cross_filesystem_rename_rejected	error	true	pass
+mmap_length_unchanged_after_grow	true	true	pass
+unix_datagram_max_accepted_bytes	>0	212960	pass
