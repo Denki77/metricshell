@@ -220,7 +220,7 @@ Measure:
 
 ### Status
 
-In progress.
+[Completed](../../research/INV-003/report.md).
 
 ---
 

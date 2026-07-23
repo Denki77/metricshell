@@ -1,8 +1,8 @@
 # INV-003 — Shutdown Time Budgeting
 
-Status: completed for Docker Desktop/LinuxKit; native Ubuntu confirmation prepared
+Status: completed
 
-Reference run: `results/20260723T150539Z`
+Reference runs: `results/20260723T150539Z`, `results/20260723T151454Z`
 
 Report: [report.md](report.md)
 
@@ -37,9 +37,10 @@ skipped after external termination begins.
 
 ## Results
 
-All 20 mandatory grid cases and every additional assertion passed on Docker Desktop/LinuxKit aarch64. Workloads after
-the deadline and workloads ignoring TERM were killed with exit `137`; earlier workloads exited `0`. MetricShell always
-emitted `shutdown_complete` before the configured deadline.
+All 20 mandatory grid cases, all 210 grid assertions, all 30 repeated shutdown cases and every additional result check
+passed in both environments: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Workloads after the deadline and
+workloads ignoring TERM were killed with exit `137`; earlier workloads exited `0`. MetricShell always emitted
+`shutdown_complete` before the configured deadline.
 
 | Window | Workload budget | Reserve | Just-before total | Forced total | Result |
 |-------:|----------------:|--------:|------------------:|-------------:|--------|
@@ -49,9 +50,18 @@ emitted `shutdown_complete` before the configured deadline.
 |   30 s |            28 s |     2 s |      27935.941 ms | 28062.445 ms | pass   |
 |   60 s |            58 s |     2 s |      57941.380 ms | 58078.702 ms | pass   |
 
-All explicit assertions in `shutdown-grid-assertions.tsv` passed: exit semantics, forced state, lifecycle marker counts,
-budget-expiry count, total deadline, finalization cap, HTTP cap and no early forced kill. The 30-run p50/p95/p99 was
-`6.825/7.710/7.986 ms`.
+All explicit assertions in `shutdown-grid-assertions.tsv` passed in both environments: exit semantics, forced state,
+lifecycle marker counts, budget-expiry count, total deadline, finalization cap, HTTP cap and no early forced kill.
+
+| Environment            | Passed | Signal-to-exit p50/p95/p99 |        Min/max |
+|------------------------|-------:|---------------------------:|---------------:|
+| macOS/LinuxKit aarch64 |  30/30 |       6.825/7.710/7.986 ms | 5.609/9.092 ms |
+| Ubuntu/LinuxKit x86_64 |  30/30 |       7.767/8.682/8.941 ms | 6.275/9.168 ms |
+
+Both runs recorded benchmark fingerprint
+`27e8a991546667f92abb5965c044b834c1583f710cbb060dfef81174b29bb53c`.
+For this benchmark, signal-to-exit is measured from TERM handling through complete MetricShell shutdown, including the
+configured 5 ms synthetic finalization.
 
 The absolute-deadline cases measured `4955 ms` fully available, `3930 ms` after deliberate grace consumption,
 `194 ms` nearly expired, `0 ms` expired and `421 ms` when reserve exceeded remaining time. Workload budget was computed
@@ -63,7 +73,7 @@ used smaller internal totals of 750 ms and 4 s, leaving safety margins of `472.1
 
 ## Conclusion
 
-The hypothesis is supported in the measured environment. Use explicit independent values as the configuration model,
+The hypothesis is confirmed in both measured environments. Use explicit independent values as the configuration model,
 but validate them against one known total grace/deadline. Fixed reserve is a useful deployment-derived default;
 percentage-only policy is rejected because its absolute safety margin becomes too small for short windows and wasteful
 for long ones. Absolute deadline is best when the runtime can supply it reliably.
@@ -77,8 +87,7 @@ for long ones. Absolute deadline is best when the runtime can supply it reliably
 - Bound HTTP drain separately and cap every phase by the absolute remaining deadline.
 - Do not perform configurable post-exit scrape waiting after TERM/INT; only drain requests already active.
 - Force-killed workload outcome remains `137`; MetricShell must still finalize and exit within its reserve.
-- Treat these as researched starting values, not cross-platform guarantees, until the matching-fingerprint Ubuntu run
-  is collected.
+- Treat these as confirmed starting values for the two tested LinuxKit environments, not universal runtime guarantees.
 
 ## Running the Prototype
 
@@ -133,12 +142,13 @@ runner works with Docker Desktop and native Ubuntu daemon path/security rules.
 ## Prototype Limits
 
 - This is research code, not production MetricShell; finalization is a controlled synthetic delay.
-- The reference environment is Docker Desktop/LinuxKit aarch64, not native Ubuntu.
+- Both tested container environments use LinuxKit: aarch64 under Docker Desktop on macOS and x86_64 under Docker on
+  Ubuntu. Native non-LinuxKit Linux, containerd/CRI-O and Kubernetes remain unverified.
 - Docker does not communicate its stop timeout to a process. `--total-grace` must match `docker stop --time` or Compose
   `stop_grace_period`; otherwise no process can infer the real deadline.
 - Kubernetes deadline plumbing, containerd/CRI-O, host pressure, CPU throttling, very high HTTP concurrency and slow
   diagnostic storage are not verified here.
-- Timing under Docker Desktop includes LinuxKit scheduling and is architecture evidence, not an SLO.
+- Timing includes LinuxKit scheduling and is architecture evidence, not an SLO.
 
 ## Additional Benchmarks
 
@@ -147,7 +157,7 @@ five real absolute-deadline states; overflow rejection; 30-run p50/p95/p99; forc
 rejection plus bounded drain; strengthened Docker 1 s/5 s deadline enforcement; and no post-exit wait during
 termination.
 
-For stronger confidence, rerun unchanged on unloaded native Ubuntu x86_64 and arm64 hosts three times, then under CPU
+For stronger confidence beyond LinuxKit, rerun unchanged on native non-LinuxKit x86_64 and arm64 hosts, then under CPU
 quotas (`--cpus=.25`), memory pressure, 100–1000 concurrent scrapes, slow filesystem/diagnostic flush, and the target
 container runtime/Kubernetes version. Use an external monotonic observer (for example eBPF or `perf trace`) to validate
 signal and exit timestamps independently of prototype logs.
@@ -156,6 +166,7 @@ signal and exit timestamps independently of prototype logs.
 
 - Prototype: `prototype/`
 - Runner for macOS and Ubuntu: `run-bench.sh`
-- Raw evidence: `results/20260723T150539Z/`
+- macOS evidence: `results/20260723T150539Z/`
+- Ubuntu evidence: `results/20260723T151454Z/`
 - Detailed analysis: [report.md](report.md)
-- ADR input: explicit budgets validated against total deadline, deadline-aware phase capping, no post-exit wait on TERM.
+- Decision: [ADR-003](../../docs/06-architecture/adr/ADR-003.md)

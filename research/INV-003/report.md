@@ -1,11 +1,10 @@
 # INV-003 Report — Shutdown Time Budgeting
 
-Status: completed for Docker Desktop/LinuxKit; native Ubuntu confirmation pending  
-Run date: 2026-07-21  
-Docker Server: 29.4.3  
-Docker platform: linux/aarch64, LinuxKit 6.12.76  
-Reference run: `results/20260723T150539Z`
-Summary: `results/20260723T150539Z/shutdown-grid.tsv`
+Status: completed
+Run date: 2026-07-23
+Docker Servers: 29.4.3, 27.4.0
+Docker platforms: linux/aarch64, linux/x86_64
+Reference runs: `results/20260723T150539Z`, `results/20260723T151454Z`
 
 ## Goal
 
@@ -51,15 +50,78 @@ inspecting every summary file and manually running the prototype are documented 
 | Environment                       | Date       | Docker | Platform      | Result set                 | Fingerprint                                                        |
 |-----------------------------------|------------|--------|---------------|----------------------------|--------------------------------------------------------------------|
 | Docker Desktop/macOS, LinuxKit VM | 2026-07-23 | 29.4.3 | linux/aarch64 | `results/20260723T150539Z` | `27e8a991546667f92abb5965c044b834c1583f710cbb060dfef81174b29bb53c` |
-| Native Ubuntu                     | pending    | —      | —             | run `run-bench.sh`         | must match the reference benchmark code fingerprint                |
+| Docker on Ubuntu, LinuxKit VM     | 2026-07-23 | 27.4.0 | linux/x86_64  | `results/20260723T151454Z` | `27e8a991546667f92abb5965c044b834c1583f710cbb060dfef81174b29bb53c` |
 
 The evidence records repository SHA, benchmark-only SHA-256, image ID, Docker server, container kernel, architecture,
 CPU count, memory and storage driver. The benchmark fingerprint covers the prototype and runner, so documentation-only
 changes do not alter stand identity.
 
+Both reference runs used the same benchmark fingerprint. The different image IDs are expected because the images were
+built for different CPU architectures; benchmark identity is defined by the canonical source fingerprint.
+
+## Cross-Environment Confirmation
+
+| Metric                                |   macOS/LinuxKit aarch64 |   Ubuntu/LinuxKit x86_64 |
+|---------------------------------------|-------------------------:|-------------------------:|
+| Mandatory shutdown grid               |               20/20 pass |               20/20 pass |
+| Explicit grid assertions              |             210/210 pass |             210/210 pass |
+| Repeated TERM-to-shutdown samples     |               30/30 pass |               30/30 pass |
+| TERM-to-shutdown p50 / p95 / p99      | 6.825 / 7.710 / 7.986 ms | 7.767 / 8.682 / 8.941 ms |
+| TERM-to-shutdown min / max            |         5.609 / 9.092 ms |         6.275 / 9.168 ms |
+| Absolute-deadline scenarios           |                 5/5 pass |                 5/5 pass |
+| HTTP admission/drain scenarios        |                 2/2 pass |                 2/2 pass |
+| Independent Docker deadline scenarios |                 2/2 pass |                 2/2 pass |
+
+`latency-stats.tsv` defines signal-to-exit as TERM reception through complete MetricShell shutdown, including the
+configured 5 ms synthetic finalization. It is not workload-only signal-to-exit. All result-bearing assertions passed
+in both environments.
+
+### Shutdown grid timing comparison
+
+| Window | macOS just-before / forced | Ubuntu just-before / forced |
+|-------:|---------------------------:|----------------------------:|
+|    1 s |       674.507 / 773.309 ms |        673.360 / 772.163 ms |
+|    5 s |     3930.539 / 4023.113 ms |      3925.638 / 4026.071 ms |
+|   10 s |     8935.097 / 9039.308 ms |      8926.074 / 9029.936 ms |
+|   30 s |   27935.941 / 28062.445 ms |    27922.744 / 28021.638 ms |
+|   60 s |   57941.380 / 58078.702 ms |    57923.676 / 58026.519 ms |
+
+### Absolute-deadline comparison
+
+| Scenario                  | macOS remaining / workload | Ubuntu remaining / workload |
+|---------------------------|---------------------------:|----------------------------:|
+| Full                      |             4955 / 3955 ms |              4737 / 3737 ms |
+| Partially spent           |             3930 / 2930 ms |              3700 / 2700 ms |
+| Nearly expired            |                 194 / 0 ms |                    0 / 0 ms |
+| Already expired           |                   0 / 0 ms |                    0 / 0 ms |
+| Reserve exceeds remaining |                 421 / 0 ms |                   89 / 0 ms |
+
+### HTTP and external-deadline comparison
+
+| Metric                                      |       macOS |      Ubuntu |
+|---------------------------------------------|------------:|------------:|
+| Fitting scrape drain                        |   73.423 ms |    0.102 ms |
+| Overlong scrape bounded drain               |  704.135 ms |  700.585 ms |
+| Normal post-TERM scrape admitted            |       false |       false |
+| Internal completion, 1 s external window    |  527.823 ms |  525.371 ms |
+| Internal safety margin, 1 s external window |  472.177 ms |  474.629 ms |
+| Internal completion, 5 s external window    | 3529.925 ms | 3523.575 ms |
+| Internal safety margin, 5 s external window | 1470.075 ms | 1476.425 ms |
+
+The Ubuntu raw TSV renders the two safety margins with a comma decimal separator because of the host locale. The values
+above normalize the separator only for presentation; the committed raw evidence remains unchanged. Host-side
+`docker stop` duration includes CLI/daemon overhead and is retained as an observation, while pass/fail uses the
+in-process completion marker and internal/external deadline ordering.
+
+The `native_ubuntu=prepared_not_run` row in each raw `coverage.tsv` is a static runner capability marker generated
+before cross-environment synthesis. It is superseded for the final investigation status by the Ubuntu
+`environment.tsv` (`host_os=Linux`) and the complete passing Ubuntu result set.
+
 ## Results
 
-All 20 mandatory cases passed.
+All 20 mandatory cases and all 210 explicit grid assertions passed in both environments. The detailed timing table
+below is the macOS reference; the Ubuntu observations are retained in its matching-fingerprint result set and summarized
+in the cross-environment table above.
 
 | Total | Workload | Reserve | Immediate | Just before | After deadline |       Never |
 |------:|---------:|--------:|----------:|------------:|---------------:|------------:|
@@ -138,13 +200,14 @@ post-exit scrape waiting interval after TERM is rejected: it competes directly w
   absolute remaining deadline.
 - Post-exit wait: allowed after natural workload completion only; disabled after external TERM/INT begins.
 
-These are admissible research values for the measured environment, not production defaults across all runtimes. A
-matching-fingerprint native Ubuntu run is required before widening the evidence claim.
+These are confirmed research values for both tested LinuxKit environments, not production defaults across all
+runtimes.
 
 ## Prototype Limits
 
 - Synthetic finalization models time budgeting, not real registry serialization, filesystem durability or log sinks.
-- The reference run is LinuxKit aarch64. Native Ubuntu x86_64/arm64 evidence is prepared but not fabricated.
+- Both tested container environments use LinuxKit: aarch64 under Docker Desktop on macOS and x86_64 under Docker on
+  Ubuntu. Native non-LinuxKit Linux remains unverified.
 - Docker does not pass `docker stop --time` to PID 1; deployment configuration must supply the same total/deadline to
   MetricShell.
 - CPU throttling, memory pressure, storage stalls, large cardinality, high scrape concurrency, containerd/CRI-O and
@@ -168,7 +231,8 @@ matching-fingerprint native Ubuntu run is required before widening the evidence 
 | Independent Docker external deadline                  | Covered at 1 s/5 s  | `external-deadline.tsv`                               |
 | Post-exit policy during external termination          | Covered             | `termination-policy.tsv`                              |
 | Environment and stand fingerprint                     | Covered             | `environment.tsv`                                     |
-| Native Ubuntu x86_64/arm64                            | Prepared, not run   | the same `run-bench.sh`                               |
+| Ubuntu/LinuxKit x86_64                                | Covered, all pass   | `results/20260723T151454Z/`                           |
+| Native non-LinuxKit x86_64/arm64                      | Not run             | outside current available environments                |
 | CPU quota/pressure and 100–1000 concurrent scrapes    | Recommended next    | not part of current evidence                          |
 | Slow disk/diagnostic sink and real metric cardinality | Recommended next    | requires production-like finalizer                    |
 | containerd/CRI-O and Kubernetes                       | Recommended next    | runtime-specific integration                          |
@@ -180,12 +244,12 @@ exit events with eBPF or `perf trace` and correlate them with `EVENT elapsed_ms`
 
 ## Conclusion
 
-INV-003 is confirmed for Docker Desktop/LinuxKit aarch64. Explicit workload timeout plus explicit reserve is the
-clearest
-configuration contract, provided MetricShell also knows the external total/deadline and rejects overcommit. A fixed
-reserve is suitable as a documented deployment default; percentage-only budgeting is not.
+INV-003 is confirmed by matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs. Explicit workload
+timeout plus explicit reserve is the clearest configuration contract, provided MetricShell also knows the external
+total/deadline and rejects overcommit. A fixed reserve is suitable as a documented deployment default;
+percentage-only budgeting is not.
 
 Recommended starting policy is a 1 s reserve for 5–10 s totals and 2 s for 30–60 s totals, with 250 ms demonstrated as
 the minimum tested reserve for a constrained 1 s total. Shutdown must stop new HTTP admission, drain only active
-requests within a cap, skip post-exit waiting, and make every phase deadline-aware. Native Ubuntu confirmation remains
-an explicit evidence boundary and is reproducible through the same `run-bench.sh` command.
+requests within a cap, skip post-exit waiting, and make every phase deadline-aware. The remaining evidence boundary is
+native non-LinuxKit Linux and other container runtimes.
