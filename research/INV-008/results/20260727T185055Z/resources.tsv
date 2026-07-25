@@ -1,0 +1,3 @@
+phase	ticks	elapsed_ms	cpu_percent_one_core	vmhwm_kib
+idle	1	2000	0.500	54260
+grpc_active	38	114.716	331.251	54260
