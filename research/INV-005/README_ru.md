@@ -4,7 +4,8 @@
 
 **Статус:** завершено  
 **Эталонные прогоны:** `results/20260723T152957Z`, `results/20260723T153335Z`  
-**Подробный отчёт:** [report.md](report_ru.md)
+**Отчёт:** [report.md](report_ru.md)  
+**Решение:** [ADR-005](../../docs-ru/06-architecture/adr/ADR-005.md)
 
 ## Вопрос
 

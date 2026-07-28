@@ -1,10 +1,9 @@
 # INV-003 — Shutdown Time Budgeting
 
-Status: completed
-
-Reference runs: `results/20260723T150539Z`, `results/20260723T151454Z`
-
-Report: [report.md](report.md)
+**Status:** completed  
+**Reference runs:** `results/20260723T150539Z`, `results/20260723T151454Z`  
+**Report:** [report.md](report.md)  
+**Decision:** [ADR-003](../../docs/06-architecture/adr/ADR-003.md)
 
 ## Question
 

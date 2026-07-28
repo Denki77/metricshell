@@ -1,8 +1,9 @@
 # INV-005 — Ingestion Transport Comparison
 
-Status: completed
-Reference runs: `results/20260723T152957Z`, `results/20260723T153335Z`
-Report: [report.md](report.md)
+**Status:** completed  
+**Reference runs:** `results/20260723T152957Z`, `results/20260723T153335Z`  
+**Report:** [report.md](report.md)  
+**Decision:** [ADR-005](../../docs/06-architecture/adr/ADR-005.md)
 
 ## Question
 

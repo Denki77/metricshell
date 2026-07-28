@@ -104,7 +104,7 @@ MetricShell:
 | INV-004 | [Семантика metric state](architecture-research.md#inv-004)      | Завершено | [INV-004](../../research/INV-004/README_ru.md) | [ADR-004](../06-architecture/adr/ADR-004.md) |
 | INV-005 | [Сравнение transports](architecture-research.md#inv-005)        | Завершено | [INV-005](../../research/INV-005/README_ru.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
 | INV-006 | [File ingestion](architecture-research.md#inv-006)              | Завершено | [INV-006](../../research/INV-006/README_ru.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
-| INV-007 | [Socket ingestion](architecture-research.md#inv-007)            | Не начато | —                                              | —                                            |
+| INV-007 | [Socket ingestion](architecture-research.md#inv-007)            | Завершено | [INV-007](../../research/INV-007/README_ru.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
 | INV-008 | [Local push](architecture-research.md#inv-008)                  | Завершено | [INV-008](../../research/INV-008/README_ru.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
 | INV-009 | [Shared memory/mmap](architecture-research.md#inv-009)          | Не начато | —                                              | —                                            |
 | INV-010 | [Exposition](architecture-research.md#inv-010)                  | Не начато | —                                              | —                                            |

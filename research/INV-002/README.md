@@ -1,14 +1,11 @@
 # INV-002 — Workload Lifecycle and Exit Semantics
 
-Status: completed
-
-Reference run: `results/20260721T200345Z`
-
-Extended reference run: `results/20260721T200406Z-extended`
-
-Ubuntu reference runs: `results/20260721T201256Z`, `results/20260721T202227Z-extended`
-
-Report: [report.md](report.md)
+**Status:** completed  
+**Reference run:** `results/20260721T200345Z`  
+**Extended reference run:** `results/20260721T200406Z-extended`  
+**Ubuntu reference runs:** `results/20260721T201256Z`, `results/20260721T202227Z-extended`  
+**Report:** [report.md](report.md)  
+**Decision:** [ADR-002](../../docs/06-architecture/adr/ADR-002.md)
 
 ## Question
 

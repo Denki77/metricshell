@@ -1,142 +1,135 @@
 # INV-007 — Socket-Based Ingestion
 
-Status: in progress  
-Reference run: `results/20260723T190106Z`  
-Report: [report.md](report.md)
+[Русская версия](README_ru.md)
+
+**Status:** completed  
+**Reference runs:** `results/20260723T190106Z`, `results/20260728T114224Z`  
+**Report:** [report.md](report.md)  
+**Decision:** [ADR-007](../../docs/06-architecture/adr/ADR-007.md)
 
 ## Question
 
 Which local socket model and protocol best fit MetricShell?
 
-## Context
-
-MetricShell and its producers run in one Linux container. The transport must support one or many producers, preserve
-message boundaries, bound resource use, expose backpressure and recover explicitly from startup and restart races.
-
 ## Candidates
 
-- Unix stream socket with newline-delimited, versioned text messages.
-- Unix stream socket with a four-byte big-endian length prefix and versioned payload.
-- Unix datagram socket with newline-delimited, versioned text messages (StatsD-like transport semantics).
-- Unversioned StatsD was not retained as a primary protocol because its metric operations and error model do not cover
-  the required versioned registry/update contract.
+- Unix stream with newline-delimited versioned text.
+- Unix stream with a four-byte big-endian length prefix.
+- Unix datagram with newline-delimited versioned text and StatsD-like transport semantics.
+- Unversioned StatsD was rejected as the primary protocol because its operations and error model do not implement the
+  required versioned registry/update contract.
 
-## Initial Hypothesis
+## Hypothesis
 
-A Unix stream socket with an explicit versioned protocol will provide reliable local delivery and backpressure.
-Length framing may be safer than line framing for future binary payloads. Unix datagrams may reduce connection and
-file-descriptor cost, but can lose messages under a slow reader and therefore are unlikely to be acceptable as the
-primary ingestion path.
-
-## Evidence Required
-
-- Single and many producers.
-- Burst throughput, latency, CPU and memory observations.
-- Slow reader and backpressure behavior.
-- Disconnect in the middle of a message.
-- MetricShell startup and restart/reconnect.
-- Malformed and oversized messages.
-- Maximum accepted payload.
-- Socket permissions and file-descriptor exhaustion.
-- Identical macOS and Ubuntu command with a path-independent benchmark fingerprint.
+Unix stream with an explicit versioned protocol provides reliable local delivery and backpressure. Datagram reduces
+connection and server file-descriptor cost, but cannot provide a portable reliable-delivery contract under pressure.
+Length framing is justified only if the payload must contain arbitrary binary data or raw newlines.
 
 ## Experiments
 
-`run-bench.sh` builds and runs one Linux container. The prototype performs 32 correctness assertions, 81 performance
-rows (three protocols, 1/8/32 producers, 64/1024/8192-byte payloads, three repetitions) and five pressure/resource
-rows.
+`run-bench.sh` builds and runs one Linux container without host bind mounts. It performs, in each environment:
 
-Each performance message contains its producer timestamp. The server records producer-to-accept p50/p95/p99, delivery,
-wall throughput, process CPU and Go runtime memory. Correctness and pressure results use portable invariants; timing
-values are observations.
+- 32 correctness assertions;
+- 81 performance rows: three protocols × 1/8/32 producers × 64/1,024/8,192-byte payloads × three repetitions;
+- five pressure and resource assertions;
+- malformed, partial, exact-maximum and oversized message cases;
+- startup retry, restart/reconnect, shutdown and socket-permission cases;
+- slow-reader and file-descriptor-pressure cases.
+
+## Environments and fingerprint
+
+| Environment           | Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
+|-----------------------|-------:|------------------|--------------|----------------------------|--------------------------------------------------------------------|
+| macOS Docker Desktop  | 29.4.3 | LinuxKit 6.12.76 | aarch64      | `results/20260723T190106Z` | `585b91f1a73f1359953cc313af2e1f3f7ff1f9757ee00086056c812357a78bca` |
+| Ubuntu Docker Desktop | 27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260728T114224Z` | `585b91f1a73f1359953cc313af2e1f3f7ff1f9757ee00086056c812357a78bca` |
+
+The fingerprints are identical. Repository HEAD, image ID and architecture differ as expected; the content fingerprint
+proves that the prototype and runner were identical.
+
+Both container environments use LinuxKit. The evidence confirms cross-architecture behavior inside LinuxKit
+aarch64/x86_64, but does not verify native non-LinuxKit Linux.
 
 ## Results
 
-The macOS Docker Desktop/LinuxKit aarch64 reference run passed every portable assertion:
+All portable assertions passed in both environments:
 
-- correctness: 32/32;
-- performance delivery: 81/81 rows delivered all messages;
-- pressure/resource cases: 5/5;
-- tested maximum payload: 65,536 bytes;
-- fingerprint: `585b91f1a73f1359953cc313af2e1f3f7ff1f9757ee00086056c812357a78bca`.
+| Assertion group           | macOS | Ubuntu |
+|---------------------------|------:|-------:|
+| Correctness               | 32/32 |  32/32 |
+| Performance delivery rows | 81/81 |  81/81 |
+| Pressure/resource         |   5/5 |    5/5 |
 
-Key pressure result:
+The tested maximum payload was 65,536 bytes.
 
-| Protocol      | Case                      | Input | Delivered | Failed/blocked |     Duration |
-|---------------|---------------------------|------:|----------:|---------------:|-------------:|
-| stream-line   | slow reader               | 2,000 |     2,000 |              0 |   256.502 ms |
-| stream-framed | slow reader               | 2,000 |     2,000 |              0 |   254.300 ms |
-| datagram-line | slow reader               | 2,000 |     1,258 |            742 | 2,023.599 ms |
-| stream-line   | FD exhaustion (limit 128) |   256 |        63 |            193 |     4.008 ms |
-| datagram-line | no accepted FD per sender |   256 |       256 |              0 |     1.900 ms |
+### Slow reader and backpressure
 
-Stream transports applied backpressure and preserved all messages. Datagram preserved message boundaries and avoided
-per-connection server FDs, but lost/rejected 37.1% of the slow-reader workload after the bounded producer deadline.
+| Environment | Protocol      | Input | Delivered | Failed/blocked |     Duration |
+|-------------|---------------|------:|----------:|---------------:|-------------:|
+| macOS       | stream-line   | 2,000 |     2,000 |              0 |   256.502 ms |
+| macOS       | stream-framed | 2,000 |     2,000 |              0 |   254.300 ms |
+| macOS       | datagram-line | 2,000 |     1,258 |            742 | 2,023.599 ms |
+| Ubuntu      | stream-line   | 2,000 |     2,000 |              0 |   203.927 ms |
+| Ubuntu      | stream-framed | 2,000 |     2,000 |              0 |   132.688 ms |
+| Ubuntu      | datagram-line | 2,000 |     2,000 |              0 | 1,744.505 ms |
 
-Selected mean-of-three throughput observations:
+Both stream candidates applied backpressure and delivered every message in both environments. Datagram delivered 62.9%
+on macOS and 100% on Ubuntu. The assertion requires bounded accounting, so both cases pass. The different outcomes
+prove that datagram delivery under pressure depends on scheduling headroom and is not a portable reliable-delivery
+contract.
 
-| Protocol      | Producers | Payload | Messages/s |       p95 |
-|---------------|----------:|--------:|-----------:|----------:|
-| stream-line   |         1 |    64 B |    565,585 |    279 µs |
-| stream-framed |         1 |    64 B |    388,776 |    304 µs |
-| datagram-line |         1 |    64 B |    303,019 |     22 µs |
-| stream-line   |        32 |    64 B |  1,497,470 | 15.009 ms |
-| stream-framed |        32 |    64 B |  1,239,313 |  9.376 ms |
-| datagram-line |        32 |    64 B |    383,943 |  0.429 ms |
-| stream-line   |        32 | 8,192 B |     58,645 | 32.262 ms |
-| stream-framed |        32 | 8,192 B |     27,814 | 52.898 ms |
-| datagram-line |        32 | 8,192 B |     50,653 |  3.187 ms |
+### Ubuntu latency statistics
 
-These measurements rank this prototype implementation only. Datagram's low accept latency does not compensate for its
-loss behavior under pressure.
+INV-007 has no signal-to-exit statistic because the prototype neither supervises nor signals a workload. The relevant
+latency is producer timestamp to protocol acceptance.
 
-## Hypothesis Evaluation
+Ubuntu mean-of-three:
 
-Partially confirmed on macOS/LinuxKit aarch64:
+| Protocol      | Producers | Payload |       p50 |       p95 |        p99 |
+|---------------|----------:|--------:|----------:|----------:|-----------:|
+| stream-line   |         1 |   1 KiB |      5 µs |     70 µs |     163 µs |
+| stream-line   |        32 |   8 KiB |    631 µs | 32.682 ms |  56.788 ms |
+| stream-framed |         1 |   1 KiB |    280 µs |    692 µs |     944 µs |
+| stream-framed |        32 |   8 KiB | 16.281 ms | 80.298 ms | 118.910 ms |
+| datagram-line |         1 |   1 KiB |     10 µs |     59 µs |     129 µs |
+| datagram-line |        32 |   8 KiB |    743 µs |  4.779 ms |   8.784 ms |
 
-- Unix stream provides reliable delivery and observable backpressure in the tested range.
-- Datagram reduces server-side FD use and can be fast, but does not provide the required delivery behavior under a
-  bounded slow-reader workload.
-- The prototype does not show a performance reason to require binary length framing. Line framing was simpler and
-  faster in most tested stream cells. Length framing remains useful only if newline-containing or binary payloads
-  become a requirement.
-- Startup and restart require bounded client retry/reconnect; an existing connection is not an epoch-independent
-  channel.
+### File descriptors
 
-Ubuntu confirmation is intentionally pending. Therefore the investigation status remains `in progress` and no ADR is
-created yet.
+At `RLIMIT_NOFILE=128`, the stream test established 63/256 connections on macOS and 60/256 on Ubuntu, rejecting the
+rest in a bounded way. The datagram server processed 256/256 messages with no accepted per-producer server FD in both
+environments.
 
-## Acceptable Values
+## Conclusion
 
-Provisional values pending the matching-fingerprint Ubuntu run:
+The hypothesis is confirmed:
 
-- primary transport: Unix stream socket;
-- protocol: custom versioned text, newline-delimited unless binary payloads are required;
-- socket mode: `0660`, with container user/group ownership configured explicitly;
-- maximum payload: 65,536 bytes tested; provisional production default should be lower (8 KiB) until realistic metric
-  cardinality payloads are measured;
-- producer write deadline: required and finite; exact default deferred to workload behavior;
-- client startup/reconnect: bounded retry with backoff; never assume the socket exists before workload start;
-- malformed/partial/oversized message: reject only that message or connection, retain last valid metric state;
-- stream connection budget: enforce a configurable limit below `RLIMIT_NOFILE` and reserve descriptors for HTTP,
-  logging and runtime needs;
-- datagram: not acceptable as the reliable primary channel; possible best-effort compatibility adapter only with
-  explicit loss accounting.
+- select Unix stream as the primary reliable socket transport;
+- select a custom versioned newline-delimited text protocol;
+- retain length framing only if binary or newline-containing payloads become a requirement;
+- reject Unix datagram as the primary reliable transport;
+- require bounded startup retry, reconnect, write deadlines and explicit failure reporting;
+- do not promise exactly-once delivery across ambiguous disconnects.
 
-## Decision Output
+## Accepted Values
 
-Provisional direction only: Unix stream plus a versioned line protocol. No ADR until the same fingerprint is run on
-Ubuntu and results are compared.
+- socket type: Unix stream;
+- socket mode: `0660`, with explicit container user/group ownership;
+- initial normal payload limit: 8 KiB;
+- tested hard ceiling: 65,536 bytes;
+- malformed, partial or oversized input: reject without replacing last-valid metric state;
+- connection limit: configurable and below `RLIMIT_NOFILE`, with descriptors reserved for runtime duties;
+- retry/reconnect: bounded with backoff;
+- producer write deadline: finite;
+- duplicate handling after ambiguous retry: explicit producer identity and sequence number where required;
+- datagram: best-effort compatibility adapter only, with drop/error counters.
 
 ## Running the Prototype
 
-Run the complete matrix on macOS or Ubuntu:
+The command is identical on macOS and Ubuntu:
 
 ```bash
 ./research/INV-007/run-bench.sh
 ```
-
-Inspect the latest evidence:
 
 ```bash
 cat research/INV-007/latest-results.txt
@@ -147,64 +140,30 @@ cat "$(cat research/INV-007/latest-results.txt)/performance.tsv"
 cat "$(cat research/INV-007/latest-results.txt)/pressure.tsv"
 ```
 
-Increase repetitions or change the tested payload ceiling:
+Higher-confidence run:
 
 ```bash
 INV007_REPETITIONS=30 INV007_MAX_PAYLOAD=65536 ./research/INV-007/run-bench.sh
 ```
 
-The Ubuntu handoff uses exactly the same command. Compare `benchmark_code_fingerprint_sha256`, not repository HEAD,
-image ID or architecture-specific digest. Results are created inside the container and extracted with `docker cp`; no
-host bind mount is used.
-
-Manual execution:
-
-```bash
-docker build -t metricshell-inv007:prototype research/INV-007/prototype
-docker create --name inv007-manual metricshell-inv007:prototype \
-  --output-dir=/results --max-payload=65536 --repetitions=3
-docker start -a inv007-manual
-docker cp inv007-manual:/results/. ./inv007-manual-results
-docker rm inv007-manual
-```
+Compare `benchmark_code_fingerprint_sha256`, not repository HEAD or image ID.
 
 ## Prototype Limits
 
-- Research harness, not production MetricShell or a production metric parser.
-- Current evidence is macOS Docker Desktop/LinuxKit aarch64 only; Ubuntu and native non-LinuxKit Linux are unverified.
-- Client and server run in one process, so process CPU/RSS are combined and scheduler effects differ from separate
-  application processes.
+- Research harness, not production MetricShell or a production parser.
+- Both evidence environments use LinuxKit; native non-LinuxKit Linux remains unverified.
+- Producers and server share one Go process, so CPU/RSS are combined.
 - Producer-to-accept latency is not end-to-end metric exposition latency.
-- The benchmark uses blocking Unix datagrams; nonblocking sends would expose loss earlier, not remove it.
-- FD exhaustion is induced with `RLIMIT_NOFILE=128` in one process. It validates bounded failure, not a production
-  connection limit.
-- The synthetic payload has minimal parsing and does not model cardinality, registry contention or Prometheus encoding.
-- Socket owner/group transitions and adversarial cross-user access require a multi-user container test.
+- Three repetitions establish feasibility and ranking, not stable capacity.
+- Synthetic parsing does not model production cardinality or registry contention.
+- Multi-user UID/GID access, parser fuzzing, race detection, Kubernetes and connection-churn sweeps remain follow-ups.
 
 ## Additional Benchmarks
 
-Covered now:
+Covered: one/8/32 producers, 64 B/1 KiB/8 KiB payloads, three repetitions, p50/p95/p99, throughput, CPU/runtime memory,
+slow reader, partial messages, malformed/max/oversized input, startup, reconnect, shutdown, mode `0660`, stream FD
+exhaustion, datagram FD model, environment metadata and identical cross-environment fingerprint.
 
-- all protocols with one, 8 and 32 producers;
-- 64 B, 1 KiB and 8 KiB messages;
-- three repetitions and p50/p95/p99;
-- burst throughput, CPU and runtime memory observations;
-- slow reader/backpressure with a bounded producer deadline;
-- disconnect mid-line and mid-frame;
-- malformed, exact-maximum and oversized messages;
-- startup retry and restart reconnect;
-- socket mode `0660`;
-- stream FD exhaustion and datagram no-per-producer-accepted-FD behavior;
-- environment metadata, image identity and path-independent benchmark fingerprint.
-
-Recommended higher-confidence follow-ups:
-
-- run 30–100 repetitions on an idle dedicated host and report confidence intervals;
-- separate producer and server processes and sample cgroup CPU/RSS for 5–15 minutes;
-- test 64/128/256 KiB ceilings and realistic metric/cardinality payloads;
-- sweep slow-reader delay, producer write deadline, connection count and accept backlog;
-- test connection churn, half-close, stalled partial frames and shutdown grace with active clients;
-- fuzz the selected parser and run race detection outside the minimal image;
-- repeat on native Linux, Ubuntu matching fingerprint and Kubernetes `emptyDir`;
-- add multi-user UID/GID permission and unauthorized-client tests;
-- compare a real StatsD client/grammar only if a compatibility adapter remains desirable.
+Recommended follow-ups: 30–100 repetitions on dedicated hosts, separate producer/server processes, cgroup CPU/RSS,
+realistic payload/cardinality parsing, connection churn and backlog sweeps, stalled frames, multi-user permission tests,
+parser fuzzing, native Linux and Kubernetes.

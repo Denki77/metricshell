@@ -1,8 +1,9 @@
 # INV-006 — File-Based Ingestion
 
-Status: completed
-Reference runs: `results/20260723T160155Z`, `results/20260723T161216Z`
-Report: [report.md](report.md)
+**Status:** completed
+**Reference runs:** `results/20260723T160155Z`, `results/20260723T161216Z`
+**Report:** [report.md](report.md)
+**Decision:** [ADR-006](../../docs/06-architecture/adr/ADR-006.md)
 
 ## Question
 

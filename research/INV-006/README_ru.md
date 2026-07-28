@@ -2,9 +2,10 @@
 
 [English version](README.md)
 
-Статус: завершено  
-Эталонные прогоны: `results/20260723T160155Z`, `results/20260723T161216Z`  
-Отчёт: [report_ru.md](report_ru.md)
+**Статус:** завершено  
+**Эталонные прогоны:** `results/20260723T160155Z`, `results/20260723T161216Z`  
+**Отчёт:** [report_ru.md](report_ru.md)  
+**Решение:** [ADR-006](../../docs-ru/06-architecture/adr/ADR-006.md)
 
 ## Вопрос
 
