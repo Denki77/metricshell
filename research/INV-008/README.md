@@ -1,12 +1,10 @@
 # INV-008 — Local Push Ingestion
 
-Status: in progress
-
-macOS reference run: `results/20260727T185055Z`
-
-Ubuntu reference run: pending
-
-Report: [report.md](report.md)
+Status: completed  
+macOS reference run: `results/20260727T185055Z`  
+Ubuntu reference run: `results/20260728T114459Z`  
+Report: [report.md](report.md)  
+Decision: [ADR-008](../../docs/06-architecture/adr/ADR-008.md)
 
 ## Question
 
@@ -50,35 +48,36 @@ three transports, loopback-only HTTP/gRPC binding, shutdown state retention, res
 
 ## Results
 
-The macOS Docker Desktop/LinuxKit aarch64 run passed all portable checks:
+The matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs passed all portable checks:
 
-- performance matrix: 36 rows, zero request errors;
-- correctness: 14/14 pass;
-- accepted records including boundary and active resource samples: 385,313;
-- idle process CPU: 0.500% of one core over two seconds;
-- peak RSS/HWM: 54,260 KiB for the combined research process hosting all three servers and clients;
-- benchmark scope: clean and tracked, with zero untracked files.
+- performance matrix: 36 rows and zero request errors in each environment;
+- correctness: 14/14 pass in each environment;
+- accepted records including boundary and active resource samples: 385,313 in each environment;
+- benchmark scope: clean and tracked, with zero untracked files in each environment;
+- identical benchmark fingerprint:
+  `34bee766d38ee43421cd100d3b23a387b7736c660d13bd6e28b591505bd101d4`.
 
 Representative `1 KiB` results:
 
-| Shape                            | Unix socket | HTTP JSON | gRPC protobuf |
-|----------------------------------|------------:|----------:|--------------:|
-| 1 record, 1 producer, records/s  |     240,827 |    26,786 |        24,679 |
-| 1 record, 1 producer, p95        |    0.005 ms |  0.057 ms |      0.077 ms |
-| batch 16, 8 producers, records/s |   1,630,940 |    89,072 |       634,355 |
-| batch 16, 8 producers, p95       |    0.245 ms |  3.246 ms |      1.046 ms |
+| Environment | Shape                            | Unix socket | HTTP JSON | gRPC protobuf |
+|-------------|----------------------------------|------------:|----------:|--------------:|
+| macOS       | 1 record, 1 producer, records/s  |     240,827 |    26,786 |        24,679 |
+| Ubuntu      | 1 record, 1 producer, records/s  |      53,048 |     8,334 |         7,391 |
+| macOS       | batch 16, 8 producers, records/s |   1,630,940 |    89,072 |       634,355 |
+| Ubuntu      | batch 16, 8 producers, records/s |     928,096 |    21,172 |       187,377 |
+| macOS       | batch 16, 8 producers, p95       |    0.245 ms |  3.246 ms |      1.046 ms |
+| Ubuntu      | batch 16, 8 producers, p95       |    0.400 ms | 11.301 ms |      2.297 ms |
 
 The Unix-socket baseline led every representative shape. HTTP was simpler and slightly faster than gRPC for the
 single-producer/single-record case. gRPC amortized framing and strongly outperformed JSON HTTP for concurrent batches,
-but still remained about 2.6× below Unix-socket throughput in that shape.
+but remained below Unix-socket throughput in both environments.
 
-These timings are observations from one environment and are not pass criteria. Cross-environment confirmation is
-pending.
+Timing distributions differ by environment and are observations rather than portable pass criteria. Candidate ordering
+and all correctness conclusions are consistent.
 
-## Provisional Conclusion
+## Conclusion
 
-The hypothesis is provisionally supported, but INV-008 remains in progress until an Ubuntu run with the same benchmark
-fingerprint is recorded.
+The hypothesis is confirmed by matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs.
 
 - Do not require an additional local push API: the Unix-socket candidate already covers ingestion with lower latency,
   higher throughput, fewer endpoint-exposure modes and no HTTP/2/protobuf client stack.
@@ -87,7 +86,7 @@ fingerprint is recorded.
 - Do not add gRPC by default. Its concurrent batched performance is materially better than JSON HTTP, but it duplicates
   socket semantics and introduces generated clients, protobuf schema evolution and HTTP/2 dependencies.
 
-## Admissible Values (Provisional)
+## Admissible Values
 
 - bind HTTP/gRPC to `127.0.0.1` by default; wildcard/external exposure requires an explicit, separately secured mode;
 - maximum decoded request payload: `1 MiB` in this prototype;
@@ -132,7 +131,8 @@ docker run --rm metricshell-inv008:prototype /out
 ## Prototype Limits
 
 - Research code, not a production parser, registry or admission-control implementation.
-- Only macOS Docker Desktop/LinuxKit aarch64 is currently recorded; Ubuntu is deliberately pending.
+- Both tested container environments use LinuxKit. The results confirm cross-architecture behavior inside
+  macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 containers, not native non-LinuxKit Linux behavior.
 - All transports carry one request containing a record array. Unix framing is `record count` followed by repeated
   `record length + record`, so wire and store semantics match HTTP and gRPC.
 - HTTP uses JSON byte strings (base64 encoding), intentionally exposing serialization overhead.
@@ -159,7 +159,7 @@ All safe, locally executable variants identified for this research were run:
 | loopback bind assertions                    | covered                                                                                      |
 | shutdown, retained state and restart        | covered                                                                                      |
 | idle CPU, active CPU and peak RSS           | covered                                                                                      |
-| matching-fingerprint Ubuntu run             | pending; handoff command is identical                                                        |
+| matching-fingerprint Ubuntu run             | covered: `results/20260728T114459Z`                                                          |
 | native non-LinuxKit Linux                   | pending; no such environment available                                                       |
 | PHP HTTP client                             | covered by INV-005; protocol compatibility is unchanged                                      |
 | PHP gRPC client                             | not locally executable; requires extension/toolchain and is itself adoption-cost evidence    |
@@ -171,6 +171,6 @@ All safe, locally executable variants identified for this research were run:
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Current raw evidence: `results/20260727T185055Z/`
+- Raw evidence: `results/20260727T185055Z/`, `results/20260728T114459Z/`
 - Detailed analysis: [report.md](report.md)
-- ADR: not created while research and Ubuntu confirmation remain in progress.
+- Accepted decision: [ADR-008](../../docs/06-architecture/adr/ADR-008.md)

@@ -1,15 +1,10 @@
 # INV-008 Report — Local Push Ingestion
 
-Status: in progress
-
-Run date: 2026-07-27
-
-Docker server: 29.4.3
-
-Docker platform: LinuxKit linux/aarch64
-
-Reference run: `results/20260727T185055Z`
-
+Status: completed  
+Run date: 2026-07-27  
+Docker server: 29.4.3  
+Docker platform: LinuxKit linux/aarch64  
+Reference runs: `results/20260727T185055Z`, `results/20260728T114459Z`  
 Benchmark fingerprint: `34bee766d38ee43421cd100d3b23a387b7736c660d13bd6e28b591505bd101d4`
 
 ## Goal
@@ -53,16 +48,17 @@ effects and Ubuntu daemon mount-policy differences.
 | Environment             | Date       | Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
 |-------------------------|------------|--------|------------------|--------------|----------------------------|--------------------------------------------------------------------|
 | Docker Desktop on macOS | 2026-07-27 | 29.4.3 | LinuxKit 6.12.76 | aarch64      | `results/20260727T185055Z` | `34bee766d38ee43421cd100d3b23a387b7736c660d13bd6e28b591505bd101d4` |
-| Ubuntu                  | pending    | —      | —                | —            | —                          | must match                                                         |
+| Ubuntu Docker Desktop   | 2026-07-28 | 27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260728T114459Z` | `34bee766d38ee43421cd100d3b23a387b7736c660d13bd6e28b591505bd101d4` |
 
 The image ID is architecture-specific and is not the portable identity. The fingerprint hashes the prototype, module
-lock and runner contents with relative names.
+lock and runner contents with relative names. Both runs recorded a clean benchmark scope and zero untracked benchmark
+files. The fingerprints are identical.
 
 ## Results
 
 ### Correctness
 
-All fourteen assertions passed:
+All fourteen assertions passed in both environments:
 
 | Case                                                  | Result |
 |-------------------------------------------------------|--------|
@@ -88,22 +84,29 @@ limit. All transports accept exactly one decoded MiB and reject one MiB plus one
 ### Performance matrix
 
 The matrix comprises three payload sizes × two batch sizes × two producer counts × three transports. All 36 rows had
-zero request errors.
+zero request errors in both environments, and both accepted exactly 385,313 records across the full run.
 
 Representative `1 KiB` rows:
 
-| Transport | Batch | Producers | Records/s |      p50 |      p95 |      p99 |
-|-----------|------:|----------:|----------:|---------:|---------:|---------:|
-| Unix      |     1 |         1 |   240,827 | 0.002 ms | 0.005 ms | 0.028 ms |
-| HTTP      |     1 |         1 |    26,786 | 0.025 ms | 0.057 ms | 0.106 ms |
-| gRPC      |     1 |         1 |    24,679 | 0.022 ms | 0.077 ms | 0.157 ms |
-| Unix      |    16 |         8 | 1,630,940 | 0.029 ms | 0.245 ms | 0.959 ms |
-| HTTP      |    16 |         8 |    89,072 | 1.357 ms | 3.246 ms | 4.153 ms |
-| gRPC      |    16 |         8 |   634,355 | 0.080 ms | 1.046 ms | 1.998 ms |
+| Environment | Transport | Batch | Producers | Records/s |      p50 |       p95 |       p99 |
+|-------------|-----------|------:|----------:|----------:|---------:|----------:|----------:|
+| macOS       | Unix      |     1 |         1 |   240,827 | 0.002 ms |  0.005 ms |  0.028 ms |
+| macOS       | HTTP      |     1 |         1 |    26,786 | 0.025 ms |  0.057 ms |  0.106 ms |
+| macOS       | gRPC      |     1 |         1 |    24,679 | 0.022 ms |  0.077 ms |  0.157 ms |
+| Ubuntu      | Unix      |     1 |         1 |    53,048 | 0.011 ms |  0.055 ms |  0.067 ms |
+| Ubuntu      | HTTP      |     1 |         1 |     8,334 | 0.088 ms |  0.225 ms |  0.438 ms |
+| Ubuntu      | gRPC      |     1 |         1 |     7,391 | 0.092 ms |  0.243 ms |  0.484 ms |
+| macOS       | Unix      |    16 |         8 | 1,630,940 | 0.029 ms |  0.245 ms |  0.959 ms |
+| macOS       | HTTP      |    16 |         8 |    89,072 | 1.357 ms |  3.246 ms |  4.153 ms |
+| macOS       | gRPC      |    16 |         8 |   634,355 | 0.080 ms |  1.046 ms |  1.998 ms |
+| Ubuntu      | Unix      |    16 |         8 |   928,096 | 0.074 ms |  0.400 ms |  0.869 ms |
+| Ubuntu      | HTTP      |    16 |         8 |    21,172 | 5.727 ms | 11.301 ms | 14.151 ms |
+| Ubuntu      | gRPC      |    16 |         8 |   187,377 | 0.295 ms |  2.297 ms |  5.639 ms |
 
 For low concurrency, HTTP’s standard persistent connection is competitive with unary gRPC, though both are far behind
 the Unix frame. With batching and concurrency, protobuf/gRPC avoids JSON/base64 overhead and substantially exceeds
-HTTP throughput. It still does not catch the simpler Unix socket.
+HTTP throughput. It still does not catch the simpler Unix socket. Timing distributions differ, but candidate ordering is
+consistent in both environments.
 
 Batching improves records per request for every transport, but increases the damage radius of a rejected request and
 requires a batch-level acceptance policy. A tested batch of 16 is an admissible research value, not a final production
@@ -111,10 +114,12 @@ maximum.
 
 ### Resources
 
-| Phase                                |    Elapsed | CPU, one-core equivalent | Peak RSS/HWM |
-|--------------------------------------|-----------:|-------------------------:|-------------:|
-| all adapters idle                    |   2,000 ms |                   0.500% |   54,260 KiB |
-| gRPC batch/concurrency active sample | 114.716 ms |                 331.251% |   54,260 KiB |
+| Environment | Phase                         |    Elapsed |    CPU, one-core equivalent | Peak RSS/HWM |
+|-------------|-------------------------------|-----------:|----------------------------:|-------------:|
+| macOS       | all adapters idle             |   2,000 ms |                      0.500% |   54,260 KiB |
+| macOS       | gRPC batch/concurrency active | 114.716 ms |                    331.251% |   54,260 KiB |
+| Ubuntu      | all adapters idle             |   2,000 ms | below 10 ms tick resolution |   49,264 KiB |
+| Ubuntu      | gRPC batch/concurrency active | 260.805 ms |                    578.974% |   49,264 KiB |
 
 The active sample used eight producers and therefore legitimately used multiple cores. RSS includes all servers,
 clients, Go runtime, protobuf and HTTP stacks. It is evidence of feasibility, not isolated adapter cost.
@@ -137,7 +142,7 @@ binding must never be the implicit default.
 
 ### HTTP simplifies language integration
 
-Provisionally supported. Standard HTTP clients and curl-level inspection reduce integration and debugging effort. The
+Supported. Standard HTTP clients and curl-level inspection reduce integration and debugging effort. The
 benefit is compatibility, not measured performance.
 
 ### HTTP duplicates socket capability
@@ -175,7 +180,8 @@ dependencies.
 
 ## Prototype Limits
 
-- Ubuntu matching-fingerprint evidence is not yet available, so the research remains in progress.
+- Both evidence environments use LinuxKit. The evidence confirms cross-architecture behavior in LinuxKit
+  aarch64/x86_64 containers, not native non-LinuxKit Linux.
 - Both client and server run in the same benchmark process and network namespace.
 - The Unix baseline avoids JSON/protobuf serialization, but uses the same request-with-`N`-records semantics and
   performs the same store operation.
@@ -203,7 +209,7 @@ dependencies.
 | idle/active resources                    | covered                                | `resources.tsv`                                 |
 | environment and code fingerprint         | covered                                | `environment.tsv`                               |
 | clean tracked benchmark scope            | covered: `true`, zero untracked files  | `environment.tsv`                               |
-| Ubuntu same-fingerprint repeat           | pending                                | run the same `run-bench.sh`                     |
+| Ubuntu same-fingerprint repeat           | covered                                | `results/20260728T114459Z`                      |
 | native non-LinuxKit Linux                | pending                                | environment unavailable                         |
 | PHP HTTP interoperability                | already covered by INV-005             | no new wire requirement                         |
 | PHP gRPC                                 | unavailable locally                    | extension/generated-stub cost is material       |
@@ -211,12 +217,12 @@ dependencies.
 | TLS/auth                                 | not applicable to local-only default   | mandatory follow-up for external bind           |
 | cardinality/backpressure limits          | deferred                               | INV-014/INV-015 after production schema         |
 
-## Provisional Conclusion
+## Conclusion
 
-INV-008’s initial assumption is provisionally confirmed on macOS/LinuxKit aarch64. HTTP can improve client convenience,
-but it duplicates the socket adapter and adds a TCP/HTTP attack surface. gRPC improves batched HTTP performance but does
-not beat the socket baseline and has the highest client/toolchain cost.
+INV-008’s initial assumption is confirmed by identical-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64
+runs. HTTP can improve client convenience, but it duplicates the socket adapter and adds a TCP/HTTP attack surface.
+gRPC improves batched HTTP performance but does not beat the socket baseline and has the highest client/toolchain cost.
 
-Recommended direction pending Ubuntu confirmation: keep Unix socket as the default and omit a mandatory local push API;
-permit a loopback-only HTTP compatibility adapter only for demonstrated integrations; reject gRPC from the default
-surface.
+Decision: keep Unix socket as the default and omit a mandatory local push API; permit a loopback-only HTTP compatibility
+adapter only for demonstrated integrations; reject gRPC from the default surface. See
+[ADR-008](../../docs/06-architecture/adr/ADR-008.md).
