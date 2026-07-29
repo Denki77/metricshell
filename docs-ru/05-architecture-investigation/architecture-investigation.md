@@ -105,7 +105,7 @@ MetricShell:
 | INV-005 | [Сравнение transports](architecture-research.md#inv-005)        | Завершено | [INV-005](../../research/INV-005/README_ru.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
 | INV-006 | [File ingestion](architecture-research.md#inv-006)              | Завершено | [INV-006](../../research/INV-006/README_ru.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
 | INV-007 | [Socket ingestion](architecture-research.md#inv-007)            | Не начато | —                                              | —                                            |
-| INV-008 | [Local push](architecture-research.md#inv-008)                  | Не начато | —                                              | —                                            |
+| INV-008 | [Local push](architecture-research.md#inv-008)                  | Завершено | [INV-008](../../research/INV-008/README_ru.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
 | INV-009 | [Shared memory/mmap](architecture-research.md#inv-009)          | Не начато | —                                              | —                                            |
 | INV-010 | [Exposition](architecture-research.md#inv-010)                  | Не начато | —                                              | —                                            |
 | INV-011 | [Семантика финального scrape](architecture-research.md#inv-011) | Не начато | —                                              | —                                            |

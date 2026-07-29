@@ -6,3 +6,4 @@
 - [ADR-004 — Семантика состояния метрик](ADR-004.md)
 - [ADR-005 — Выбор модели transport](ADR-005.md)
 - [ADR-006 — File-based ingestion](ADR-006.md)
+- [ADR-008 — Unix socket как default local ingestion transport](ADR-008.md)

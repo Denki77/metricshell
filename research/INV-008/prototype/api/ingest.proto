@@ -1,0 +1,13 @@
+syntax = "proto3";
+package ingest;
+option go_package = "metricshell/inv008/api";
+
+message PushRequest {
+  repeated bytes records = 1;
+}
+message PushReply {
+  uint64 accepted = 1;
+}
+service Ingest {
+  rpc Push(PushRequest) returns (PushReply);
+}
