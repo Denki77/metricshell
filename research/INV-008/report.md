@@ -77,6 +77,10 @@ All fourteen assertions passed in both environments:
 | adapter shutdown retained accepted state              | pass   |
 | HTTP adapter restart accepted new requests            | pass   |
 
+The `empty HTTP record set` assertion used a syntactically valid request that decoded to zero records. It did not send
+an empty HTTP body and did not model the production zero-series snapshot contract. ADR-004 supersedes rejection of this
+decoded representation; the assertion remains accurate historical prototype evidence, not a production requirement.
+
 The application limit is one decoded MiB for every transport. HTTP’s encoded-body guard is deliberately larger than
 the base64/JSON representation of a valid one-MiB decoded request; the shared store applies the authoritative decoded
 limit. All transports accept exactly one decoded MiB and reject one MiB plus one byte without incrementing state.
@@ -164,8 +168,8 @@ dependencies.
 
 ## Acceptable Values and Policies
 
-- default candidate: no additional push API; use the Unix-socket adapter;
-- optional compatibility candidate: HTTP JSON only when backed by a concrete client requirement;
+- default candidate: use the Unix-socket adapter;
+- stable request/response transport selected by ADR-005: loopback HTTP JSON;
 - gRPC: not part of the default implementation;
 - bind: `127.0.0.1`; external bind requires explicit security design;
 - HTTP endpoint: versioned `/v1/metrics`;
@@ -173,8 +177,10 @@ dependencies.
 - batch: `1–16` records tested;
 - producers: `1–8` concurrent tested;
 - deadlines and bounded reads required;
-- malformed JSON: HTTP `400`; empty/semantic HTTP request: `422`; oversize HTTP request: `413`;
-- malformed/empty/oversized request: reject atomically and retain prior state;
+- malformed JSON: HTTP `400`; prototype empty decoded record set: `422`; oversize HTTP request: `413`;
+- production contract: an empty transport payload is malformed, while a syntactically valid snapshot containing zero
+  metric families or series is a valid zero-series snapshot and must be accepted;
+- malformed/oversized request: reject atomically and retain prior state;
 - adapter shutdown/restart: retain MetricShell state, return connection failure during downtime, require reconnect;
 - schema compatibility: additive changes within a version; breaking changes require a new HTTP path/protobuf package.
 
@@ -223,6 +229,6 @@ INV-008’s initial assumption is confirmed by identical-fingerprint macOS/Linux
 runs. HTTP can improve client convenience, but it duplicates the socket adapter and adds a TCP/HTTP attack surface.
 gRPC improves batched HTTP performance but does not beat the socket baseline and has the highest client/toolchain cost.
 
-Decision: keep Unix socket as the default and omit a mandatory local push API; permit a loopback-only HTTP compatibility
-adapter only for demonstrated integrations; reject gRPC from the default surface. See
+Decision: keep Unix socket as the default, retain loopback HTTP as the stable request/response transport selected by
+ADR-005, and reject gRPC from the default surface. See
 [ADR-008](../../docs/06-architecture/adr/ADR-008.md).

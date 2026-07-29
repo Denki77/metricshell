@@ -1,4 +1,6 @@
 .idea
+.DS_Store
+
 research/INV*/latest-*results.txt
 
 research/INV*/results/*/*

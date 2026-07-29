@@ -11,15 +11,23 @@
 
 ## Цель
 
-Определить:
+Определить минимально достаточный metric-state contract для MetricShell после отделения transport/runtime
+responsibilities от instrumentation и cross-producer aggregation, находящихся вне scope.
 
-* какой компонент владеет истинным состоянием метрик;
-* какая семантика обновлений остаётся корректной при потере сообщений;
-* что происходит при изменении порядка сообщений и повторной доставке;
-* как система восстанавливается после перезапуска producer или receiver;
-* как удаляются устаревшие series;
-* как обрабатываются конфликты типов и схем;
-* как несколько producers могут безопасно публиковать данные в одни экспортируемые metric families.
+## Коррекция scope
+
+Эксперимент намеренно сравнил более широкий набор semantic models, чем требуется продукту. Первоначальная интерпретация
+предполагала, что MetricShell может принимать независимые operations, владеть per-producer contributions и агрегировать
+их для exposition.
+
+Project scope исключает локальную или распределённую агрегацию значений между producers и business metric design.
+Functional requirements требуют consistent acceptance и exposition counters, gauges и histograms, но не требуют
+`increment`, `set`, `observe`, producer epochs, sequence recovery или completeness classification. Эти concerns
+принадлежат workload и его libraries, которые должны публиковать один полный, не содержащий конфликтов application
+snapshot.
+
+Prototype и result files не изменяются. Multi-owner и operation scenarios сохраняются как доказательство сложности,
+которую исключает выбранный scope.
 
 ## Прототип
 
@@ -88,12 +96,12 @@ Environment metadata и идентификаторы image сохраняютс�
 
 ### Семантические сценарии
 
-| Кандидат                    | Восстановление после потерянного update | Восстановление receiver после restart | Несколько producers                              | Удаление stale series        | Вердикт                          |
-|-----------------------------|-----------------------------------------|---------------------------------------|--------------------------------------------------|------------------------------|----------------------------------|
-| Complete per-owner snapshot | при следующем snapshot                  | после повторной публикации            | детерминированная агрегация совместимых значений | да                           | authoritative model              |
-| Per-series absolute values  | только при повторной отправке series    | только после частичной republish      | неоднозначный last-writer-wins                   | нет границы полного registry | только gauges с явным owner      |
-| Operations only             | нет                                     | нет                                   | increments counters коммутативны                 | нет                          | отклонить как единственный truth |
-| Hybrid                      | при reconciliation                      | при reconciliation                    | owner-scoped                                     | да                           | принять                          |
+| Кандидат                   | Recovery после lost update    | Receiver restart   | Несколько producers              | Stale removal        | Scope interpretation                    |
+|----------------------------|-------------------------------|--------------------|----------------------------------|----------------------|-----------------------------------------|
+| Complete snapshot          | при следующем snapshot        | republish          | workload разрешает до публикации | да                   | выбранная minimum sufficient model      |
+| Per-series absolute values | только при повторной отправке | partial republish  | неоднозначный last-writer-wins   | нет границы registry | недостаточный partial-state contract    |
+| Operations only            | нет                           | нет                | counter increments коммутативны  | нет                  | вне scope и недостаточный durable truth |
+| Hybrid                     | при reconciliation            | при reconciliation | owner-scoped                     | да                   | валидный aggregator design вне scope    |
 
 Четыре строки в `semantics.tsv` намеренно имеют `result=fail`.
 
@@ -107,13 +115,16 @@ Environment metadata и идентификаторы image сохраняютс�
 `assertions.tsv` проверяет каждый именованный сценарий отдельно и дополнительно проверяет точное количество сценариев.
 Pass/fail больше не определяется только агрегированным числом успешных и неуспешных строк.
 
-### Граница владения producer
+### Экспериментальная граница владения producer
 
-Для operation path используется полная граница:
+Для экспериментального operation path используется полная граница:
 
 ```text
 (producer_id, producer_epoch, sequence)
 ```
+
+Эта граница является необходимым условием контрфактической operation/hybrid model, а не допустимым набором полей
+production protocol MetricShell.
 
 Правила:
 
@@ -228,48 +239,28 @@ Signal-to-exit latency не является метрикой INV-004.
 
 ## Допустимые значения и protocol constraints
 
-Принятая граница:
+Принятая production boundary — один полный application snapshot.
 
-```text
-(producer_id, producer_epoch, sequence)
-```
+* MetricShell структурно валидирует candidate целиком до state mutation.
+* Валидный candidate атомарно заменяет предыдущий валидный snapshot.
+* Корректно закодированный zero-series snapshot очищает application series; отсутствующий или пустой payload malformed.
+* Missing series удаляются через отсутствие в новом принятом snapshot.
+* Duplicate series, type conflicts и внутренние metadata conflicts candidate отклоняют candidate целиком.
+* Установленная привязка name-to-type family сохраняется после omission до следующего workload execution.
+* Прочая metadata проверяется на внутреннюю согласованность в candidate и не фиксируется на весь execution.
+* Classic histogram требует ordered cumulative buckets, `+Inf`, равный `count`, и numeric `sum`.
+* Counters и histograms не валидируются по business monotonicity между snapshots.
+* MetricShell не принимает instrumentation operations и не агрегирует значения между producers.
+* Success acknowledgement socket/HTTP подтверждает atomic installation в одном linear acceptance order; producer
+  timestamps не переупорядочивают candidates.
+* Final application state — последний валидный принятый полный snapshot либо первоначальный zero-series snapshot.
 
-Complete owner snapshot заменяет только вклад соответствующего owner в registry.
-
-Правила:
-
-* older epoch отклоняется;
-* older и duplicate sequences игнорируются;
-* новый epoch не может применять operations до initial authoritative snapshot;
-* отсутствующие series в новом complete owner snapshot удаляют вклад этого owner;
-* metric types не могут изменяться неявно;
-* histogram boundaries не могут изменяться внутри epoch;
-* counter не может уменьшаться внутри epoch;
-* cumulative histogram buckets и count не могут уменьшаться внутри epoch;
-* новый epoch может начинаться с меньшего counter;
-* новый epoch может reset histogram;
-* совместимые counters агрегируются суммированием;
-* совместимые histogram components агрегируются component-wise;
-* gauge aggregation должна быть явно настроена;
-* без явной policy duplicate gauges отклоняются;
-* type или schema conflict отклоняется и публикуется как ingestion error.
-
-Operations являются optional hints или fast-path updates.
-
-Они не владеют durable truth самостоятельно.
-
-Дополнительные правила:
-
-* sequence gap делает owner incomplete;
-* incomplete owner восстанавливается authoritative snapshot;
-* receiver restart требует republish;
-* final application state требует final authoritative snapshot;
-* фиксированный reconciliation interval в INV-004 не выбирается;
-* interval зависит от performance transport и допустимого окна потери и выбирается в INV-005–INV-008.
+`producer_id`, `producer_epoch`, `sequence`, gaps, completeness state и reconciliation intervals относятся только к
+отклонённой operation/hybrid aggregator model.
 
 ## Дополнительные benchmarks и coverage
 
-Runner выполняет весь in-scope набор semantic и synthetic benchmarks:
+Runner выполняет полный первоначальный набор semantic и synthetic benchmarks:
 
 * все модели-кандидаты;
 * scale matrix;
@@ -298,6 +289,9 @@ Runner выполняет весь in-scope набор semantic и synthetic ben
 `semantics.tsv` и `assertions.tsv` содержат отдельные проверяемые contracts.
 
 `coverage.tsv` содержит high-level coverage groups.
+
+Этот набор намеренно шире текущего product scope. Сохранение broad runner оставляет falsifying и complexity evidence,
+не превращая исследованные механизмы в implementation requirements.
 
 Для более надёжного performance sizing рекомендуется:
 
@@ -338,19 +332,13 @@ transport-free semantic model не может измерить их коррек
 
 ## Вывод
 
-Matching-fingerprint evidence из macOS/LinuxKit и Ubuntu/LinuxKit подтверждает уточнённую гипотезу.
+Matching-fingerprint evidence поддерживает более узкий вывод, чем первоначальный report. Reconciliation требуется, если
+MetricShell принимает изменяющие состояние operations. Producer ownership и aggregation policies требуются, если
+MetricShell объединяет независимо принадлежащие registries. Обе возможности находятся вне scope MetricShell.
 
-Разные transports могут использовать разные представления обновлений, но должны сходиться к одной authoritative semantic
-model.
-
-Принимается hybrid semantics:
-
-* истиной владеют versioned complete per-producer snapshots;
-* sequenced и deduplicated operations являются необязательным ускорением;
-* reconciliation обязателен после sequence gaps;
-* reconciliation обязателен после receiver restart;
-* reconciliation обязателен для final state;
-* operations-only ownership отклоняется;
-* unowned absolute counters отклоняются.
+Выбирается один полный, не содержащий конфликтов application snapshot для file, Unix stream и local HTTP. Каждый
+transport выполняет одну application operation: structural validation и atomic replacement последнего валидного
+snapshot. MetricShell сохраняет Prometheus types, но не применяет instrumentation operations, не проверяет business
+monotonicity между snapshots и не агрегирует конфликтующие producer values.
 
 Решение зафиксировано в [ADR-004](../../docs-ru/06-architecture/adr/ADR-004.md).

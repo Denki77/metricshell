@@ -48,6 +48,10 @@ Docker servers: 29.4.3, 27.4.0
 - shutdown adapter сохраняет accepted state;
 - HTTP restart принимает новые requests.
 
+Assertion `empty HTTP records` использовал синтаксически валидный request, decoded в ноль records. Он не отправлял
+пустой HTTP body и не моделировал production contract zero-series snapshot. ADR-004 отменяет rejection этого decoded
+representation; assertion остаётся точным историческим prototype evidence, а не production requirement.
+
 Application limit равен одному decoded MiB во всех transports. HTTP encoded-body guard превышает размер корректного
 base64/JSON-представления decoded `1 MiB`; authoritative decoded limit применяется общим store.
 
@@ -97,14 +101,16 @@ Active workload использует восемь producers и нескольк�
 ## Принятые значения и policy
 
 - default transport: Unix socket;
-- обязательный local push API отсутствует;
-- HTTP JSON: только optional compatibility adapter для подтверждённой integration requirement;
+- HTTP JSON: stable request/response transport, выбранный ADR-005;
 - gRPC: исключён из default surface;
 - HTTP/gRPC bind: `127.0.0.1`;
 - decoded request limit: `1 MiB`;
 - tested batch: `1–16`;
 - tested concurrency: `1–8`;
-- invalid request отклоняется атомарно, accepted state сохраняется;
+- prototype empty decoded record set: HTTP `422`;
+- production contract: пустой transport payload является malformed, а синтаксически валидный snapshot с нулём metric
+  families или series является валидным zero-series snapshot и должен приниматься;
+- malformed/oversized request отклоняется атомарно, accepted state сохраняется;
 - API и schema должны иметь явное versioning.
 
 ## Ограничения
@@ -118,7 +124,7 @@ backpressure. TLS/mTLS не проверялись, поскольку external 
 ## Итог
 
 Исследование завершено одинаковыми по fingerprint и полностью проходящими прогонами. MetricShell сохраняет Unix socket
-как default ingestion transport, не вводит обязательный HTTP/gRPC push API, допускает loopback-only HTTP compatibility
-adapter при подтверждённой необходимости и исключает gRPC из default surface.
+как default ingestion transport, сохраняет loopback HTTP как stable request/response transport из ADR-005 и исключает
+gRPC из default surface.
 
 Решение зафиксировано в [ADR-008](../../docs-ru/06-architecture/adr/ADR-008.md).

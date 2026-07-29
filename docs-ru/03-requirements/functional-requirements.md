@@ -68,14 +68,30 @@ transport по умолчанию. Одновременная работа не�
 
 ### FR-014 — Эквивалентная семантика метрик
 
-Официальные клиенты СЛЕДУЕТ реализовывать так, чтобы counters, gauges и histograms имели эквивалентную семантику во всех
-transports; одинаковые wire formats и performance при этом не требуются.
+Передача одного и того же полного application snapshot через file, socket или local HTTP ingestion ДОЛЖНА приводить
+к одному и тому же принятому application state и результату exposition. Wire formats, acknowledgement behavior и
+performance МОГУТ различаться.
+
+### FR-015 — Пустой и первоначальный снимки
+
+До первой принятой публикации active application snapshot НЕ ДОЛЖЕН содержать application series. Пустой transport
+payload ДОЛЖЕН считаться malformed. Синтаксически валидный полный snapshot с нулём metric families или series ДОЛЖЕН
+приниматься как zero-series snapshot и очищать active application state. Отсутствующий, обрезанный или иной malformed
+transport payload НЕ ДОЛЖЕН интерпретироваться как zero-series snapshot.
+
+### FR-016 — Подтверждение принятия и порядок
+
+Для socket и local HTTP ingestion успешный acknowledgement ДОЛЖЕН означать, что полный candidate валидирован и атомарно
+установлен. MetricShell ДОЛЖЕН задавать один линейный порядок одновременно принятых candidates и НЕ ДОЛЖЕН определять
+freshness по timestamp, переданному producer. Workload ДОЛЖЕН сериализовать публикации, если важен порядок генерации.
 
 ## Модель метрик
 
 ### FR-020 — Семейства метрик
 
-**MetricShell** ДОЛЖЕН поддерживать counters, gauges и histograms.
+**MetricShell** ДОЛЖЕН сохранять и публиковать Prometheus types counter, gauge и histogram из принятого snapshot.
+MetricShell НЕ ДОЛЖЕН выполнять роль instrumentation library: increment, set, observe и агрегация значений между
+producers не являются ingestion operations.
 
 ### FR-021 — Metadata Prometheus
 
@@ -84,13 +100,16 @@ transports; одинаковые wire formats и performance при этом н�
 
 ### FR-022 — Валидация входных данных
 
-Невалидные входные данные ДОЛЖНЫ отклоняться без падения MetricShell и без завершения workload по умолчанию. Факт
-отклонения ДОЛЖЕН быть наблюдаемым.
+Структурно невалидные входные данные ДОЛЖНЫ отклоняться без падения MetricShell и без завершения workload по умолчанию.
+Структурная validation включает syntax, names, labels, type metadata, duplicate series, структуру histogram и
+настроенные resource limits. MetricShell НЕ ДОЛЖЕН интерпретировать или проверять business meaning структурно валидных
+metric values. Отклонение ДОЛЖНО быть наблюдаемым.
 
 ### FR-023 — Идентичность series и конфликты
 
-Series ДОЛЖНА идентифицироваться именем метрики и набором labels. Duplicate values, type conflicts и metadata conflicts
-ДОЛЖНЫ обрабатываться согласно документированной детерминированной policy.
+Series ДОЛЖНА идентифицироваться именем метрики и набором labels. Duplicate series внутри candidate snapshot,
+type conflicts и metadata conflicts ДОЛЖНЫ приводить к детерминированному атомарному отклонению; MetricShell НЕ ДОЛЖЕН
+разрешать их агрегацией значений.
 
 ### FR-024 — Ограничения ресурсов
 
@@ -101,6 +120,14 @@ Series ДОЛЖНА идентифицироваться именем метри
 
 Ошибки подсистемы метрик НЕ ДОЛЖНЫ повреждать выполнение workload. Строгое поведение, при котором ошибка метрик влияет
 на workload, МОЖЕТ существовать только как явно включаемая configuration.
+
+### FR-026 — Срок жизни привязки типа семейства метрик
+
+После принятия имени metric family с Prometheus metric type внутри одного workload execution то же имя НЕ ДОЛЖНО
+приниматься с другим type до следующего workload execution. Отсутствие всех series family удаляет её значения из
+active state, но НЕ ДОЛЖНО сбрасывать эту привязку name-to-type. HELP, unit, label names, histogram boundaries и прочая
+metadata ДОЛЖНЫ проверяться на внутреннюю согласованность внутри каждого candidate, но это требование не фиксирует их
+на весь workload execution.
 
 ## Публикация метрик
 
@@ -115,12 +142,14 @@ Series ДОЛЖНА идентифицироваться именем метри
 
 ### FR-032 — Состав ответа
 
-Обычный scrape ДОЛЖЕН включать принятые application metrics согласно активной policy и обязательные self-metrics
-**MetricShell**. Он НЕ ДОЛЖЕН неявно добавлять не относящиеся к workload host-wide metrics.
+Обычный scrape ДОЛЖЕН включать все series из active complete application snapshot, оставшиеся после явно настроенной
+filtering, а также обязательные self-metrics **MetricShell**. Active snapshot является первоначальным zero-series
+snapshot либо последним принятым snapshot. Scrape НЕ ДОЛЖЕН неявно исключать принятые application metrics по признаку
+completeness producer или добавлять не относящиеся к workload host-wide metrics.
 
 ### FR-033 — Фильтрация
 
-Операторы ДОЛЖНЫ иметь возможность включать или исключать metric families либо prefixes.
+Операторам СЛЕДУЕТ предоставить возможность включать или исключать семейства метрик либо префиксы.
 
 ### FR-034 — Семантика неуспешного scrape
 
@@ -132,7 +161,9 @@ HTTP errors, partial responses и health indicators ДОЛЖНЫ подчиня�
 ### FR-040 — Финальное наблюдаемое состояние
 
 После завершения workload **MetricShell** ДОЛЖЕН сформировать одно финальное наблюдаемое состояние application metrics
-на основании последних валидных принятых данных. Механизм хранения является архитектурным решением.
+из последнего валидного принятого полного application snapshot. Если ни один snapshot не был принят, первоначальный
+zero-series application snapshot ДОЛЖЕН стать финальным application state. Механизм хранения является архитектурным
+решением.
 
 ### FR-041 — Стабильное финальное состояние
 
