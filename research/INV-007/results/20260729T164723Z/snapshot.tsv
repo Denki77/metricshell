@@ -1,0 +1,3 @@
+case	parts	bytes	committed_version	result
+multipart_atomic_snapshot	3	12000	snap-1	pass
+incomplete_snapshot_not_committed	1	7	snap-1	pass
