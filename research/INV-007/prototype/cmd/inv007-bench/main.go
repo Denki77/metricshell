@@ -22,13 +22,14 @@ import (
 type protocol string
 
 const (
-	line     protocol = "stream-line"
-	framed   protocol = "stream-framed"
-	datagram protocol = "datagram-line"
+	line                   protocol = "stream-line"
+	framed                 protocol = "stream-framed"
+	datagram               protocol = "datagram-line"
+	defaultConnectionLimit          = 64
 )
 
 type counters struct {
-	accepted, valid, malformed, oversized atomic.Int64
+	accepted, valid, malformed, oversized, connectionRejected, active, maxBuffered atomic.Int64
 }
 
 type server struct {
@@ -36,17 +37,20 @@ type server struct {
 	path      string
 	max       int
 	delay     time.Duration
+	connLimit int
+	ack       bool
 	ln        net.Listener
 	pc        net.PacketConn
-	stop      chan struct{}
 	wg        sync.WaitGroup
+	connMu    sync.Mutex
+	conns     map[net.Conn]struct{}
 	c         counters
-	onMessage func([]byte)
+	onMessage func([]byte) bool
 }
 
-func startServer(p protocol, path string, max int, mode os.FileMode, delay time.Duration, onMessage func([]byte)) (*server, error) {
+func startServer(p protocol, path string, max int, mode os.FileMode, delay time.Duration, connLimit int, ack bool, onMessage func([]byte) bool) (*server, error) {
 	_ = os.Remove(path)
-	s := &server{proto: p, path: path, max: max, delay: delay, stop: make(chan struct{}), onMessage: onMessage}
+	s := &server{proto: p, path: path, max: max, delay: delay, connLimit: connLimit, ack: ack, conns: make(map[net.Conn]struct{}), onMessage: onMessage}
 	var err error
 	if p == datagram {
 		s.pc, err = net.ListenPacket("unixgram", path)
@@ -76,29 +80,52 @@ func (s *server) serveStreams() {
 		if err != nil {
 			return
 		}
+		s.connMu.Lock()
+		if len(s.conns) >= s.connLimit {
+			s.c.connectionRejected.Add(1)
+			s.connMu.Unlock()
+			_ = c.Close()
+			continue
+		}
+		s.conns[c] = struct{}{}
+		s.c.active.Add(1)
 		s.c.accepted.Add(1)
+		s.connMu.Unlock()
 		s.wg.Add(1)
-		go func() { defer s.wg.Done(); defer c.Close(); s.readStream(c) }()
+		go func() {
+			defer s.wg.Done()
+			defer func() { s.connMu.Lock(); delete(s.conns, c); s.c.active.Add(-1); s.connMu.Unlock(); _ = c.Close() }()
+			s.readStream(c)
+		}()
 	}
 }
 
 func (s *server) readStream(c net.Conn) {
 	if s.proto == line {
-		r := bufio.NewReaderSize(c, s.max+2)
+		r := bufio.NewReaderSize(c, s.max+1)
 		for {
-			b, err := r.ReadBytes('\n')
-			if len(b) > 0 {
-				if len(b) > s.max+1 {
-					s.c.oversized.Add(1)
-				} else if b[len(b)-1] != '\n' {
-					s.c.malformed.Add(1)
-				} else {
-					s.accept(b[:len(b)-1])
-				}
+			b, err := r.ReadSlice('\n')
+			s.observeBuffered(len(b))
+			if errors.Is(err, bufio.ErrBufferFull) {
+				s.c.oversized.Add(1)
+				s.drainLine(r)
+				s.respond(c, false, "oversized", b)
+				continue
 			}
 			if err != nil {
+				if len(b) > 0 {
+					s.c.malformed.Add(1)
+					s.respond(c, false, "partial", b)
+				}
 				return
 			}
+			if len(b)-1 > s.max {
+				s.c.oversized.Add(1)
+				s.respond(c, false, "oversized", b)
+				continue
+			}
+			payload := b[:len(b)-1]
+			s.respond(c, s.accept(payload), "invalid", payload)
 		}
 	}
 	var h [4]byte
@@ -116,17 +143,57 @@ func (s *server) readStream(c net.Conn) {
 			} else {
 				s.c.malformed.Add(1)
 			}
+			s.respond(c, false, "size", nil)
 			return
 		}
 		b := make([]byte, n)
 		if _, err := io.ReadFull(c, b); err != nil {
 			s.c.malformed.Add(1)
+			s.respond(c, false, "partial", b)
 			return
 		}
-		s.accept(b)
+		s.observeBuffered(len(b))
+		s.respond(c, s.accept(b), "invalid", b)
 	}
 }
 
+func (s *server) observeBuffered(n int) {
+	for {
+		old := s.c.maxBuffered.Load()
+		if int64(n) <= old || s.c.maxBuffered.CompareAndSwap(old, int64(n)) {
+			return
+		}
+	}
+}
+func (s *server) drainLine(r *bufio.Reader) {
+	for {
+		b, err := r.ReadSlice('\n')
+		s.observeBuffered(len(b))
+		if !errors.Is(err, bufio.ErrBufferFull) {
+			return
+		}
+	}
+}
+func messageID(b []byte) string {
+	for _, field := range strings.Fields(string(b)) {
+		if strings.HasPrefix(field, "id=") {
+			return strings.TrimPrefix(field, "id=")
+		}
+	}
+	return "-"
+}
+
+func (s *server) respond(c net.Conn, ok bool, reason string, b []byte) {
+	if !s.ack {
+		return
+	}
+	_ = c.SetWriteDeadline(time.Now().Add(time.Second))
+	if ok {
+		_, _ = io.WriteString(c, "ACK "+messageID(b)+"\n")
+	} else {
+		_, _ = io.WriteString(c, "NACK "+messageID(b)+" "+reason+"\n")
+	}
+}
 func (s *server) serveDatagrams() {
 	defer s.wg.Done()
 	buf := make([]byte, s.max+2)
@@ -135,7 +202,8 @@ func (s *server) serveDatagrams() {
 		if err != nil {
 			return
 		}
-		if n-1 > s.max {
+		s.observeBuffered(n)
+		if n > s.max+1 {
 			s.c.oversized.Add(1)
 			continue
 		}
@@ -146,33 +214,34 @@ func (s *server) serveDatagrams() {
 		s.accept(buf[:n-1])
 	}
 }
-
-func (s *server) accept(b []byte) {
+func (s *server) accept(b []byte) bool {
 	if s.delay > 0 {
 		time.Sleep(s.delay)
 	}
 	if !strings.HasPrefix(string(b), "v1 ") {
 		s.c.malformed.Add(1)
-		return
+		return false
 	}
 	s.c.valid.Add(1)
-	if s.onMessage != nil {
-		s.onMessage(b)
+	if s.onMessage != nil && !s.onMessage(b) {
+		s.c.valid.Add(-1)
+		s.c.malformed.Add(1)
+		return false
 	}
+	return true
 }
 func (s *server) close() {
-	select {
-	case <-s.stop:
-		return
-	default:
-		close(s.stop)
-	}
 	if s.ln != nil {
 		_ = s.ln.Close()
 	}
 	if s.pc != nil {
 		_ = s.pc.Close()
 	}
+	s.connMu.Lock()
+	for c := range s.conns {
+		_ = c.Close()
+	}
+	s.connMu.Unlock()
 	s.wg.Wait()
 	_ = os.Remove(s.path)
 }
@@ -182,7 +251,7 @@ func dial(p protocol, path string) (net.Conn, error) {
 	if p == datagram {
 		network = "unixgram"
 	}
-	return net.DialTimeout(network, path, 2*time.Second)
+	return net.DialTimeout(network, path, 500*time.Millisecond)
 }
 func send(c net.Conn, p protocol, b []byte) error {
 	if p == line || p == datagram {
@@ -195,7 +264,14 @@ func send(c net.Conn, p protocol, b []byte) error {
 	_, err := c.Write(out)
 	return err
 }
-
+func sendAck(c net.Conn, p protocol, b []byte) (string, error) {
+	if err := send(c, p, b); err != nil {
+		return "", err
+	}
+	_ = c.SetReadDeadline(time.Now().Add(time.Second))
+	r, err := bufio.NewReader(c).ReadString('\n')
+	return strings.TrimSpace(r), err
+}
 func waitFor(fn func() bool, d time.Duration) bool {
 	end := time.Now().Add(d)
 	for time.Now().Before(end) {
@@ -226,11 +302,17 @@ func (t *tsv) row(format string, a ...any) {
 	fmt.Fprintf(t.f, format+"\n", a...)
 }
 func (t *tsv) close() { _ = t.f.Close() }
-func boolResult(v bool) string {
-	if v {
+func result(ok bool) string {
+	if ok {
 		return "pass"
 	}
 	return "fail"
+}
+func mapErr(err error) string {
+	if err != nil {
+		return "error"
+	}
+	return "ok"
 }
 
 func correctness(dir string, max int) int {
@@ -242,11 +324,11 @@ func correctness(dir string, max int) int {
 		if !ok {
 			failed++
 		}
-		out.row("%s\t%s\t%s\t%s\t%s", p, name, expected, actual, boolResult(ok))
+		out.row("%s\t%s\t%s\t%s\t%s", p, name, expected, actual, result(ok))
 	}
 	for _, p := range []protocol{line, framed, datagram} {
 		path := "/tmp/inv007-" + string(p) + ".sock"
-		s, err := startServer(p, path, max, 0660, 0, nil)
+		s, err := startServer(p, path, max, 0660, 0, defaultConnectionLimit, false, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -277,53 +359,91 @@ func correctness(dir string, max int) int {
 			check(p, "disconnect_mid_message", "2", strconv.FormatInt(s.c.malformed.Load(), 10))
 		}
 		c, _ = dial(p, path)
-		exact := []byte("v1 " + strings.Repeat("x", max-3))
-		_ = send(c, p, exact)
+		_ = send(c, p, []byte("v1 "+strings.Repeat("x", max-3)))
 		_ = c.Close()
 		waitFor(func() bool { return s.c.valid.Load() == 2 }, time.Second)
 		check(p, "maximum_payload_accepted", "2", strconv.FormatInt(s.c.valid.Load(), 10))
 		c, _ = dial(p, path)
-		tooBig := []byte("v1 " + strings.Repeat("x", max))
-		_ = send(c, p, tooBig)
+		oversizedBytes := max * 2
+		if p == datagram {
+			oversizedBytes = max + 1024
+		}
+		_ = send(c, p, []byte("v1 "+strings.Repeat("x", oversizedBytes)))
 		_ = c.Close()
 		waitFor(func() bool { return s.c.oversized.Load() >= 1 }, time.Second)
-		check(p, "oversized_rejected", "1", strconv.FormatInt(s.c.oversized.Load(), 10))
-		s.close()
+		check(p, "substantially_oversized_rejected", "1", strconv.FormatInt(s.c.oversized.Load(), 10))
+		if p == line {
+			check(p, "bounded_parser_buffer", "true", strconv.FormatBool(s.c.maxBuffered.Load() <= int64(max+1)))
+		}
+
+		if p != datagram {
+			active, _ := dial(p, path)
+			if p == line {
+				_, _ = active.Write([]byte("v1 " + strings.Repeat("z", max-3)))
+				time.Sleep(10 * time.Millisecond)
+			}
+			start := time.Now()
+			done := make(chan struct{})
+			go func() { s.close(); close(done) }()
+			select {
+			case <-done:
+				check(p, "shutdown_active_client_bounded", "true", strconv.FormatBool(time.Since(start) < time.Second))
+			case <-time.After(time.Second):
+				check(p, "shutdown_active_client_bounded", "true", "false")
+			}
+			_ = active.SetReadDeadline(time.Now().Add(time.Second))
+			one := make([]byte, 1)
+			_, readErr := active.Read(one)
+			check(p, "shutdown_breaks_old_connection", "error", mapErr(readErr))
+			_ = active.Close()
+		} else {
+			s.close()
+		}
 		_, err = dial(p, path)
 		check(p, "shutdown_refuses_new", "error", mapErr(err))
 
-		// Startup race: bounded client retry succeeds after the socket appears.
-		var attempts int
-		var rc net.Conn
-		done := make(chan struct{})
+		type retryResult struct {
+			attempts int
+			c        net.Conn
+			err      error
+		}
+		retryCh := make(chan retryResult, 1)
 		go func() {
-			defer close(done)
+			rr := retryResult{}
 			for i := 0; i < 50; i++ {
-				attempts++
-				rc, err = dial(p, path)
-				if err == nil {
+				rr.attempts++
+				rr.c, rr.err = dial(p, path)
+				if rr.err == nil {
+					retryCh <- rr
 					return
 				}
 				time.Sleep(10 * time.Millisecond)
 			}
+			retryCh <- rr
 		}()
 		time.Sleep(50 * time.Millisecond)
-		s, err = startServer(p, path, max, 0660, 0, nil)
+		s, err = startServer(p, path, max, 0660, 0, defaultConnectionLimit, false, nil)
 		if err != nil {
 			panic(err)
 		}
-		<-done
-		check(p, "startup_retry", "ok", mapErr(err))
-		if rc != nil {
-			_ = rc.Close()
+		rr := <-retryCh
+		check(p, "startup_retry", "ok", mapErr(rr.err))
+		check(p, "startup_retry_bounded", "true", strconv.FormatBool(rr.attempts > 1 && rr.attempts < 50))
+		if rr.c != nil {
+			_ = rr.c.Close()
 		}
-		check(p, "startup_retry_bounded", "true", strconv.FormatBool(attempts > 1 && attempts < 50))
 
-		// Restart: persistent connection breaks, reconnect delivers to new epoch.
 		old, _ := dial(p, path)
+		restartDone := make(chan struct{})
+		go func() { s.close(); close(restartDone) }()
+		if p != datagram {
+			_ = old.SetReadDeadline(time.Now().Add(time.Second))
+			_, readErr := old.Read(make([]byte, 1))
+			check(p, "restart_old_connection_error", "error", mapErr(readErr))
+		}
+		<-restartDone
 		_ = old.Close()
-		s.close()
-		s2, err := startServer(p, path, max, 0660, 0, nil)
+		s2, err := startServer(p, path, max, 0660, 0, defaultConnectionLimit, false, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -333,17 +453,27 @@ func correctness(dir string, max int) int {
 			_ = fresh.Close()
 		}
 		waitFor(func() bool { return s2.c.valid.Load() == 1 }, time.Second)
-		check(p, "restart_reconnect", "1", strconv.FormatInt(s2.c.valid.Load(), 10))
+		check(p, "restart_reconnect_new_epoch", "1", strconv.FormatInt(s2.c.valid.Load(), 10))
 		s2.close()
 	}
-	return failed
-}
-
-func mapErr(err error) string {
-	if err != nil {
-		return "error"
+	for _, p := range []protocol{line, framed} {
+		path := "/tmp/inv007-ack.sock"
+		s, err := startServer(p, path, max, 0660, 0, defaultConnectionLimit, true, nil)
+		if err != nil {
+			panic(err)
+		}
+		c, _ := dial(p, path)
+		ack, err := sendAck(c, p, []byte("v1 id=42 metric=1"))
+		check(p, "ack_after_accept", "ACK 42", ack)
+		check(p, "ack_read", "ok", mapErr(err))
+		_ = c.Close()
+		c, _ = dial(p, path)
+		nack, _ := sendAck(c, p, []byte("bad id=43"))
+		check(p, "nack_invalid", "NACK 43 invalid", nack)
+		_ = c.Close()
+		s.close()
 	}
-	return "ok"
+	return failed
 }
 
 func percentile(v []float64, q float64) float64 {
@@ -351,12 +481,62 @@ func percentile(v []float64, q float64) float64 {
 		return 0
 	}
 	sort.Float64s(v)
-	i := int(q * float64(len(v)-1))
-	return v[i]
+	return v[int(q*float64(len(v)-1))]
+}
+func rssKiB() int64 {
+	b, err := os.ReadFile("/proc/self/statm")
+	if err != nil {
+		return -1
+	}
+	f := strings.Fields(string(b))
+	if len(f) < 2 {
+		return -1
+	}
+	pages, err := strconv.ParseInt(f[1], 10, 64)
+	if err != nil {
+		return -1
+	}
+	return pages * int64(os.Getpagesize()) / 1024
+}
+
+func memoryEvidence(dir string, max int) int {
+	out := newTSV(dir+"/memory.tsv", "case\tmessage_bytes\tmessages\tmax_parser_buffer_bytes\trss_before_kib\trss_after_kib\trss_delta_kib\tallowed_delta_kib\tresult")
+	defer out.close()
+	runtime.GC()
+	before := rssKiB()
+	path := "/tmp/inv007-memory.sock"
+	s, err := startServer(line, path, max, 0660, 0, defaultConnectionLimit, false, nil)
+	if err != nil {
+		panic(err)
+	}
+	payload := []byte("v1 " + strings.Repeat("m", max*2))
+	wire := append(append([]byte{}, payload...), '\n')
+	c, err := dial(line, path)
+	if err != nil {
+		panic(err)
+	}
+	for i := 0; i < 16; i++ {
+		if _, err = c.Write(wire); err != nil {
+			break
+		}
+	}
+	_ = c.Close()
+	waitFor(func() bool { return s.c.oversized.Load() == 16 }, 3*time.Second)
+	s.close()
+	runtime.GC()
+	after := rssKiB()
+	delta := after - before
+	allowed := int64(16 * 1024)
+	ok := s.c.oversized.Load() == 16 && s.c.maxBuffered.Load() <= int64(max+1) && delta <= allowed
+	out.row("bounded_line_reader\t%d\t16\t%d\t%d\t%d\t%d\t%d\t%s", len(payload), s.c.maxBuffered.Load(), before, after, delta, allowed, result(ok))
+	if !ok {
+		return 1
+	}
+	return 0
 }
 
 func performance(dir string, max, repetitions int) int {
-	out := newTSV(dir+"/performance.tsv", "protocol\tproducers\tpayload_bytes\tmessages\trepetition\tdelivered\tdropped_or_failed\twall_ms\tmsg_per_second\tp50_us\tp95_us\tp99_us\tcpu_ms\trss_kib\tresult")
+	out := newTSV(dir+"/performance.tsv", "protocol\tproducers\tpayload_bytes\tmessages\trepetition\tdelivered\tdropped_or_failed\twall_ms\tmsg_per_second\tp50_us\tp95_us\tp99_us\tcpu_ms\tgo_runtime_sys_kib\trss_kib\tresult")
 	defer out.close()
 	failed := 0
 	for _, p := range []protocol{line, framed, datagram} {
@@ -370,7 +550,7 @@ func performance(dir string, max, repetitions int) int {
 					path := "/tmp/inv007-perf.sock"
 					var latMu sync.Mutex
 					lat := make([]float64, 0, producers*perProducer)
-					s, err := startServer(p, path, max, 0660, 0, func(b []byte) {
+					s, err := startServer(p, path, max, 0660, 0, defaultConnectionLimit, false, func(b []byte) bool {
 						parts := strings.SplitN(string(b), " ", 3)
 						if len(parts) > 1 {
 							if ns, e := strconv.ParseInt(parts[1], 10, 64); e == nil {
@@ -379,6 +559,7 @@ func performance(dir string, max, repetitions int) int {
 								latMu.Unlock()
 							}
 						}
+						return true
 					})
 					if err != nil {
 						panic(err)
@@ -400,8 +581,7 @@ func performance(dir string, max, repetitions int) int {
 							defer c.Close()
 							padding := strings.Repeat("x", size-30)
 							for i := 0; i < perProducer; i++ {
-								b := []byte(fmt.Sprintf("v1 %d %s", time.Now().UnixNano(), padding))
-								if e = send(c, p, b); e != nil {
+								if e = send(c, p, []byte(fmt.Sprintf("v1 %d %s", time.Now().UnixNano(), padding))); e != nil {
 									sendFail.Add(1)
 								}
 							}
@@ -414,17 +594,15 @@ func performance(dir string, max, repetitions int) int {
 					_ = syscall.Getrusage(syscall.RUSAGE_SELF, &after)
 					s.close()
 					delivered := s.c.valid.Load()
-					lost := expected - delivered
 					userUS := (after.Utime.Sec-before.Utime.Sec)*1e6 + int64(after.Utime.Usec-before.Utime.Usec)
 					systemUS := (after.Stime.Sec-before.Stime.Sec)*1e6 + int64(after.Stime.Usec-before.Stime.Usec)
-					cpu := float64(userUS+systemUS) / 1000
 					var ms runtime.MemStats
 					runtime.ReadMemStats(&ms)
 					ok := delivered == expected
 					if !ok {
 						failed++
 					}
-					out.row("%s\t%d\t%d\t%d\t%d\t%d\t%d\t%.3f\t%.1f\t%.3f\t%.3f\t%.3f\t%.3f\t%d\t%s", p, producers, size, expected, rep, delivered, lost, wall.Seconds()*1000, float64(delivered)/wall.Seconds(), percentile(lat, .50), percentile(lat, .95), percentile(lat, .99), cpu, ms.Sys/1024, boolResult(ok))
+					out.row("%s\t%d\t%d\t%d\t%d\t%d\t%d\t%.3f\t%.1f\t%.3f\t%.3f\t%.3f\t%.3f\t%d\t%d\t%s", p, producers, size, expected, rep, delivered, expected-delivered, wall.Seconds()*1000, float64(delivered)/wall.Seconds(), percentile(lat, .5), percentile(lat, .95), percentile(lat, .99), float64(userUS+systemUS)/1000, ms.Sys/1024, rssKiB(), result(ok))
 				}
 			}
 		}
@@ -440,11 +618,11 @@ func pressure(dir string, max int) int {
 		if !ok {
 			failed++
 		}
-		out.row("%s\t%s\t%d\t%d\t%d\t%.3f\t%s", p, name, input, delivered, blocked, d.Seconds()*1000, boolResult(ok))
+		out.row("%s\t%s\t%d\t%d\t%d\t%.3f\t%s", p, name, input, delivered, blocked, d.Seconds()*1000, result(ok))
 	}
 	for _, p := range []protocol{line, framed, datagram} {
 		path := "/tmp/inv007-pressure.sock"
-		s, err := startServer(p, path, max, 0660, 200*time.Microsecond, nil)
+		s, err := startServer(p, path, max, 0660, 200*time.Microsecond, defaultConnectionLimit, false, nil)
 		if err != nil {
 			panic(err)
 		}
@@ -474,10 +652,35 @@ func pressure(dir string, max int) int {
 		waitFor(func() bool { return s.c.valid.Load()+sf.Load() >= n }, 5*time.Second)
 		d := time.Since(start)
 		s.close()
-		ok := s.c.valid.Load()+sf.Load() == n
-		check(p, "slow_reader_backpressure", n, int(s.c.valid.Load()), int(sf.Load()), d, ok)
+		check(p, "slow_reader_backpressure", n, int(s.c.valid.Load()), int(sf.Load()), d, s.c.valid.Load()+sf.Load() == n)
 	}
-	// File descriptor pressure: lower the soft limit, hold clients, and verify bounded rejection/recovery.
+	path := "/tmp/inv007-limit.sock"
+	s, err := startServer(line, path, max, 0660, 0, 8, false, nil)
+	if err != nil {
+		panic(err)
+	}
+	var conns []net.Conn
+	for i := 0; i < 32; i++ {
+		c, e := dial(line, path)
+		if e == nil {
+			conns = append(conns, c)
+		}
+	}
+	waitFor(func() bool { return s.c.connectionRejected.Load() > 0 }, time.Second)
+	rejected := int(s.c.connectionRejected.Load())
+	for _, c := range conns {
+		_ = c.Close()
+	}
+	waitFor(func() bool { return s.c.active.Load() == 0 }, time.Second)
+	recovery, recErr := dial(line, path)
+	if recErr == nil {
+		_ = send(recovery, line, []byte("v1 recovered=1"))
+		_ = recovery.Close()
+	}
+	waitFor(func() bool { return s.c.valid.Load() == 1 }, time.Second)
+	check(line, "application_connection_limit_recovery", 32, 1, rejected, 0, rejected > 0 && s.c.valid.Load() == 1)
+	s.close()
+
 	var old syscall.Rlimit
 	_ = syscall.Getrlimit(syscall.RLIMIT_NOFILE, &old)
 	lim := old
@@ -485,29 +688,28 @@ func pressure(dir string, max int) int {
 		lim.Cur = 128
 	}
 	_ = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &lim)
-	path := "/tmp/inv007-fd.sock"
-	s, err := startServer(line, path, max, 0660, 0, nil)
+	s, err = startServer(line, path, max, 0660, 0, 256, false, nil)
 	if err != nil {
 		panic(err)
 	}
-	var conns []net.Conn
-	rejected := 0
+	conns = nil
+	rejected = 0
 	start := time.Now()
 	for i := 0; i < 256; i++ {
 		c, e := dial(line, path)
 		if e != nil {
 			rejected++
-			continue
+		} else {
+			conns = append(conns, c)
 		}
-		conns = append(conns, c)
 	}
 	for _, c := range conns {
 		_ = c.Close()
 	}
 	s.close()
 	_ = syscall.Setrlimit(syscall.RLIMIT_NOFILE, &old)
-	check(line, "fd_exhaustion", 256, len(conns), rejected, time.Since(start), rejected > 0)
-	s, err = startServer(datagram, path, max, 0660, 0, nil)
+	check(line, "system_fd_exhaustion", 256, len(conns), rejected, time.Since(start), rejected > 0)
+	s, err = startServer(datagram, path, max, 0660, 0, defaultConnectionLimit, false, nil)
 	if err != nil {
 		panic(err)
 	}
@@ -516,15 +718,96 @@ func pressure(dir string, max int) int {
 		panic(err)
 	}
 	start = time.Now()
-	rejected = 0
 	for i := 0; i < 256; i++ {
-		if send(c, datagram, []byte("v1 fd=1")) != nil {
-			rejected++
-		}
+		_ = send(c, datagram, []byte("v1 fd=1"))
 	}
 	_ = c.Close()
 	waitFor(func() bool { return s.c.valid.Load() == 256 }, time.Second)
 	check(datagram, "fd_model_no_per_producer_accept", 256, int(s.c.valid.Load()), int(s.c.accepted.Load()), time.Since(start), s.c.valid.Load() == 256 && s.c.accepted.Load() == 0)
+	s.close()
+	return failed
+}
+
+func snapshot(dir string, max int) int {
+	out := newTSV(dir+"/snapshot.tsv", "case\tparts\tbytes\tcommitted_version\tresult")
+	defer out.close()
+	failed := 0
+	path := "/tmp/inv007-snapshot.sock"
+	var mu sync.Mutex
+	parts := map[int]string{}
+	committed := ""
+	pendingID := ""
+	expectedParts := 0
+	s, err := startServer(line, path, max, 0660, 0, defaultConnectionLimit, true, func(b []byte) bool {
+		f := strings.Fields(string(b))
+		if len(f) < 3 {
+			return false
+		}
+		mu.Lock()
+		defer mu.Unlock()
+		switch f[1] {
+		case "snapshot_begin":
+			if len(f) < 4 {
+				return false
+			}
+			expectedParts, _ = strconv.Atoi(f[3])
+			if expectedParts <= 0 {
+				return false
+			}
+			pendingID = f[2]
+			parts = map[int]string{}
+			return true
+		case "snapshot_part":
+			if len(f) >= 5 && f[2] == pendingID {
+				i, _ := strconv.Atoi(f[3])
+				if i < 0 || i >= expectedParts {
+					return false
+				}
+				parts[i] = f[4]
+				return true
+			}
+			return false
+		case "snapshot_commit":
+			if f[2] != pendingID || len(parts) != expectedParts {
+				return false
+			}
+			committed = f[2]
+			return true
+		}
+		return false
+	})
+	if err != nil {
+		panic(err)
+	}
+	c, _ := dial(line, path)
+	msgs := []string{"v1 snapshot_begin snap-1 3 id=begin-1", "v1 snapshot_part snap-1 0 " + strings.Repeat("a", 4000) + " id=part-0", "v1 snapshot_part snap-1 1 " + strings.Repeat("b", 4000) + " id=part-1", "v1 snapshot_part snap-1 2 " + strings.Repeat("c", 4000) + " id=part-2", "v1 snapshot_commit snap-1 id=commit-1"}
+	for index, m := range msgs {
+		ack, e := sendAck(c, line, []byte(m))
+		expectedIDs := []string{"begin-1", "part-0", "part-1", "part-2", "commit-1"}
+		if e != nil || ack != "ACK "+expectedIDs[index] {
+			failed++
+		}
+	}
+	_ = c.Close()
+	mu.Lock()
+	ok := committed == "snap-1" && len(parts) == 3
+	mu.Unlock()
+	if !ok {
+		failed++
+	}
+	out.row("multipart_atomic_snapshot\t3\t12000\t%s\t%s", committed, result(ok))
+	c, _ = dial(line, path)
+	_, _ = sendAck(c, line, []byte("v1 snapshot_begin snap-2 2 id=begin-2"))
+	_, _ = sendAck(c, line, []byte("v1 snapshot_part snap-2 0 partial id=part-2-0"))
+	incompleteNack, _ := sendAck(c, line, []byte("v1 snapshot_commit snap-2 id=commit-2"))
+	_ = c.Close()
+	mu.Lock()
+	incompleteRetained := committed == "snap-1" && strings.HasPrefix(incompleteNack, "NACK commit-2")
+	mu.Unlock()
+	if !incompleteRetained {
+		failed++
+	}
+	out.row("incomplete_snapshot_not_committed\t1\t7\t%s\t%s", committed, result(incompleteRetained))
 	s.close()
 	return failed
 }
@@ -539,7 +822,7 @@ func main() {
 	if err := os.MkdirAll(out, 0755); err != nil {
 		panic(err)
 	}
-	failed := correctness(out, max) + performance(out, max, reps) + pressure(out, max)
+	failed := correctness(out, max) + memoryEvidence(out, max) + performance(out, max, reps) + pressure(out, max) + snapshot(out, max)
 	s := newTSV(out+"/summary.tsv", "metric\tvalue")
 	s.row("portable_assertions_failed\t%d", failed)
 	s.row("max_payload_bytes\t%d", max)

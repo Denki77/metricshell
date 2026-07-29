@@ -47,7 +47,7 @@ docker start -a "${CONTAINER}" >"${RESULTS_DIR}/benchmark.log" 2>&1
 BENCH_EXIT=$?
 set -e
 docker cp "${CONTAINER}:/results/." "${RESULTS_DIR}"
-for required in summary.tsv correctness.tsv performance.tsv pressure.tsv; do
+for required in summary.tsv correctness.tsv memory.tsv performance.tsv pressure.tsv snapshot.tsv; do
   if [ ! -s "${RESULTS_DIR}/${required}" ]; then
     echo "benchmark did not produce ${required}" >&2
     BENCH_EXIT=1

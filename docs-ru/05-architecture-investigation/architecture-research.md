@@ -456,7 +456,7 @@ MetricShell, malformed frames, maximum payload и file-descriptor exhaustion.
 
 ### Статус
 
-Завершено.
+В процессе.
 
 ---
 

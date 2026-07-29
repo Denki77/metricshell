@@ -1,6 +1,0 @@
-protocol	case	input	delivered	failed_or_blocked	duration_ms	result
-stream-line	slow_reader_backpressure	2000	2000	0	203.927	pass
-stream-framed	slow_reader_backpressure	2000	2000	0	132.688	pass
-datagram-line	slow_reader_backpressure	2000	2000	0	1744.505	pass
-stream-line	fd_exhaustion	256	60	196	15.073	pass
-datagram-line	fd_model_no_per_producer_accept	256	256	0	3.926	pass
