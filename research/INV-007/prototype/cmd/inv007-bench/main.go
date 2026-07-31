@@ -188,10 +188,26 @@ func (s *server) respond(c net.Conn, ok bool, reason string, b []byte) {
 		return
 	}
 	_ = c.SetWriteDeadline(time.Now().Add(time.Second))
+	fields := strings.Fields(string(b))
+	command := ""
+	publicationID := messageID(b)
+	if len(fields) >= 2 {
+		command = fields[1]
+	}
+	if strings.HasPrefix(command, "snapshot_") && len(fields) >= 3 {
+		publicationID = fields[2]
+	}
 	if ok {
-		_, _ = io.WriteString(c, "ACK "+messageID(b)+"\n")
+		switch command {
+		case "snapshot_begin", "snapshot_part":
+			_, _ = io.WriteString(c, "FRAME_ACCEPTED "+messageID(b)+"\n")
+		case "snapshot_commit":
+			_, _ = io.WriteString(c, "ACK "+publicationID+"\n")
+		default:
+			_, _ = io.WriteString(c, "ACK "+messageID(b)+"\n")
+		}
 	} else {
-		_, _ = io.WriteString(c, "NACK "+messageID(b)+" "+reason+"\n")
+		_, _ = io.WriteString(c, "NACK "+publicationID+" "+reason+"\n")
 	}
 }
 func (s *server) serveDatagrams() {
@@ -729,7 +745,7 @@ func pressure(dir string, max int) int {
 }
 
 func snapshot(dir string, max int) int {
-	out := newTSV(dir+"/snapshot.tsv", "case\tparts\tbytes\tcommitted_version\tresult")
+	out := newTSV(dir+"/snapshot.tsv", "case\tparts\tbytes\tcommitted_version\tframe_response\tcommit_response\tresult")
 	defer out.close()
 	failed := 0
 	path := "/tmp/inv007-snapshot.sock"
@@ -781,10 +797,12 @@ func snapshot(dir string, max int) int {
 	}
 	c, _ := dial(line, path)
 	msgs := []string{"v1 snapshot_begin snap-1 3 id=begin-1", "v1 snapshot_part snap-1 0 " + strings.Repeat("a", 4000) + " id=part-0", "v1 snapshot_part snap-1 1 " + strings.Repeat("b", 4000) + " id=part-1", "v1 snapshot_part snap-1 2 " + strings.Repeat("c", 4000) + " id=part-2", "v1 snapshot_commit snap-1 id=commit-1"}
+	responses := make([]string, 0, len(msgs))
 	for index, m := range msgs {
 		ack, e := sendAck(c, line, []byte(m))
-		expectedIDs := []string{"begin-1", "part-0", "part-1", "part-2", "commit-1"}
-		if e != nil || ack != "ACK "+expectedIDs[index] {
+		responses = append(responses, ack)
+		expectedResponses := []string{"FRAME_ACCEPTED begin-1", "FRAME_ACCEPTED part-0", "FRAME_ACCEPTED part-1", "FRAME_ACCEPTED part-2", "ACK snap-1"}
+		if e != nil || ack != expectedResponses[index] {
 			failed++
 		}
 	}
@@ -795,19 +813,19 @@ func snapshot(dir string, max int) int {
 	if !ok {
 		failed++
 	}
-	out.row("multipart_atomic_snapshot\t3\t12000\t%s\t%s", committed, result(ok))
+	out.row("multipart_atomic_snapshot\t3\t12000\t%s\t%s\t%s\t%s", committed, responses[1], responses[4], result(ok))
 	c, _ = dial(line, path)
-	_, _ = sendAck(c, line, []byte("v1 snapshot_begin snap-2 2 id=begin-2"))
-	_, _ = sendAck(c, line, []byte("v1 snapshot_part snap-2 0 partial id=part-2-0"))
+	beginResponse, _ := sendAck(c, line, []byte("v1 snapshot_begin snap-2 2 id=begin-2"))
+	partResponse, _ := sendAck(c, line, []byte("v1 snapshot_part snap-2 0 partial id=part-2-0"))
 	incompleteNack, _ := sendAck(c, line, []byte("v1 snapshot_commit snap-2 id=commit-2"))
 	_ = c.Close()
 	mu.Lock()
-	incompleteRetained := committed == "snap-1" && strings.HasPrefix(incompleteNack, "NACK commit-2")
+	incompleteRetained := committed == "snap-1" && beginResponse == "FRAME_ACCEPTED begin-2" && partResponse == "FRAME_ACCEPTED part-2-0" && strings.HasPrefix(incompleteNack, "NACK snap-2")
 	mu.Unlock()
 	if !incompleteRetained {
 		failed++
 	}
-	out.row("incomplete_snapshot_not_committed\t1\t7\t%s\t%s", committed, result(incompleteRetained))
+	out.row("incomplete_snapshot_not_committed\t1\t7\t%s\t%s\t%s\t%s", committed, partResponse, incompleteNack, result(incompleteRetained))
 	s.close()
 	return failed
 }

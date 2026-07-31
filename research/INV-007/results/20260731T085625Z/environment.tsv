@@ -1,0 +1,15 @@
+key	value
+run_date_utc	2026-07-31T08:56:40Z
+repository_head_sha	636faf23566e8743c631eba3633f6948ad48c2fd
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	0
+benchmark_code_fingerprint_sha256	298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391
+image_id	sha256:d6addd1c365f85b479125c189a4ba16e31f7ec008f79702a91dca1af6a7a20a1
+docker_server_version	29.6.2
+docker_os	Docker Desktop
+docker_architecture	aarch64
+container_kernel	Linux f3f79e99f42e 6.12.76-linuxkit #1 SMP Sat Jul 11 11:18:11 UTC 2026 aarch64 Linux
+container_image_architecture	arm64
+repetitions	3
+max_payload_bytes	65536
+benchmark_exit	0

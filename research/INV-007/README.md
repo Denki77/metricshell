@@ -2,10 +2,10 @@
 
 [Русская версия](README_ru.md)
 
-**Status:** completed  
-**Reference runs:** `results/20260729T072602Z`, `results/20260729T164723Z`  
+**Status:** in progress  
+Current reference run: `results/20260731T085625Z`  
 **Report:** [report.md](report.md)  
-**Decision:** [ADR-007](../../docs/06-architecture/adr/ADR-007.md)
+**Proposed decision:** [ADR-007](../../docs/06-architecture/adr/ADR-007.md)
 
 ## Question
 
@@ -14,115 +14,100 @@ ADR-004?
 
 ## Scope Alignment
 
-ADR-004 was narrowed while INV-007 was running. MetricShell now accepts one complete, conflict-free application
-snapshot per publication. It does not accept instrumentation operations, aggregate per-producer registries, or own
-producer identity, sequencing and reconciliation.
+MetricShell accepts one complete, conflict-free application snapshot per publication. It does not accept
+instrumentation operations, aggregate per-producer registries, or own producer identity, sequencing and reconciliation.
 
-Socket multipart framing is therefore transport-level assembly of one complete candidate snapshot. Parts are never
-installed or exposed independently. A valid commit triggers complete-candidate validation and atomic replacement.
+Multipart framing assembles one complete candidate at the transport layer. Parts are never installed or exposed
+independently.
+
+## Revised ACK Contract
+
+- `FRAME_ACCEPTED <frame-id>` confirms only that `snapshot_begin` or `snapshot_part` was accepted into bounded temporary
+  transaction state.
+- `FRAME_ACCEPTED` does not confirm publication acceptance and does not permit the client to discard authoritative
+  publication state.
+- `ACK <publication-id>` is emitted only after `snapshot_commit`, complete structural validation and atomic
+  installation.
+- `NACK <publication-id> <reason>` rejects the publication and preserves the last valid snapshot.
+- A successful socket `Write` is not application acceptance.
+
+The current prototype recorded `FRAME_ACCEPTED part-0`, final `ACK snap-1`, and `NACK snap-2 invalid` for an incomplete
+publication.
 
 ## Selected Direction
 
-- Unix stream is the primary reliable socket transport.
-- Native framing is versioned newline-delimited text.
-- Confirmed mode correlates a publication ID with `ACK <id>` or `NACK <id> <reason>`.
-- ACK is emitted only after the complete candidate has been structurally validated and atomically installed.
-- A candidate larger than one frame uses `snapshot_begin`, bounded `snapshot_part` frames and `snapshot_commit`.
-- Initial configurable frame-size default is 8 KiB. It is a conservative starting value, not a benchmark-derived
-  architecture limit.
-- 65,536 B is the maximum individual payload exercised in the reference runs, not a built-in hard ceiling.
-- Datagram is rejected as the reliable primary transport.
+- Primary transport: Unix stream.
+- Native framing: bounded versioned newline-delimited text.
+- Candidate larger than one frame: `snapshot_begin`, bounded indexed `snapshot_part`, `snapshot_commit`.
+- Initial configurable frame default: 8 KiB; this is not a benchmark-derived architecture limit.
+- Maximum individual payload exercised: 65,536 B; this is not a built-in hard ceiling.
+- Application connection limit below `RLIMIT_NOFILE`.
+- Finite read, write, idle, transaction and shutdown deadlines.
+- Unix datagram is not an application-snapshot ingestion transport.
 
-## Environments and Fingerprint
+## Current Environment
 
-| Environment           | Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
-|-----------------------|-------:|------------------|--------------|----------------------------|--------------------------------------------------------------------|
-| macOS Docker Desktop  | 29.6.2 | LinuxKit 6.12.76 | aarch64      | `results/20260729T072602Z` | `cb1dd3d415e35ee1f58fa3de0de6e42a2583eecb24771c915402a64776eabfa7` |
-| Ubuntu Docker Desktop | 27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260729T164723Z` | `cb1dd3d415e35ee1f58fa3de0de6e42a2583eecb24771c915402a64776eabfa7` |
+| Environment          |        Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
+|----------------------|--------------:|------------------|--------------|----------------------------|--------------------------------------------------------------------|
+| macOS Docker Desktop |        29.6.2 | LinuxKit 6.12.76 | aarch64      | `results/20260731T085625Z` | `298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391` |
+| Ubuntu               | pending rerun | —                | x86_64       | —                          | must match                                                         |
 
-Fingerprints are identical. Repository HEAD, image ID and architecture differ as expected; the content fingerprint
-proves prototype and runner identity.
+The current container environment uses LinuxKit. Native non-LinuxKit Linux remains unverified.
 
-Both container environments use LinuxKit. The results confirm cross-architecture behavior inside LinuxKit
-aarch64/x86_64, not native non-LinuxKit Linux.
+## Current Assertions
 
-## Assertions
+| Group                | Result |
+|----------------------|-------:|
+| Correctness          |  45/45 |
+| Performance delivery |  81/81 |
+| Pressure/resource    |    6/6 |
+| Bounded memory       |    1/1 |
+| Snapshot publication |    2/2 |
 
-All portable assertions passed in both environments:
+### Bounded parser
 
-| Group                | macOS | Ubuntu |
-|----------------------|------:|-------:|
-| Correctness          | 45/45 |  45/45 |
-| Performance delivery | 81/81 |  81/81 |
-| Pressure/resource    |   6/6 |    6/6 |
-| Bounded memory       |   1/1 |    1/1 |
-| Snapshot transaction |   2/2 |    2/2 |
+Sixteen 131,075-byte lines used at most 65,537 B of parser buffer. RSS changed from 9,004 KiB to 6,152 KiB, remaining
+inside the 16 MiB test allowance.
 
-Correctness includes bounded oversized parsing, unterminated active client shutdown, old-connection failure, reconnect,
-ACK/NACK, exact maximum payload, malformed input, socket mode and startup retry.
+The parser uses bounded `ReadSlice` chunks and drains oversized lines without accumulating the complete input.
+`performance.tsv` separates `go_runtime_sys_kib` from actual Linux `/proc/self/statm` `rss_kib`.
 
-## Key Evidence
+### Shutdown and reconnect
 
-### Bounded line parsing
+Active idle/unterminated stream connections are tracked and closed during bounded shutdown. The old connection receives
+an error, new connections are refused after shutdown, and bounded reconnect delivers into a new server epoch.
 
-| Environment | Message bytes | Messages | Max parser buffer | RSS before | RSS after |  RSS delta | Allowed |
-|-------------|--------------:|---------:|------------------:|-----------:|----------:|-----------:|--------:|
-| macOS       |       131,075 |       16 |          65,537 B |  9,028 KiB | 6,144 KiB | -2,884 KiB |  16 MiB |
-| Ubuntu      |       131,075 |       16 |          65,537 B |  8,632 KiB | 6,432 KiB | -2,200 KiB |  16 MiB |
+### Snapshot publication
 
-The parser uses bounded `ReadSlice` chunks and drains oversized lines without accumulating the complete message.
-`performance.tsv` reports Go runtime reserved memory as `go_runtime_sys_kib` and actual Linux process resident pages as
-`rss_kib`.
+A 12,000-byte candidate was assembled from three bounded parts. Intermediate frames received `FRAME_ACCEPTED`; only
+commit received `ACK snap-1`. A later incomplete candidate received `NACK snap-2 invalid` and retained committed
+snapshot `snap-1`.
 
-### Shutdown, reconnect and acknowledgement
-
-In both environments:
-
-- shutdown closed active idle/unterminated stream connections inside the bounded assertion window;
-- the old connection observed an error;
-- bounded reconnect delivered to a new server epoch;
-- valid `id=42` received `ACK 42`;
-- invalid `id=43` received `NACK 43 invalid`.
-
-For the production complete-snapshot contract, the ACK point is after atomic installation, as required by ADR-004.
-
-### Complete candidate assembly
-
-A synthetic 12,000-byte candidate was assembled from three bounded parts and committed atomically. A later incomplete
-candidate did not replace committed version `snap-1` in either environment.
-
-The snapshot ID is transport correlation for one application publication; it is not producer ownership or a
-MetricShell aggregation key.
+Publication ID is transport correlation, not producer ownership or an aggregation key.
 
 ### Pressure and resource behavior
 
-| Environment | Stream line slow reader | Stream framed | Datagram    | App-limit rejected | FD established/rejected |
-|-------------|-------------------------|---------------|-------------|-------------------:|------------------------:|
-| macOS       | 2,000/2,000             | 2,000/2,000   | 1,875/2,000 |                 23 |                71 / 185 |
-| Ubuntu      | 2,000/2,000             | 2,000/2,000   | 2,000/2,000 |                  5 |                61 / 195 |
+| Case                                  | Input |       Delivered | Failed/rejected |
+|---------------------------------------|------:|----------------:|----------------:|
+| stream-line slow reader               | 2,000 |           2,000 |               0 |
+| stream-framed slow reader             | 2,000 |           2,000 |               0 |
+| datagram slow reader                  | 2,000 |           1,696 |             304 |
+| application connection limit/recovery |    32 | 1 after release |              22 |
+| system FD exhaustion                  |   256 |              62 |             194 |
+| datagram no accepted per-producer FD  |   256 |             256 |               0 |
 
-The application connection-limit test also confirmed recovery after connections were released. The separate
-`RLIMIT_NOFILE` case proves bounded OS errors only.
-
-The experiment does not isolate why datagram results differ. It establishes that datagram did not demonstrate a
-portable reliable-delivery contract under the bounded-pressure scenario.
-
-### Representative producer-to-accept latency
-
-| Environment | Protocol    | Producers | Payload | Messages/s |    p50 |       p95 |       p99 |
-|-------------|-------------|----------:|--------:|-----------:|-------:|----------:|----------:|
-| macOS       | stream-line |         1 |   1 KiB |    347,520 |  11 µs |    173 µs |    354 µs |
-| Ubuntu      | stream-line |         1 |   1 KiB |    257,842 |   7 µs |     64 µs |    403 µs |
-| macOS       | stream-line |        32 |   8 KiB |    118,566 | 351 µs | 13.799 ms | 22.930 ms |
-| Ubuntu      | stream-line |        32 |   8 KiB |     64,249 | 268 µs | 26.546 ms | 44.630 ms |
-
-INV-007 has no signal-to-exit metric because it neither supervises nor signals a workload.
+The datagram experiment remains comparative evidence only. It does not establish one cause for loss and does not make
+datagram an application ingestion transport.
 
 ## Running
+
+Run the same command on macOS and Ubuntu:
 
 ```bash
 ./research/INV-007/run-bench.sh
 ```
+
+Inspect:
 
 ```bash
 cat "$(cat research/INV-007/latest-results.txt)/summary.tsv"
@@ -134,11 +119,14 @@ cat "$(cat research/INV-007/latest-results.txt)/snapshot.tsv"
 cat "$(cat research/INV-007/latest-results.txt)/environment.tsv"
 ```
 
-## Limits
+Ubuntu evidence is comparable only if the fingerprint is
+`298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391`.
 
-- Both reference environments use LinuxKit; native Linux remains unverified.
-- ACK/NACK and multipart grammar are research forms, not the final wire specification.
-- The 8 KiB frame default still requires realistic complete-snapshot cardinality benchmarks before production freeze.
-- Memory evidence is scoped to the defined workload, not a universal process-memory guarantee.
-- Clients and server share one Go process in the prototype.
-- Production implementation requires independent unit, integration, fuzz, race and security coverage.
+## Limits and Remaining Work
+
+- A matching-fingerprint Ubuntu rerun is required before completion and ADR acceptance.
+- Both intended reference environments use LinuxKit; native Linux remains a separate gap.
+- `FRAME_ACCEPTED`, ACK/NACK and multipart grammar are research forms, not the final wire specification.
+- The 8 KiB configurable default requires realistic complete-snapshot cardinality benchmarks.
+- Memory evidence is scoped to the defined workload.
+- Production implementation requires independent unit, integration, fuzz, race, security and end-to-end coverage.
