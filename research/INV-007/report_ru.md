@@ -2,107 +2,107 @@
 
 [English version](report.md)
 
-**Статус:** в процессе
-
-**Дата прогона:** 2026-07-29
-
-**Reference run:** `results/20260729T072602Z`
-
+**Статус:** завершено  
+**Дата прогонов:** 2026-07-29  
+**Эталонные прогоны:** `results/20260729T072602Z`, `results/20260729T164723Z`  
 **Fingerprint:** `cb1dd3d415e35ee1f58fa3de0de6e42a2583eecb24771c915402a64776eabfa7`
 
 ## Цель
 
-Повторно проверить socket ingestion после устранения gaps в bounded parsing, shutdown, reconnect, acknowledgement,
-authoritative snapshots, memory naming и application connection limits.
+Выбрать bounded acknowledged local socket protocol для complete application snapshot contract пересмотренного ADR-004.
 
-## Среда
+## Коррекция scope
 
-| Среда                         |                               Docker | Kernel           | Architecture | Result set         |
-|-------------------------------|-------------------------------------:|------------------|--------------|--------------------|
-| macOS Docker Desktop/LinuxKit |                               29.6.2 | LinuxKit 6.12.76 | aarch64      | `20260729T072602Z` |
-| Ubuntu/LinuxKit               | ожидается matching-fingerprint rerun | —                | x86_64       | —                  |
+MetricShell получает один complete application snapshot за publication. Он не агрегирует независимые producer
+registries, не принимает instrumentation operations и не владеет producer sequencing/reconciliation.
 
-Текущая evidence environment использует LinuxKit. Native Linux без LinuxKit не проверен.
+Multipart case является transport framing одного complete candidate. Ни одна part не становится metric state. ACK
+подтверждает complete validation и atomic installation.
+
+## Среды
+
+| Среда                    | Docker | Kernel           | Architecture | Result set         |
+|--------------------------|-------:|------------------|--------------|--------------------|
+| Docker Desktop на macOS  | 29.6.2 | LinuxKit 6.12.76 | aarch64      | `20260729T072602Z` |
+| Docker Desktop на Ubuntu | 27.4.0 | LinuxKit 6.10.14 | x86_64       | `20260729T164723Z` |
+
+Fingerprints идентичны. Обе container environments используют LinuxKit; native Linux без LinuxKit не покрыт.
+
+## Cross-environment confirmation
+
+| Evidence                       |       macOS |      Ubuntu |
+|--------------------------------|------------:|------------:|
+| Correctness                    |       45/45 |       45/45 |
+| Performance delivery           |       81/81 |       81/81 |
+| Pressure/resource              |         6/6 |         6/6 |
+| Memory                         |         1/1 |         1/1 |
+| Snapshot                       |         2/2 |         2/2 |
+| Max parser buffer              |    65 537 B |    65 537 B |
+| RSS delta                      |  -2 884 KiB |  -2 200 KiB |
+| Stream-line slow reader        | 2 000/2 000 | 2 000/2 000 |
+| Datagram slow reader           | 1 875/2 000 | 2 000/2 000 |
+| App-limit rejections           |          23 |           5 |
+| System FD established/rejected |      71/185 |      61/195 |
+
+Все portable assertions прошли в обеих средах. Exact timings и resource counts являются observations.
 
 ## Результаты
 
-Все текущие macOS assertions прошли:
+### Bounded framing
 
-- correctness: 45/45;
-- performance delivery: 81/81;
-- pressure/resource: 6/6;
-- bounded memory: 1/1;
-- snapshot transaction: 2/2.
-
-### Bounded parser и memory
-
-`ReadBytes` заменён на bounded parser через `ReadSlice`. `bufio.ErrBufferFull` классифицирует message как oversized,
-после чего line дренируется bounded chunks.
-
-Для 16 messages по 131 075 B максимальный parser chunk составил 65 537 B. RSS изменился с 9 028 до 6 144 KiB
-(-2 884 KiB), то есть не вырос и остался ниже test allowance 16 MiB.
-
-Exactly-limit line без newline удерживался открытым до shutdown. Shutdown закрыл connection и завершился внутри
-one-second assertion bound.
-
-`performance.tsv` различает `go_runtime_sys_kib` (`MemStats.Sys`) и actual `rss_kib` из `/proc/self/statm`.
+Line reader использует bounded `ReadSlice`. Oversized input дренируется без buffering полного line. В обеих средах
+messages 131 075 B дали максимум 65 537 B parser buffer и отсутствие RSS growth в measured case.
 
 ### Shutdown и reconnect
 
-Server учитывает accepted stream connections и закрывает их при shutdown. Подтверждены bounded shutdown с active
-client, error старой connection, отказ новых connections после shutdown и bounded reconnect в новую metric-state epoch.
+Server закрывает tracked active connections. Bounded shutdown, error old connection, refusal после shutdown и reconnect
+в новую epoch прошли в обеих средах.
 
-### ACK/NACK contract
+### Application acknowledgement
 
-Confirmed mode использует correlation/message ID:
+`ACK <id>` отличает application acceptance от successful socket write. Valid input получил ACK, invalid input — NACK.
+Согласно ADR-004 success означает complete candidate validation и atomic installation.
 
-- `ACK <id>` отправляется после validation и atomic-application callback;
-- `NACK <id> <reason>` сообщает rejection;
-- disconnect до ACK имеет ambiguous result;
-- retry с duplicate suppression использует producer identity и message/snapshot sequence.
+Disconnect до ACK имеет ambiguous result. Повтор complete snapshot может создать ещё одну linear acceptance, но не
+требует per-producer operation sequences внутри MetricShell.
 
-Prototype подтвердил `ACK 42` и `NACK 43 invalid` для обоих stream framings.
+### Complete candidate framing
 
-### Authoritative snapshots
+Complete candidate 12 000 B собран из трёх bounded frames и committed. Следующая incomplete transaction сохранила
+previous snapshot. Production grammar должна ограничивать total bytes, parts, lifetime и concurrent candidates.
 
-Большой authoritative snapshot передаётся transaction:
+### Datagram и connection limits
 
-1. `snapshot_begin`;
-2. bounded `snapshot_part`;
-3. `snapshot_commit`.
+Datagram результаты различались; причина не изолирована. Подтверждено только отсутствие portable reliable contract.
 
-Только commit атомарно заменяет producer snapshot. Committed 12 000-byte snapshot из трёх parts прошёл; следующий
-incomplete snapshot сохранил предыдущую committed version. Это согласует socket ingestion с ADR-004.
+Application limit отклонил excess connections и восстановился после освобождения. `RLIMIT_NOFILE` case отдельно
+подтверждает bounded system errors.
 
-### Resource limits
+## Принятое направление
 
-Application limit восемь concurrent stream connections отклонил excess clients и принял новую connection после
-освобождения. Отдельный `RLIMIT_NOFILE=128` case доказывает bounded OS errors, но не application limit.
-
-### Datagram
-
-Текущий slow-reader case доставил 1 875/2 000 и сообщил 125 failures. Experiment не изолирует kernel, socket buffers,
-runtime scheduling или host load. Корректный вывод: datagram не продемонстрировал portable reliable-delivery contract.
-
-## Состояние решения
-
-Направление остаётся Unix stream + versioned line protocol с acknowledged mode и multipart authoritative snapshots.
-ADR-007 имеет статус Proposed до matching-fingerprint Ubuntu run.
-
-Initial configurable frame default — 8 KiB. Это conservative operational value, не benchmark-derived limit.
-`65 536 B` — maximum payload exercised в reference run, не built-in hard ceiling.
+- Unix stream primary transport.
+- Versioned newline-delimited framing.
+- Confirmed publication mode с correlation ID и ACK/NACK.
+- ACK после complete validation и atomic installation.
+- Multipart framing, если candidate больше одного frame.
+- Initial configurable frame default 8 KiB; final value определяется realistic snapshot benchmarks.
+- 65 536 B — только maximum individual payload exercised.
+- Datagram отклонён как reliable primary.
+- Application connection limit ниже `RLIMIT_NOFILE`.
+- Bounded deadlines.
 
 ## Signal-to-exit
 
-Не применимо. INV-007 не supervises workload и не отправляет signals. Релевантная latency — producer timestamp →
-protocol acceptance.
+Не применимо. Релевантная метрика — producer timestamp → protocol acceptance.
 
-## Оставшаяся работа
+## Ограничения
 
-- выполнить полный Ubuntu runner с fingerprint
-  `cb1dd3d415e35ee1f58fa3de0de6e42a2583eecb24771c915402a64776eabfa7`;
-- сравнить assertions и revised TSV schemas;
-- переводить status в completed/accepted только после matching evidence;
-- измерить realistic snapshot format/cardinality;
-- определить final ACK/NACK и multipart snapshot wire grammar;
-- отдельно проверить native non-LinuxKit Linux.
+Обе среды используют LinuxKit. Native Linux, Kubernetes и multi-user permissions не проверены. Final snapshot grammar
+и production structural parser не реализованы. Memory assertion ограничено defined workload.
+
+## Вывод
+
+Matching-fingerprint evidence LinuxKit aarch64/x86_64 подтверждает Unix stream с bounded versioned line framing и
+application ACK/NACK для complete application snapshots. Все assertions прошли в обеих средах.
+
+Решение зафиксировано в [ADR-007](../../docs-ru/06-architecture/adr/ADR-007.md).
