@@ -1,0 +1,3 @@
+case	parts	bytes	committed_version	frame_response	commit_response	result
+multipart_atomic_snapshot	3	12000	snap-1	FRAME_ACCEPTED part-0	ACK snap-1	pass
+incomplete_snapshot_not_committed	1	7	snap-1	FRAME_ACCEPTED part-2-0	NACK snap-2 invalid	pass
