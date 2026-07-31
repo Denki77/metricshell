@@ -7,8 +7,8 @@
 | Requirements  | Scenarios |
 |---------------|-----------|
 | FR-001–FR-006 | AC-RUN-*  |
-| FR-010–FR-014 | AC-ING-*  |
-| FR-020–FR-025 | AC-MET-*  |
+| FR-010–FR-016 | AC-ING-*  |
+| FR-020–FR-026 | AC-MET-*  |
 | FR-030–FR-034 | AC-EXP-*  |
 | FR-040–FR-047 | AC-FIN-*  |
 | FR-050–FR-052 | AC-OBS-*  |
@@ -62,19 +62,19 @@ For every mode and failure path, expiry of all configured deadlines leads to a t
 
 ## Ingestion transports
 
-The same semantic dataset MUST run against socket, file, and local push transports.
+The same complete application snapshot MUST run against socket, file, and local HTTP transports.
 
-### AC-ING-001 — Counter equivalence
+### AC-ING-001 — File snapshot equivalence
 
-A valid counter submitted through each transport is exposed with equivalent final semantics.
+Given a complete dataset containing counters, gauges, and histograms, file ingestion exposes the expected dataset.
 
-### AC-ING-002 — Gauge equivalence
+### AC-ING-002 — Socket snapshot equivalence
 
-The same gauge updates through each transport produce equivalent current and final values.
+The same complete dataset submitted as one framed socket snapshot produces exposition identical to AC-ING-001.
 
-### AC-ING-003 — Histogram equivalence
+### AC-ING-003 — HTTP snapshot equivalence
 
-The same observations through each transport produce equivalent buckets, count, and sum.
+The same complete dataset submitted in one local HTTP request produces exposition identical to AC-ING-001.
 
 ### AC-ING-004 — Atomic file visibility
 
@@ -83,19 +83,22 @@ state.
 
 ### AC-ING-005 — Malformed socket input
 
-Invalid socket input is rejected, diagnosed, and does not terminate the workload.
+Invalid socket input is rejected atomically, leaves the last accepted snapshot unchanged, is diagnosed, and does not
+terminate the workload.
 
 ### AC-ING-006 — Malformed file
 
-Invalid file input follows documented fallback/rejection behavior and does not corrupt the last valid state.
+Invalid file input is rejected atomically under the documented fallback policy and leaves the last accepted snapshot
+unchanged.
 
-### AC-ING-007 — Malformed push
+### AC-ING-007 — Malformed HTTP input
 
-Invalid push input receives documented rejection and does not corrupt accepted state.
+Malformed HTTP input receives the documented atomic rejection and leaves the last accepted snapshot unchanged.
 
 ### AC-ING-008 — Capacity limit
 
-Input exceeding a configured limit receives bounded deterministic treatment without uncontrolled memory growth.
+A candidate exceeding a configured limit is rejected atomically without changing the last accepted snapshot or causing
+uncontrolled memory growth.
 
 ### AC-ING-009 — Explicit transport
 
@@ -105,11 +108,23 @@ The selected transport is observable in effective configuration; disabled transp
 
 Failure of the selected metrics transport does not terminate the workload by default.
 
+### AC-ING-011 — Empty body is not an empty snapshot
+
+An empty HTTP body is rejected as a malformed transport payload and leaves the last accepted snapshot unchanged. A
+syntactically valid complete snapshot containing zero metric families or series is accepted as a zero-series snapshot.
+
+### AC-ING-012 — Acknowledgement and acceptance order
+
+A socket or local HTTP success acknowledgement is returned only after the candidate is validated and atomically
+installed. Concurrent accepted candidates receive one linear acceptance order, and the last candidate in that order is
+active. Producer timestamps do not change that order.
+
 ## Metric model
 
 ### AC-MET-001 — Counter
 
-A valid counter is exposed with correct Prometheus counter semantics.
+A structurally valid counter in one snapshot is exposed with correct Prometheus counter representation. MetricShell does
+not compare successive snapshots to enforce business-level counter monotonicity.
 
 ### AC-MET-002 — Gauge
 
@@ -117,27 +132,49 @@ A valid gauge can increase and decrease.
 
 ### AC-MET-003 — Histogram
 
-A valid histogram exposes cumulative buckets, count, and sum.
+A valid classic histogram snapshot has ordered boundaries, cumulative bucket values, a `+Inf` bucket equal to `count`,
+and a structurally valid numeric `sum`; it is exposed correctly.
 
 ### AC-MET-004 — Invalid names and labels
 
-Invalid metric or label names are rejected without affecting accepted valid series.
+A candidate snapshot containing any invalid metric or label name is rejected atomically. The last accepted snapshot
+remains unchanged.
 
 ### AC-MET-005 — Duplicate series
 
-Duplicate updates follow one documented deterministic policy.
+A candidate snapshot containing the same series more than once is rejected atomically and does not change active state.
 
-### AC-MET-006 — Type conflict
+### AC-MET-006 — Type-binding conflict
 
-The same family submitted with incompatible types is rejected according to policy.
+A type conflict within a candidate snapshot or with an established metric-family name-to-type binding is rejected
+atomically. Omitting all series of the family and later reusing its name with a different type remains a conflict during
+the same workload execution. A HELP change alone does not violate the type binding when the candidate remains internally
+consistent.
 
 ### AC-MET-007 — Series and label limits
 
-Configured series and label limits are enforced and diagnostic signals are emitted.
+A candidate exceeding configured series or label limits is rejected atomically, the last accepted snapshot remains
+unchanged, and diagnostic signals are emitted.
 
 ### AC-MET-008 — Payload limit
 
 Oversized input is rejected without unbounded allocation.
+
+### AC-MET-009 — Last valid snapshot retention
+
+Given an accepted snapshot followed by a malformed or conflicting candidate snapshot, exposition continues to serve the
+previously accepted snapshot unchanged.
+
+### AC-MET-010 — No cross-producer aggregation
+
+Given an accepted complete application snapshot containing a series with value `2`, and a subsequently accepted complete
+application snapshot containing the same series with value `3`, exposition contains `3`. MetricShell never derives `5`
+and never retains producer-scoped contributions. Workload components must coordinate before publication.
+
+### AC-MET-011 — Zero-series snapshot
+
+Given an accepted snapshot containing application series, accepting a correctly encoded zero-series snapshot removes
+all application series while MetricShell self-metrics remain available.
 
 ## Exposition
 
@@ -152,8 +189,8 @@ Concurrent ingestion and scraping never produce a torn or syntactically invalid 
 
 ### AC-EXP-003 — Response contents
 
-The response contains accepted application metrics and documented MetricShell self-metrics, but no unrelated host-wide
-metrics.
+The response contains the active application snapshot—initially zero-series or subsequently accepted—and documented
+MetricShell self-metrics, but no unrelated host-wide metrics.
 
 ### AC-EXP-004 — Filtering
 
@@ -231,6 +268,11 @@ An external shutdown deadline ends post-exit waiting and MetricShell terminates 
 ### AC-FIN-014 — No durability claim
 
 Documentation and diagnostics never claim that a served response proves TSDB or remote-write persistence.
+
+### AC-FIN-015 — No application publication
+
+If the workload terminates without any accepted application snapshot, the final application state contains zero
+application series and documented MetricShell self-metrics remain available.
 
 ## Observability
 

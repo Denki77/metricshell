@@ -230,7 +230,8 @@ Metric-State Ownership and Semantics
 
 ### Question
 
-Does the workload send complete values, update operations, or both?
+What is the minimum metric-state representation required when MetricShell transports, validates, and exposes metrics
+but does not aggregate values across producers?
 
 ### Candidates
 
@@ -269,6 +270,10 @@ Different transports support different representations while preserving applicat
 File ingestion naturally favors complete snapshots. Socket and local push may favor operations or absolute updates.
 Equivalent client semantics do not require identical transport semantics.
 
+This hypothesis was rejected after checking the experiment against project scope. Reconciliation is required if
+MetricShell accepts state-changing operations. Producer ownership and aggregation policies are required if MetricShell
+combines independently owned registries. Both capabilities are outside MetricShell's scope.
+
 ### Evaluation Criteria
 
 - correctness after dropped messages;
@@ -281,7 +286,8 @@ Equivalent client semantics do not require identical transport semantics.
 
 ### Status
 
-Completed.
+Completed. The selected model is one complete, conflict-free application snapshot for every transport. MetricShell
+validates each candidate and atomically replaces the last valid snapshot.
 
 ---
 

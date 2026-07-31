@@ -231,7 +231,8 @@ MetricShell получает абсолютный deadline и динамичес
 
 ### Вопрос
 
-Отправляет ли workload полные значения, операции обновления либо оба варианта?
+Какое минимальное представление metric state требуется, если MetricShell транспортирует, валидирует и публикует
+метрики, но не агрегирует значения между producers?
 
 ### Кандидаты
 
@@ -272,6 +273,10 @@ absolute updates.
 
 Эквивалентная client semantics не требует одинаковой transport semantics.
 
+После сверки эксперимента с project scope эта гипотеза отклонена. Reconciliation требуется, если MetricShell принимает
+изменяющие состояние operations. Producer ownership и aggregation policies требуются, если MetricShell объединяет
+независимо принадлежащие registries. Обе возможности находятся вне scope MetricShell.
+
 ### Критерии оценки
 
 - корректность после dropped messages;
@@ -284,7 +289,8 @@ absolute updates.
 
 ### Статус
 
-Завершено.
+Завершено. Выбрана модель одного полного, не содержащего конфликтов application snapshot для каждого transport.
+MetricShell валидирует каждый candidate и атомарно заменяет последний валидный snapshot.
 
 ---
 

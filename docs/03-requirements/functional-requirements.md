@@ -68,14 +68,30 @@ default transport. Simultaneous transports MAY be supported only after conflict 
 
 ### FR-014 — Equivalent metric semantics
 
-Official clients SHOULD provide equivalent counter, gauge, and histogram semantics across transports, without requiring
-identical wire formats or performance.
+Submitting the same complete application snapshot through file, socket, or local HTTP ingestion MUST produce the same
+accepted application state and exposition result. Wire formats, acknowledgement behavior, and performance MAY differ.
+
+### FR-015 — Empty and initial snapshots
+
+Before the first accepted publication, the active application snapshot MUST contain zero application series. An empty
+transport payload MUST be treated as malformed. A syntactically valid complete snapshot containing zero metric families
+or series MUST be accepted as a zero-series snapshot and MUST clear the active application state. An absent, truncated,
+or otherwise malformed transport payload MUST NOT be interpreted as a zero-series snapshot.
+
+### FR-016 — Acknowledged acceptance and ordering
+
+For socket and local HTTP ingestion, a success acknowledgement MUST mean that the complete candidate was validated and
+atomically installed. MetricShell MUST assign one linear acceptance order to concurrent accepted candidates and MUST
+NOT infer freshness from a producer-supplied timestamp. The workload MUST serialize publication when generation order
+matters.
 
 ## Metric model
 
 ### FR-020 — Metric families
 
-**MetricShell** MUST support counters, gauges, and histograms.
+**MetricShell** MUST preserve and expose Prometheus counter, gauge, and histogram types contained in an accepted
+snapshot. It MUST NOT act as an instrumentation library: increment, set, observe, or cross-producer value aggregation
+are not ingestion operations.
 
 ### FR-021 — Prometheus metadata
 
@@ -84,12 +100,15 @@ exposition metadata.
 
 ### FR-022 — Input validation
 
-Invalid input MUST be rejected without crashing or terminating the workload by default. Rejection MUST be observable.
+Structurally invalid input MUST be rejected without crashing or terminating the workload by default. Structural
+validation includes syntax, names, labels, type metadata, duplicate series, histogram structure, and configured resource
+limits. MetricShell MUST NOT infer or validate the workload's business meaning for otherwise valid metric values.
+Rejection MUST be observable.
 
 ### FR-023 — Series identity and conflicts
 
-A metric name plus label set MUST identify a series. Duplicate values, type conflicts, and metadata conflicts MUST
-follow a documented deterministic policy.
+A metric name plus label set MUST identify a series. Duplicate series within a candidate snapshot, type conflicts, and
+metadata conflicts MUST cause deterministic atomic rejection; MetricShell MUST NOT resolve them by aggregating values.
 
 ### FR-024 — Resource limits
 
@@ -99,6 +118,14 @@ concurrent ingestion.
 ### FR-025 — Failure isolation
 
 Metrics failures MUST NOT corrupt workload execution. Strict failure behavior MAY exist only as explicit configuration.
+
+### FR-026 — Metric-family type-binding lifetime
+
+Once a metric-family name is accepted with a Prometheus metric type during one workload execution, the same name MUST
+NOT be accepted with a different type until the next workload execution. Omitting every series of the family removes
+its values from active state but MUST NOT clear this name-to-type binding. HELP, unit, label names, histogram boundaries,
+and other metadata MUST be validated for internal consistency within each candidate but are not lifetime-bound by this
+requirement.
 
 ## Metrics exposition
 
@@ -112,9 +139,10 @@ While the workload runs, a successful scrape MUST return one internally consiste
 
 ### FR-032 — Response scope
 
-A normal scrape MUST include accepted application metrics under the active policy and required **MetricShell**
-self-metrics.
-It MUST NOT silently add unrelated host-wide metrics.
+A normal scrape MUST include all series from the active complete application snapshot that remain after explicitly
+configured filtering, plus required **MetricShell** self-metrics. The active snapshot is the zero-series initial snapshot
+or the last accepted snapshot. A scrape MUST NOT silently omit accepted application metrics for producer completeness
+reasons or add unrelated host-wide metrics.
 
 ### FR-033 — Filtering
 
@@ -130,8 +158,8 @@ investigation.
 ### FR-040 — Final observable state
 
 After workload termination, **MetricShell** MUST establish one final observable application metric state from the last
-valid
-accepted data. The storage mechanism is an architecture decision.
+valid accepted complete application snapshot. If no snapshot was accepted, the zero-series initial application snapshot
+MUST become the final application state. The storage mechanism is an architecture decision.
 
 ### FR-041 — Stable final state
 
@@ -158,7 +186,7 @@ Scraper identity rules are an architecture decision.
 ### FR-046 — Configurable waiting
 
 Operators MUST be able to configure the fixed duration, maximum scrape wait, and required scrape count within
-implementation safety bounds within implementation safety bounds.
+implementation safety bounds.
 
 ### FR-047 — Delivery limitation
 

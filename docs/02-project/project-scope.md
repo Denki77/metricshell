@@ -16,11 +16,14 @@
 - Service discovery.
 - Prometheus configuration.
 - Alerting.
-- Distributed metrics aggregation.
+- Local or distributed aggregation of metric values across producers.
 - Log collection.
 - Trace collection.
 - Host monitoring.
 - Business metrics design.
+
+MetricShell does not retain producer-scoped metric contributions and does not aggregate metric values. The workload and
+its libraries must publish one complete, conflict-free application snapshot.
 
 ---
 [Project Goals](project-goals.md)

@@ -14,8 +14,22 @@ Summaries: `results/20260723T073114Z/summary.tsv`, `results/20260723T150118Z/sum
 
 ## Goal
 
-Determine which component owns metric truth and which update semantics remain correct under loss, ordering changes,
-duplicates, restarts, stale data, type conflicts and multiple producers.
+Determine the minimum sufficient metric-state contract for MetricShell after separating transport/runtime
+responsibilities from out-of-scope instrumentation and cross-producer aggregation.
+
+## Scope correction
+
+The experiment intentionally compared a broader set of semantic models than the product ultimately requires. Its
+original interpretation assumed MetricShell might accept independent operations, own per-producer contributions, and
+aggregate them for exposition.
+
+Project scope excludes local or distributed aggregation of metric values across producers and business metric design.
+Functional requirements require consistent acceptance and exposition of counters, gauges, and histograms, but do not
+require `increment`, `set`, `observe`, producer epochs, sequence recovery, or completeness classification. The workload
+and its libraries own those concerns and must publish one complete, conflict-free application snapshot.
+
+The prototype and result files remain unchanged. Multi-owner and operation scenarios are retained as evidence of the
+complexity avoided by the selected scope.
 
 ## Prototype
 
@@ -54,21 +68,25 @@ result and the scenario-set cardinality assertion passed, for 34/34 assertions i
 
 ### Semantic scenarios
 
-| Candidate                   |          Recover dropped update |       Receiver restart |                       Multi-producer |        Stale removal | Verdict                 |
-|-----------------------------|--------------------------------:|-----------------------:|-------------------------------------:|---------------------:|-------------------------|
-| Complete per-owner snapshot |           yes, at next snapshot |   yes, after republish | deterministic compatible aggregation |                  yes | authoritative model     |
-| Per-series absolute         | only when same series is resent |   only after republish |           ambiguous last-writer-wins | no registry boundary | gauges only, with owner |
-| Operations only             |                              no |                     no |           counter increments commute |                   no | reject as sole truth    |
-| Hybrid                      |          yes, at reconciliation | yes, at reconciliation |                         owner-scoped |                  yes | accept                  |
+| Candidate           |          Recover dropped update |       Receiver restart |                       Multi-producer |        Stale removal | Scope interpretation                  |
+|---------------------|--------------------------------:|-----------------------:|-------------------------------------:|---------------------:|---------------------------------------|
+| Complete snapshot   |           yes, at next snapshot |              republish | workload resolves before publication |                  yes | selected minimum sufficient model     |
+| Per-series absolute | only when same series is resent |   only after republish |           ambiguous last-writer-wins | no registry boundary | insufficient partial-state contract   |
+| Operations only     |                              no |                     no |           counter increments commute |                   no | out of scope and insufficient truth   |
+| Hybrid              |          yes, at reconciliation | yes, at reconciliation |                         owner-scoped |                  yes | valid aggregator design, out of scope |
 
 Four rows in `semantics.tsv` intentionally have `result=fail`: they are falsifying counterexamples, not runner
 failures. They demonstrate absolute counter decrease, absolute multi-producer collision, lost operation and state loss
 after receiver restart. `assertions.tsv` checks every named scenario independently plus exact scenario-set cardinality;
 it no longer relies on aggregate pass/fail counts.
 
-The operation path enforces the full `(producer_id, producer_epoch, sequence)` boundary. An old epoch is rejected. A
+The experimental operation path enforces the full `(producer_id, producer_epoch, sequence)` boundary. An old epoch is
+rejected. A
 new epoch observed through an operation becomes incomplete/non-authoritative and cannot mutate values; its initial
 complete snapshot authorizes subsequent operations starting at the new sequence space.
+
+This boundary is an observed prerequisite of the counterfactual operation/hybrid design, not an admissible production
+protocol field set for MetricShell.
 
 Histogram evidence uses complete `bounds`, cumulative `buckets`, `count` and `sum`, not a scalar proxy. The suite
 checks component-wise aggregation, boundary compatibility, `count == final cumulative bucket`, non-decreasing buckets
@@ -126,25 +144,38 @@ INV-004 are the throughput, allocation and reconciliation measurements above.
 | Memory/network amplification | highest                 | low                | low                                 | configurable                   |
 | Multiple producers           | owner-scoped            | ambiguous          | safe for compatible commutative ops | owner-scoped                   |
 
-## Admissible Values and Protocol Constraints
+## Admissible values and protocol constraints
 
-The accepted boundary is `(producer_id, producer_epoch, sequence)`. A complete owner snapshot replaces only that
-owner's registry contribution. Older epochs and older/duplicate sequences are ignored. A newly observed epoch cannot
-apply operations until its initial authoritative snapshot. Missing series become stale and are removed. Types and
-histogram boundaries cannot change silently. Counter values and cumulative histogram buckets/count cannot decrease
-within an epoch; a new epoch may reset them.
+The accepted production boundary is one complete application snapshot.
 
-Operations are optional hints/fast-path updates. A sequence gap makes the owner incomplete until a snapshot repairs it;
-receiver restart requires republish; final application state requires a final snapshot. No fixed reconciliation period
-is selected here because it depends on transport throughput and acceptable loss window.
+- MetricShell structurally validates the whole candidate before state mutation.
+- A valid candidate atomically replaces the previous valid snapshot.
+- A correctly encoded zero-series snapshot clears active application series; an absent or empty payload is malformed.
+- Missing series are removed by omission from the newly accepted snapshot.
+- Duplicate series, type conflicts, and candidate-internal metadata conflicts reject the complete candidate.
+- An established family name-to-type binding survives omission until the next workload execution.
+- Other metadata is validated for internal consistency within each candidate and is not lifetime-bound.
+- Classic histograms require ordered cumulative buckets, `+Inf` equal to `count`, and numeric `sum`.
+- Counters and histograms are not validated for business monotonicity across snapshots.
+- MetricShell does not accept instrumentation operations or aggregate values across producers.
+- Socket/HTTP success acknowledges atomic installation in one linear acceptance order; producer timestamps do not
+  reorder
+  candidates.
+- The final application state is the last valid accepted complete snapshot, or the zero-series initial snapshot.
+
+`producer_id`, `producer_epoch`, `sequence`, gaps, completeness state, and reconciliation intervals belong only to the
+rejected operation/hybrid aggregator model.
 
 ## Additional Benchmarks and Coverage
 
-The runner executes every in-scope semantic and synthetic benchmark identified for INV-004: all candidates, scale and
+The runner executes the complete original semantic and synthetic benchmark scope: all candidates, scale and
 producer grids, 30-run distributions, allocation, loss/reorder/duplicate faults, both restart directions, explicit gap
 state, transactional conflict rejection, operation epoch transitions, snapshot monotonicity, full histogram component
 aggregation, gauge/type/histogram ownership conflicts, and hybrid reconciliation intervals 100/1,000/10,000.
 `semantics.tsv` and `assertions.tsv` record the individual contracts; `coverage.tsv` records the high-level groups.
+
+This is deliberately broader than current product scope. Keeping the broader runner preserves falsifying and complexity
+evidence without converting its explored mechanisms into implementation requirements.
 
 For higher-confidence performance sizing, use a quiet native Linux host with 100 repetitions and fixed CPU/memory. Real
 transport encodings, histogram bucket scaling, crash-safe persistence, disk-full behavior and hostile cardinality are
@@ -166,10 +197,12 @@ honestly by a transport-free semantic model.
 
 ## Conclusion
 
-The matching-fingerprint macOS/LinuxKit and Ubuntu/LinuxKit evidence confirms the refined hypothesis. Different
-transports may use different representations, but they must converge on one authoritative semantic model. Select hybrid
-semantics:
-versioned complete per-producer snapshots own truth; sequenced/deduplicated operations are optional acceleration;
-reconciliation is mandatory after gaps and restart and for final state. Operations-only ownership and unowned absolute
-counters are rejected by the evidence in both environments. The decision is recorded in
+The matching-fingerprint evidence supports a narrower conclusion than the original report. Reconciliation is required
+if MetricShell accepts state-changing operations. Producer ownership and aggregation policies are required if
+MetricShell combines independently owned registries. Both capabilities are outside MetricShell's scope.
+
+Select one complete, conflict-free application snapshot for file, Unix stream, and local HTTP. Every transport performs
+the same application operation: structural validation followed by atomic replacement of the last valid snapshot.
+MetricShell preserves Prometheus types but does not apply instrumentation operations, enforce business monotonicity
+between snapshots, or aggregate colliding producer values. The decision is recorded in
 [ADR-004](../../docs/06-architecture/adr/ADR-004.md).

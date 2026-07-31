@@ -71,13 +71,16 @@ Runner выполняет 36 performance combinations: три транспорт
 Timing distributions различаются и являются observations, а не portable pass criteria. Correctness, границы payload и
 ранжирование кандидатов совпали.
 
+Prototype assertion для `422` использовал синтаксически валидный request с пустым decoded record set. Он не проверял
+пустой transport payload или production contract zero-series snapshot. ADR-004 отменяет rejection пустого decoded
+record set; это prototype behavior остаётся историей evidence, а не production requirement.
+
 ## Итоговый вывод
 
 Гипотеза подтверждена одинаковыми по fingerprint прогонами:
 
-- дополнительный local push API не является обязательным;
 - Unix socket остаётся default ingestion transport;
-- loopback-only HTTP JSON допустим как опциональный compatibility adapter при наличии подтверждённой client requirement;
+- HTTP JSON сохраняется как stable request/response transport из ADR-005, а Unix socket остаётся default;
 - gRPC не включается в default surface: он эффективнее JSON HTTP для batched concurrency, но дублирует socket semantics
   и требует protobuf schema, generated clients и HTTP/2 runtime.
 
@@ -88,8 +91,10 @@ Timing distributions различаются и являются observations, а
 - протестированный batch: `1–16` records;
 - протестированная concurrency: `1–8` producers;
 - malformed JSON: HTTP `400`;
-- empty records: HTTP `422`;
+- prototype empty decoded record set: HTTP `422`;
 - decoded/encoded oversize: HTTP `413`;
+- production contract: пустой transport payload является malformed, а синтаксически валидный snapshot с нулём metric
+  families или series является валидным zero-series snapshot и должен приниматься;
 - invalid request отклоняется атомарно без изменения принятого state;
 - HTTP path versioning: `/v1/metrics`;
 - breaking schema changes требуют новой версии path/protobuf package.

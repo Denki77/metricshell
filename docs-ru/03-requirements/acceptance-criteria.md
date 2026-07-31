@@ -9,8 +9,8 @@
 | Требования    | Сценарии  |
 |---------------|-----------|
 | FR-001–FR-006 | AC-RUN-*  |
-| FR-010–FR-014 | AC-ING-*  |
-| FR-020–FR-025 | AC-MET-*  |
+| FR-010–FR-016 | AC-ING-*  |
+| FR-020–FR-026 | AC-MET-*  |
 | FR-030–FR-034 | AC-EXP-*  |
 | FR-040–FR-047 | AC-FIN-*  |
 | FR-050–FR-052 | AC-OBS-*  |
@@ -64,19 +64,19 @@ termination, а MetricShell завершается в пределах уста�
 
 ## Ingestion transports
 
-Один и тот же semantic dataset ДОЛЖЕН выполняться через socket, file и local push transports.
+Один и тот же полный application snapshot ДОЛЖЕН передаваться через socket, file и local HTTP transports.
 
-### AC-ING-001 — Эквивалентность counter
+### AC-ING-001 — Эквивалентность file snapshot
 
-Валидный counter, отправленный через каждый transport, публикуется с эквивалентной финальной семантикой.
+Полный dataset с counters, gauges и histograms, переданный через file ingestion, публикуется в ожидаемом виде.
 
-### AC-ING-002 — Эквивалентность gauge
+### AC-ING-002 — Эквивалентность socket snapshot
 
-Одинаковые gauge updates через каждый transport дают эквивалентные текущие и финальные значения.
+Тот же полный dataset, переданный как один framed socket snapshot, создаёт exposition, идентичный AC-ING-001.
 
-### AC-ING-003 — Эквивалентность histogram
+### AC-ING-003 — Эквивалентность HTTP snapshot
 
-Одинаковые observations через каждый transport дают эквивалентные buckets, count и sum.
+Тот же полный dataset, переданный одним local HTTP request, создаёт exposition, идентичный AC-ING-001.
 
 ### AC-ING-004 — Атомарная видимость файла
 
@@ -85,21 +85,22 @@ termination, а MetricShell завершается в пределах уста�
 
 ### AC-ING-005 — Невалидный socket input
 
-Невалидный socket input отклоняется, диагностируется и не завершает workload.
+Невалидный socket input отклоняется атомарно, не изменяет последний принятый snapshot, диагностируется и не завершает
+workload.
 
 ### AC-ING-006 — Невалидный файл
 
-Невалидный file input обрабатывается согласно документированной fallback/rejection policy и не повреждает последнее
-валидное состояние.
+Невалидный file input отклоняется атомарно согласно документированной fallback policy и не изменяет последний принятый
+snapshot.
 
-### AC-ING-007 — Невалидный push input
+### AC-ING-007 — Невалидный HTTP input
 
-Невалидный push input получает документированный rejection и не повреждает принятое состояние.
+Невалидный HTTP input получает документированный atomic rejection и не изменяет последний принятый snapshot.
 
 ### AC-ING-008 — Capacity limit
 
-Input, превышающий настроенный limit, получает ограниченную детерминированную обработку без неконтролируемого роста
-memory.
+Candidate, превышающий настроенный limit, отклоняется атомарно без изменения последнего принятого snapshot и
+неконтролируемого роста memory.
 
 ### AC-ING-009 — Явный transport
 
@@ -109,11 +110,23 @@ memory.
 
 Failure выбранного metrics transport по умолчанию не завершает workload.
 
+### AC-ING-011 — Пустой body не является пустым snapshot
+
+Пустой HTTP body отклоняется как malformed transport payload и не изменяет последний принятый snapshot. Синтаксически
+валидный полный snapshot с нулём metric families или series принимается как zero-series snapshot.
+
+### AC-ING-012 — Acknowledgement и порядок принятия
+
+Успешный acknowledgement socket или local HTTP возвращается только после validation и atomic installation candidate.
+Одновременно принятые candidates получают один линейный порядок, и последний candidate в этом порядке становится active
+state. Timestamps producers не изменяют этот порядок.
+
 ## Модель метрик
 
 ### AC-MET-001 — Counter
 
-Валидный counter публикуется с корректной Prometheus counter semantics.
+Структурно валидный counter в одном snapshot публикуется с корректным Prometheus representation. MetricShell не
+сравнивает последовательные snapshots для проверки business-level monotonicity counter.
 
 ### AC-MET-002 — Gauge
 
@@ -121,27 +134,49 @@ Failure выбранного metrics transport по умолчанию не за
 
 ### AC-MET-003 — Histogram
 
-Валидный histogram публикует cumulative buckets, count и sum.
+Валидный classic histogram snapshot содержит упорядоченные boundaries, cumulative bucket values, bucket `+Inf`,
+равный `count`, и структурно валидный numeric `sum`; такой snapshot публикуется корректно.
 
 ### AC-MET-004 — Невалидные имена и labels
 
-Невалидные metric или label names отклоняются без влияния на принятые валидные series.
+Candidate snapshot с любым невалидным metric или label name отклоняется атомарно. Последний принятый snapshot остаётся
+неизменным.
 
 ### AC-MET-005 — Duplicate series
 
-Duplicate updates обрабатываются согласно одной документированной детерминированной policy.
+Candidate snapshot, содержащий одну series более одного раза, отклоняется атомарно и не изменяет active state.
 
-### AC-MET-006 — Type conflict
+### AC-MET-006 — Конфликт привязки типа
 
-Одна family, отправленная с несовместимыми types, отклоняется согласно policy.
+Type conflict внутри candidate snapshot или с установленной привязкой name-to-type metric family отклоняется атомарно.
+Отсутствие всех series family и последующее повторное использование её имени с другим type остаётся конфликтом внутри
+того же workload execution. Изменение только HELP не нарушает type binding, если candidate остаётся внутренне
+согласованным.
 
 ### AC-MET-007 — Limits series и labels
 
-Настроенные limits series и labels применяются, а diagnostic signals публикуются.
+Candidate, превышающий настроенные limits series или labels, отклоняется атомарно, последний принятый snapshot не
+изменяется, а diagnostic signals публикуются.
 
 ### AC-MET-008 — Payload limit
 
 Oversized input отклоняется без неограниченного allocation.
+
+### AC-MET-009 — Сохранение последнего валидного snapshot
+
+Если после принятого snapshot поступает malformed или conflicting candidate snapshot, exposition продолжает без
+изменений публиковать ранее принятый snapshot.
+
+### AC-MET-010 — Отсутствие агрегации между producers
+
+Если принятый полный application snapshot содержит series со значением `2`, а следующий принятый полный application
+snapshot содержит ту же series со значением `3`, exposition содержит `3`. MetricShell никогда не выводит `5` и не
+хранит producer-scoped contributions. Компоненты workload должны координироваться до публикации.
+
+### AC-MET-011 — Zero-series snapshot
+
+Если после snapshot с application series принимается корректно закодированный zero-series snapshot, все application
+series удаляются, а self-metrics MetricShell остаются доступны.
 
 ## Exposition
 
@@ -156,8 +191,8 @@ Prometheus tools.
 
 ### AC-EXP-003 — Состав response
 
-Response содержит принятые application metrics и документированные self-metrics MetricShell, но не содержит
-не относящиеся к workload host-wide metrics.
+Response содержит active application snapshot — первоначально zero-series либо впоследствии принятый — и
+документированные self-metrics MetricShell, но не содержит не относящиеся к workload host-wide metrics.
 
 ### AC-EXP-004 — Filtering
 
@@ -235,6 +270,11 @@ External shutdown deadline завершает post-exit waiting, и MetricShell 
 ### AC-FIN-014 — Отсутствие гарантии durability
 
 Документация и diagnostics не утверждают, что выданный response доказывает сохранение в TSDB или remote-write.
+
+### AC-FIN-015 — Отсутствие application publication
+
+Если workload завершается без единого принятого application snapshot, финальное application state содержит ноль
+application series, а документированные self-metrics MetricShell остаются доступны.
 
 ## Наблюдаемость
 

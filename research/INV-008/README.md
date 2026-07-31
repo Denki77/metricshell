@@ -75,14 +75,17 @@ but remained below Unix-socket throughput in both environments.
 Timing distributions differ by environment and are observations rather than portable pass criteria. Candidate ordering
 and all correctness conclusions are consistent.
 
+The prototype's `422` assertion used a syntactically valid request whose decoded record set was empty. It did not test
+an empty transport payload or the production zero-series snapshot contract. ADR-004 supersedes rejection of the empty
+decoded record set; that prototype behavior is evidence history, not a production requirement.
+
 ## Conclusion
 
 The hypothesis is confirmed by matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs.
 
-- Do not require an additional local push API: the Unix-socket candidate already covers ingestion with lower latency,
-  higher throughput, fewer endpoint-exposure modes and no HTTP/2/protobuf client stack.
-- Retain HTTP JSON as an optional compatibility adapter if concrete users need standard-library HTTP integration or
-  curl-level debugging.
+- Keep Unix socket as the default local ingestion transport because it provides lower latency, higher throughput, fewer
+  endpoint-exposure modes and no HTTP/2/protobuf client stack.
+- Retain HTTP JSON as the stable request/response transport selected by ADR-005, while Unix socket remains the default.
 - Do not add gRPC by default. Its concurrent batched performance is materially better than JSON HTTP, but it duplicates
   socket semantics and introduces generated clients, protobuf schema evolution and HTTP/2 dependencies.
 
@@ -92,8 +95,10 @@ The hypothesis is confirmed by matching-fingerprint macOS/LinuxKit aarch64 and U
 - maximum decoded request payload: `1 MiB` in this prototype;
 - batch size: `1–16` records tested; prefer batching for HTTP/gRPC;
 - concurrent producers: `1–8` tested;
-- malformed JSON: HTTP `400`; empty records: HTTP `422`; decoded/encoded oversize: HTTP `413`;
-- reject empty, malformed and oversized requests without changing accepted state;
+- malformed JSON: HTTP `400`; prototype empty decoded record set: HTTP `422`; decoded/encoded oversize: HTTP `413`;
+- production contract: an empty transport payload is malformed, while a syntactically valid snapshot containing zero
+  metric families or series is a valid zero-series snapshot and must be accepted;
+- reject malformed and oversized requests without changing accepted state;
 - retain accepted in-memory state when an adapter stops; clients must reconnect after restart;
 - use versioned paths for HTTP (`/v1/metrics`) and versioned protobuf packages/services for gRPC;
 - apply bounded request/body reads and deadlines; production queue/cardinality limits remain owned by INV-014.
