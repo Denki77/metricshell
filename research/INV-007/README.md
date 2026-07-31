@@ -2,10 +2,10 @@
 
 [Русская версия](README_ru.md)
 
-**Status:** in progress  
-Current reference run: `results/20260731T085625Z`  
+**Status:** completed  
+Reference runs: `results/20260731T085625Z`, `results/20260731T125558Z`  
 **Report:** [report.md](report.md)  
-**Proposed decision:** [ADR-007](../../docs/06-architecture/adr/ADR-007.md)
+**Decision:** [ADR-007](../../docs/06-architecture/adr/ADR-007.md)
 
 ## Question
 
@@ -47,27 +47,28 @@ publication.
 
 ## Current Environment
 
-| Environment          |        Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
-|----------------------|--------------:|------------------|--------------|----------------------------|--------------------------------------------------------------------|
-| macOS Docker Desktop |        29.6.2 | LinuxKit 6.12.76 | aarch64      | `results/20260731T085625Z` | `298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391` |
-| Ubuntu               | pending rerun | —                | x86_64       | —                          | must match                                                         |
+| Environment           | Docker | Kernel           | Architecture | Result set                 | Fingerprint                                                        |
+|-----------------------|-------:|------------------|--------------|----------------------------|--------------------------------------------------------------------|
+| macOS Docker Desktop  | 29.6.2 | LinuxKit 6.12.76 | aarch64      | `results/20260731T085625Z` | `298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391` |
+| Ubuntu Docker Desktop | 27.4.0 | LinuxKit 6.10.14 | x86_64       | `results/20260731T125558Z` | `298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391` |
 
-The current container environment uses LinuxKit. Native non-LinuxKit Linux remains unverified.
+The fingerprints are identical and all assertions passed in both environments. Both container environments use
+LinuxKit; native non-LinuxKit Linux remains unverified.
 
 ## Current Assertions
 
-| Group                | Result |
-|----------------------|-------:|
-| Correctness          |  45/45 |
-| Performance delivery |  81/81 |
-| Pressure/resource    |    6/6 |
-| Bounded memory       |    1/1 |
-| Snapshot publication |    2/2 |
+| Group                | macOS | Ubuntu |
+|----------------------|------:|-------:|
+| Correctness          | 45/45 |  45/45 |
+| Performance delivery | 81/81 |  81/81 |
+| Pressure/resource    |   6/6 |    6/6 |
+| Bounded memory       |   1/1 |    1/1 |
+| Snapshot publication |   2/2 |    2/2 |
 
 ### Bounded parser
 
-Sixteen 131,075-byte lines used at most 65,537 B of parser buffer. RSS changed from 9,004 KiB to 6,152 KiB, remaining
-inside the 16 MiB test allowance.
+Sixteen 131,075-byte lines used at most 65,537 B of parser buffer in both environments. RSS changed from 9,004 to
+6,152 KiB on macOS and from 8,620 to 6,136 KiB on Ubuntu, remaining inside the 16 MiB test allowance.
 
 The parser uses bounded `ReadSlice` chunks and drains oversized lines without accumulating the complete input.
 `performance.tsv` separates `go_runtime_sys_kib` from actual Linux `/proc/self/statm` `rss_kib`.
@@ -87,14 +88,14 @@ Publication ID is transport correlation, not producer ownership or an aggregatio
 
 ### Pressure and resource behavior
 
-| Case                                  | Input |       Delivered | Failed/rejected |
-|---------------------------------------|------:|----------------:|----------------:|
-| stream-line slow reader               | 2,000 |           2,000 |               0 |
-| stream-framed slow reader             | 2,000 |           2,000 |               0 |
-| datagram slow reader                  | 2,000 |           1,696 |             304 |
-| application connection limit/recovery |    32 | 1 after release |              22 |
-| system FD exhaustion                  |   256 |              62 |             194 |
-| datagram no accepted per-producer FD  |   256 |             256 |               0 |
+| Case                                |       macOS |      Ubuntu |
+|-------------------------------------|------------:|------------:|
+| stream-line slow reader             | 2,000/2,000 | 2,000/2,000 |
+| stream-framed slow reader           | 2,000/2,000 | 2,000/2,000 |
+| datagram slow reader                | 1,696/2,000 | 2,000/2,000 |
+| application-limit excess rejections |          22 |          13 |
+| system FD established/rejected      |      62/194 |      65/191 |
+| datagram FD model                   |     256/256 |     256/256 |
 
 The datagram experiment remains comparative evidence only. It does not establish one cause for loss and does not make
 datagram an application ingestion transport.
@@ -119,13 +120,12 @@ cat "$(cat research/INV-007/latest-results.txt)/snapshot.tsv"
 cat "$(cat research/INV-007/latest-results.txt)/environment.tsv"
 ```
 
-Ubuntu evidence is comparable only if the fingerprint is
+Both reference runs have fingerprint
 `298879f5849c6bb14e4ff7bbd8849987a4583c6141a791c0b94b19332056f391`.
 
 ## Limits and Remaining Work
 
-- A matching-fingerprint Ubuntu rerun is required before completion and ADR acceptance.
-- Both intended reference environments use LinuxKit; native Linux remains a separate gap.
+- Both reference environments use LinuxKit; native Linux remains a separate gap.
 - `FRAME_ACCEPTED`, ACK/NACK and multipart grammar are research forms, not the final wire specification.
 - The 8 KiB configurable default requires realistic complete-snapshot cardinality benchmarks.
 - Memory evidence is scoped to the defined workload.

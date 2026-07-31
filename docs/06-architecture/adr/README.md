@@ -6,4 +6,5 @@
 - [ADR-004 — Complete Application Snapshots Own Metric State](ADR-004.md)
 - [ADR-005 — Ingestion Transport Model](ADR-005.md)
 - [ADR-006 — File Ingestion Uses Directory inotify with Periodic Reconciliation](ADR-006.md)
+- [ADR-007 — Complete Snapshots Use Acknowledged Unix Stream Framing](ADR-007.md)
 - [ADR-008 — Unix Socket Remains the Default Local Ingestion Transport](ADR-008.md)
