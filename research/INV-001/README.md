@@ -1,8 +1,9 @@
 # INV-001 — Process and PID 1 Model
 
-Status: completed  
-Reference runs: `results/20260717T192610Z`, `results/20260718T085124Z`  
-Report: [report.md](report.md)
+**Status:** completed  
+**Reference runs:** `results/20260717T192610Z`, `results/20260718T085124Z`  
+**Report:** [report.md](report.md)  
+**Decision:** [ADR-001](../../docs/06-architecture/adr/ADR-001.md)
 
 ## Question
 

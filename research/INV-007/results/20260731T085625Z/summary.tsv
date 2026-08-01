@@ -1,0 +1,4 @@
+metric	value
+portable_assertions_failed	0
+max_payload_bytes	65536
+performance_repetitions	3

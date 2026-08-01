@@ -1,0 +1,2 @@
+case	message_bytes	messages	max_parser_buffer_bytes	rss_before_kib	rss_after_kib	rss_delta_kib	allowed_delta_kib	result
+bounded_line_reader	131075	16	65537	9004	6152	-2852	16384	pass
