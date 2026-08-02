@@ -1,0 +1,14 @@
+key	value
+run_date_utc	2026-08-02T16:23:56Z
+repository_head_sha	37fd20218d573f641e6e6ad6b2497602187d632f
+benchmark_scope_diff_clean	false
+benchmark_code_fingerprint_sha256	41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07
+docker_server_version	29.6.2
+docker_os	linux
+docker_architecture	aarch64
+container_kernel	Linux b5553c8a3a90 6.12.76-linuxkit #1 SMP Sat Jul 11 11:18:11 UTC 2026 aarch64 Linux
+image_id	sha256:4814a277b42cbf4e256ed04aa0e7e1be623ec5ac760b43bd0c5bae984d1fa598
+go_version	go1.25.12
+architecture	arm64
+os	linux
+cpu_count	6

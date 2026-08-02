@@ -105,7 +105,7 @@ Architecture investigation may refine how these capabilities are implemented.
 | INV-006 | [File ingestion](architecture-research.md#INV-006)          | Completed   | [INV-006](../../research/INV-006/README.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
 | INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Completed   | [INV-007](../../research/INV-007/README.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
 | INV-008 | [Local push](architecture-research.md#INV-008)              | Completed   | [INV-008](../../research/INV-008/README.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
-| INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Not started | —                                           | —                                            |
+| INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Completed   | [INV-009](../../research/INV-009/README.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
 | INV-010 | [Exposition](architecture-research.md#INV-010)              | Not started | —                                           | —                                            |
 | INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | Not started | —                                           | —                                            |
 | INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | Not started | —                                           | —                                            |

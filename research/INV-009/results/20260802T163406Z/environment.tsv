@@ -1,0 +1,14 @@
+key	value
+run_date_utc	2026-08-02T16:35:15Z
+repository_head_sha	74b2574260393ebc5338507e45d8474fe86a3488
+benchmark_scope_diff_clean	true
+benchmark_code_fingerprint_sha256	41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07
+docker_server_version	27.4.0
+docker_os	linux
+docker_architecture	x86_64
+container_kernel	Linux 64c32ffd3f6b 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+image_id	sha256:c78be1e078cb13afd0d5a173a393ef6fa97dd3c3a4330bd3a4a370e2f020d57d
+go_version	go1.25.12
+architecture	amd64
+os	linux
+cpu_count	8

@@ -106,7 +106,7 @@ MetricShell:
 | INV-006 | [File ingestion](architecture-research.md#inv-006)              | Завершено | [INV-006](../../research/INV-006/README_ru.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
 | INV-007 | [Socket ingestion](architecture-research.md#inv-007)            | Завершено | [INV-007](../../research/INV-007/README_ru.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
 | INV-008 | [Local push](architecture-research.md#inv-008)                  | Завершено | [INV-008](../../research/INV-008/README_ru.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
-| INV-009 | [Shared memory/mmap](architecture-research.md#inv-009)          | Не начато | —                                              | —                                            |
+| INV-009 | [Shared memory/mmap](architecture-research.md#inv-009)          | Завершено | [INV-009](../../research/INV-009/README_ru.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
 | INV-010 | [Exposition](architecture-research.md#inv-010)                  | Не начато | —                                              | —                                            |
 | INV-011 | [Семантика финального scrape](architecture-research.md#inv-011) | Не начато | —                                              | —                                            |
 | INV-012 | [Пригодность Kubernetes](architecture-research.md#inv-012)      | Не начато | —                                              | —                                            |

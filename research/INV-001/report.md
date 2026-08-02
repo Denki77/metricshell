@@ -1,11 +1,11 @@
 # INV-001 Report — Process and PID 1 Model
 
-Status: completed  
-Run dates: 2026-07-17, 2026-07-18  
-Docker Servers: 29.4.3, 27.4.0  
-Docker platforms: linux/aarch64, linux/x86_64  
-Reference runs: `results/20260717T192610Z`, `results/20260718T085124Z`  
-Summaries: `results/20260717T192610Z/summary.tsv`, `results/20260718T085124Z/summary.tsv`
+**Status:** completed  
+**Run dates:** 2026-07-17, 2026-07-18  
+**Docker Servers:** 29.4.3, 27.4.0  
+**Docker platforms:** linux/aarch64, linux/x86_64  
+**Reference runs:** `results/20260717T192610Z`, `results/20260718T085124Z`  
+**Summaries:** `results/20260717T192610Z/summary.tsv`, `results/20260718T085124Z/summary.tsv`
 
 ## Goal
 

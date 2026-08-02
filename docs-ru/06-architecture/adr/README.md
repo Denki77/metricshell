@@ -8,3 +8,4 @@
 - [ADR-006 — File-based ingestion](ADR-006.md)
 - [ADR-007 — Полные снимки и подтверждаемое кадрирование в потоковом Unix-сокете](ADR-007.md)
 - [ADR-008 — Unix socket как default local ingestion transport](ADR-008.md)
+- [ADR-009 — Не добавлять shared memory как default ingestion adapter](ADR-009.md)
