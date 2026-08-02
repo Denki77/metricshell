@@ -1,0 +1,36 @@
+case	metric	value	unit	note
+startup-repeat-1	published_host_port	52851	port	
+startup-repeat-1	http_ready_ns	302484992	ns	
+startup-repeat-2	published_host_port	52855	port	
+startup-repeat-2	http_ready_ns	243577856	ns	
+startup-repeat-3	published_host_port	52859	port	
+startup-repeat-3	http_ready_ns	261864960	ns	
+startup-repeat-4	published_host_port	52863	port	
+startup-repeat-4	http_ready_ns	261266176	ns	
+startup-repeat-5	published_host_port	52867	port	
+startup-repeat-5	http_ready_ns	265008128	ns	
+startup-repeat-6	published_host_port	52871	port	
+startup-repeat-6	http_ready_ns	249660928	ns	
+startup-repeat-7	published_host_port	52875	port	
+startup-repeat-7	http_ready_ns	239767040	ns	
+startup-repeat-8	published_host_port	52879	port	
+startup-repeat-8	http_ready_ns	241835008	ns	
+startup-repeat-9	published_host_port	52883	port	
+startup-repeat-9	http_ready_ns	252266752	ns	
+startup-repeat-10	published_host_port	52887	port	
+startup-repeat-10	http_ready_ns	259596800	ns	
+frozen_state	published_host_port	52891	port	
+frozen_state	http_ready_ns	267113984	ns	
+immediate	container_lifecycle_ns	286007040	ns	
+duration	container_lifecycle_ns	813244160	ns	configured 500 ms
+one_scrape	published_host_port	52899	port	
+one_scrape	http_ready_ns	400069120	ns	
+n_scrapes	published_host_port	52914	port	
+n_scrapes	http_ready_ns	354788096	ns	
+concurrent_scrapes	published_host_port	52921	port	
+concurrent_scrapes	http_ready_ns	250061056	ns	
+eligibility_token	published_host_port	52944	port	
+eligibility_token	http_ready_ns	285257984	ns	
+aborted_scrape	published_host_port	52950	port	
+aborted_scrape	http_ready_ns	254053120	ns	
+timeout	container_lifecycle_ns	858604032	ns	configured 500 ms

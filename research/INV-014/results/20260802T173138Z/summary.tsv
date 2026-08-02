@@ -1,0 +1,19 @@
+case	result	details
+startup	pass	all assertions passed
+non_root	pass	all assertions passed
+binding	pass	all assertions passed
+sandbox	pass	all assertions passed
+complete_snapshot	pass	all assertions passed
+validation	pass	all assertions passed
+secret_policy	pass	all assertions passed
+label_limit	pass	all assertions passed
+series_limit	pass	all assertions passed
+payload_limit	pass	all assertions passed
+concurrency_limit	pass	all assertions passed
+slow_client	pass	all assertions passed
+fd_limit	pass	all assertions passed
+memory_limit	pass	all assertions passed
+path_permissions	pass	all assertions passed
+bind_failure	pass	all assertions passed
+memory_exhaustion	pass	all assertions passed
+malicious_producer	pass	all assertions passed

@@ -1,0 +1,14 @@
+key	value
+investigation	INV-012
+runtime_under_test	Minikube
+minikube_profile	metricshell-inv012
+minikube_version	v1.38.1
+kubernetes_version	v1.34.0
+prometheus_chart_version	88.1.2
+run_date_utc	2026-08-03T14:42:12Z
+repository_head_sha	fa336517e2aec70d4dde8aff9a63565391ad0849
+benchmark_scope_diff_clean	false
+benchmark_code_fingerprint_sha256	caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c
+host_uname	Darwin Deniss-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:24 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6020 arm64 
+docker_server_version	29.6.2
+docker_architecture	aarch64

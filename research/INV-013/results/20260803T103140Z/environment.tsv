@@ -1,0 +1,15 @@
+key	value
+investigation	INV-013
+run_date_utc	2026-08-03T10:31:54Z
+repository_head_sha	c2deba7522f1b4d321ba897e15e9e239a9592475
+benchmark_scope_diff_clean	false
+benchmark_code_fingerprint_sha256	01b04f50305cce6474d74f9fa196d35bcd60dd65281134056d568cb2d4e96ea4
+host_uname	Darwin Deniss-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:24 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6020 arm64 
+docker_server_version	29.6.2
+docker_architecture	aarch64
+container_kernel	Linux a8dd7c387ecc 6.12.76-linuxkit #1 SMP Sat Jul 11 11:18:11 UTC 2026 aarch64 Linux
+golang_image	golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f
+php_image	php:8.3-cli-alpine@sha256:afdf8b1fee58486ccc0dab5f30f634b86873d56dac985f71ba217945647c05ad
+alpine_image	alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+artifact_sha256	f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486
+binfmt_image	tonistiigi/binfmt:qemu-v9.2.2@sha256:1b804311fe87047a4c96d38b4b3ef6f62fca8cd125265917a9e3dc3c996c39e6

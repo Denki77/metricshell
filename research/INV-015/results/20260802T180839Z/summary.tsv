@@ -1,0 +1,13 @@
+case	result	details
+benchmark_matrix	pass	all assertions passed
+startup	pass	all assertions passed
+idle	pass	all assertions passed
+replacement	pass	all assertions passed
+concurrent_scrape_10	pass	all assertions passed
+queue_overflow	pass	all assertions passed
+failure_injection	pass	all assertions passed
+shutdown	pass	all assertions passed
+final_scrape	pass	all assertions passed
+aborted_final_scrape	pass	all assertions passed
+final_timeout	pass	all assertions passed
+resource_exhaustion	pass	all assertions passed

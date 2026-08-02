@@ -106,12 +106,12 @@ Architecture investigation may refine how these capabilities are implemented.
 | INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Completed   | [INV-007](../../research/INV-007/README.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
 | INV-008 | [Local push](architecture-research.md#INV-008)              | Completed   | [INV-008](../../research/INV-008/README.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
 | INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Completed   | [INV-009](../../research/INV-009/README.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
-| INV-010 | [Exposition](architecture-research.md#INV-010)              | Not started | —                                           | —                                            |
-| INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | Not started | —                                           | —                                            |
-| INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | Not started | —                                           | —                                            |
-| INV-013 | [Distribution](architecture-research.md#INV-013)            | Not started | —                                           | —                                            |
-| INV-014 | [Security and limits](architecture-research.md#INV-014)     | Not started | —                                           | —                                            |
-| INV-015 | [Benchmarks](architecture-research.md#INV-015)              | Not started | —                                           | —                                            |
+| INV-010 | [Exposition](architecture-research.md#INV-010)              | In progress | —                                           | —                                            |
+| INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | In progress | —                                           | —                                            |
+| INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | In progress | —                                           | —                                            |
+| INV-013 | [Distribution](architecture-research.md#INV-013)            | In progress | —                                           | —                                            |
+| INV-014 | [Security and limits](architecture-research.md#INV-014)     | In progress | —                                           | —                                            |
+| INV-015 | [Benchmarks](architecture-research.md#INV-015)              | In progress | —                                           | —                                            |
 
 ## 7. Completion Criteria
 

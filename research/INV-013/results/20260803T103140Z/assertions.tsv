@@ -1,0 +1,25 @@
+case	assertion	expected	actual	result
+supply_chain	golang_image_digest_pinned	true	true	pass
+supply_chain	php_image_digest_pinned	true	true	pass
+supply_chain	alpine_image_digest_pinned	true	true	pass
+supply_chain	binfmt_image_digest_pinned	true	true	pass
+distribution	metricshell-inv013-binary starts	true	true	pass
+version_pin	metricshell-inv013-binary version	0.13.0-research	0.13.0-research	pass
+distribution	metricshell-inv013-multistage starts	true	true	pass
+version_pin	metricshell-inv013-multistage version	0.13.0-research	0.13.0-research	pass
+distribution	metricshell-inv013-base starts	true	true	pass
+version_pin	metricshell-inv013-base version	0.13.0-research	0.13.0-research	pass
+standalone_copy	artifact_nonempty	true	true	pass
+supply_chain	checksum_verifies	f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486	f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486	pass
+non_root	base_uid_nonzero	true	true	pass
+non_root	multistage_uid_nonzero	true	true	pass
+libc	scratch_exec	true	true	pass
+libc	alpine_exec	true	true	pass
+libc	php_alpine_exec	true	true	pass
+libc	cgo_free_static	true	true	pass
+architecture_amd64	image_architecture	amd64	amd64	pass
+architecture_amd64	executable_with_emulation	true	true	pass
+architecture_arm64	image_architecture	arm64	arm64	pass
+architecture_arm64	executable_with_emulation	true	true	pass
+reproducibility	binary_sha256	f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486	f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486	pass
+sbom	spdx_generated	true	true	pass
