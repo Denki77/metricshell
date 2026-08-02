@@ -1,0 +1,3 @@
+case	expected	actual	result
+memory_limit_exit_code	137	137	pass
+memory_limit_oom_killed	true	true	pass
