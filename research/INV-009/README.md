@@ -1,10 +1,10 @@
 # INV-009 — Shared Memory and mmap Adapter
 
-Status: in progress
+Status: completed
 
 macOS reference run: `results/20260802T162350Z`
 
-Ubuntu reference run: pending
+Ubuntu/LinuxKit reference run: `results/20260802T163406Z`
 
 Report: [report.md](report.md)
 
@@ -39,21 +39,22 @@ snapshot size grows and will not justify the binary ABI, synchronization, recove
 
 ## Current Result
 
-The macOS/LinuxKit aarch64 run passed 78/78 in-container assertions and both external OOM assertions. All 13,860
-complete candidates were read, validated, atomically installed and acknowledged by live consumers. Parallel active-state
-readers performed more than 150,000 reads and observed zero malformed/torn or unknown states.
+Both macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 passed 78/78 in-container assertions and both external OOM
+assertions. In each environment, all 16,740 complete candidates were read, validated, atomically installed and
+acknowledged by live consumers. Parallel active-state
+readers performed 158,526 and 84,677 reads respectively and observed zero malformed/torn or unknown states.
 
 Producer publication cost and end-to-end acceptance are reported separately. The former measures only local commit or
 socket write/enqueue and is not adapter throughput. The comparable end-to-end results have no universal winner: tmpfs
-tmpfs mmap led 1 publisher/128 B (`388,400 accepted/s`) and 8 publishers/128 B (`474,496/s`), file and tmpfs mmap were
+mmap led 1 publisher/128 B (`388,400 accepted/s`) and 8 publishers/128 B (`474,496/s`), file and tmpfs mmap were
 nearly tied at 8 publishers/4 KiB (`173,940/s` and `174,395/s`), and Unix socket led 8 publishers/64 KiB (`28,513/s`).
 The hypothesis is only
 partially supported; the measured gain is shape-dependent and does not justify a default native binary ABI.
 
-The investigation remains in progress until Ubuntu records fingerprint
-`41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07` and an ADR is produced.
+Both runs recorded fingerprint `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`.
+The investigation is completed and [ADR-009](../../docs/06-architecture/adr/ADR-009.md) records the decision.
 
-## Admissible Values (Provisional)
+## Admissible Values
 
 - application operation: complete candidate validation followed by atomic replacement of the active snapshot;
 - no summing, merging, operation replay, producer identity or cross-producer aggregation;
@@ -65,7 +66,7 @@ The investigation remains in progress until Ubuntu records fingerprint
 - overwrite is permitted only if explicitly observable; an overwritten candidate is not an accepted application state;
 - unknown mapping versions are rejected; crash recovery exposes only fully committed candidate bytes;
 - mapped bytes must be bounded below both container memory and `/dev/shm` backing limits;
-- shared memory is not recommended as the default ingestion adapter before cross-environment validation.
+- shared memory is not selected as the default ingestion adapter.
 
 ## Running the Prototype
 
@@ -114,7 +115,8 @@ docker run --rm metricshell-inv009:prototype /out
   unmeasured transport work.
 - PHP has no portable built-in mmap/atomic-ring API. FFI or an extension would be required, increasing adoption cost and
   memory-safety risk without changing the complete-snapshot contract.
-- Current evidence is macOS/LinuxKit aarch64 only. Confirmation in the Ubuntu environment is pending.
+- Both evidence environments use LinuxKit. Cross-architecture behavior is confirmed inside LinuxKit, not on native
+  non-LinuxKit Linux, containerd, CRI-O or Kubernetes.
 - CPU/RSS and Docker Desktop timings are architectural observations, not SLOs.
 
 ## Additional Benchmarks
@@ -137,7 +139,7 @@ docker run --rm metricshell-inv009:prototype /out
 | mapping schema mismatch and reopen                          | covered                                                                   |
 | private mapping permissions                                 | covered: `0600`                                                           |
 | cgroup memory-limit enforcement                             | covered: exit 137 and Docker `OOMKilled=true`                             |
-| matching-fingerprint Ubuntu run                             | pending; same runner prepared                                             |
+| matching-fingerprint Ubuntu run                             | covered; identical fingerprint and 80/80 assertions pass                  |
 | PHP FFI/extension client                                    | not portable; requirement itself is adoption-cost evidence                |
 | full Prometheus structural validation and concurrent scrape | owned by INV-010/implementation tests, not duplicated here                |
 | soak/wraparound under a production ABI                      | recommended only after transport selection                                |
@@ -145,7 +147,7 @@ docker run --rm metricshell-inv009:prototype /out
 
 ## Better Follow-up Benchmarking
 
-On Ubuntu, first run the unchanged script and verify the fingerprint. For deeper transport work, run at least 30
+For deeper transport work on native non-LinuxKit Linux, run at least 30
 repetitions per shape, pin candidate publishers and consumer to CPUs, report median and dispersion, sample cgroup v2
 CPU/memory, and use `perf stat` for cycles, instructions, cache misses and context switches. Any long wraparound soak
 must
@@ -156,6 +158,6 @@ semantics.
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Current raw evidence: `results/20260802T162350Z/`
+- Raw evidence: `results/20260802T162350Z/`, `results/20260802T163406Z/`
 - Detailed analysis: [report.md](report.md)
-- ADR: pending Ubuntu confirmation
+- ADR: [ADR-009](../../docs/06-architecture/adr/ADR-009.md)

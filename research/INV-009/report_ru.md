@@ -1,16 +1,11 @@
 # Отчёт INV-009 — Адаптер shared memory и mmap
 
-Статус: в процессе
-
-Дата прогона: 2026-08-02
-
-Docker server: 29.6.2
-
-Docker platform: linux/aarch64
-
-Референсный прогон: `results/20260802T162350Z`
-
-Fingerprint: `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`
+**Статус:** завершено  
+**Дата прогона:** 2026-08-02  
+**Docker servers:** 29.6.2 (macOS/LinuxKit), 27.4.0 (Ubuntu/LinuxKit)  
+**Docker platforms:** linux/aarch64, linux/x86_64  
+**Референсные прогоны:** `results/20260802T162350Z`, `results/20260802T163406Z`  
+**Fingerprint:** `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`
 
 ## Цель
 
@@ -61,12 +56,12 @@ cat "$latest/environment.tsv"
 
 ## Окружения прогона
 
-| Окружение                        | Дата       |    Docker | Архитектура | Результат                  | Статус                |
-|----------------------------------|------------|----------:|-------------|----------------------------|-----------------------|
-| Docker Desktop на macOS/LinuxKit | 2026-08-02 |    29.6.2 | aarch64     | `results/20260802T162350Z` | 80/80 assertions pass |
-| Ubuntu                           | ожидается  | ожидается | ожидается   | ожидается                  | обязателен до ADR     |
+| Окружение                         | Дата       | Docker | Архитектура | Результат                  | Статус                  |
+|-----------------------------------|------------|-------:|-------------|----------------------------|-------------------------|
+| Docker Desktop на macOS/LinuxKit  | 2026-08-02 | 29.6.2 | aarch64     | `results/20260802T162350Z` | 80/80 assertions pass   |
+| Docker Desktop на Ubuntu/LinuxKit | 2026-08-02 | 27.4.0 | x86_64      | `results/20260802T163406Z` | 80/80 проверок пройдено |
 
-Референсный прогон использовал fingerprint
+Оба прогона использовали fingerprint
 `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`. Repository SHA и image ID сохранены только
 как контекст.
 
@@ -95,9 +90,21 @@ count. Elapsed заканчивается только после всех ackno
 |          1 |   64 KiB |               15 528 |                19 222 |            14 536 | mmap tmpfs  |
 |          8 |   64 KiB |               21 240 |                24 282 |            28 513 | Unix socket |
 
-Все 13 860 candidates были валидированы, установлены и подтверждены без ошибок. Ни один transport не выигрывает
-стабильно. Параллельные readers выполнили более 150 тыс. чтений active state и видели только точные известные старый
-или новый snapshots.
+End-to-end результаты Ubuntu/LinuxKit x86_64:
+
+| Publishers | Snapshot | mmap file accepted/s | mmap tmpfs accepted/s | socket accepted/s | Лучший      |
+|-----------:|---------:|---------------------:|----------------------:|------------------:|-------------|
+|          1 |    128 B |              118 574 |               111 120 |            20 864 | mmap file   |
+|          8 |    128 B |              352 135 |               340 843 |           126 318 | mmap file   |
+|          1 |    4 KiB |               27 917 |                30 792 |             6 506 | mmap tmpfs  |
+|          8 |    4 KiB |               24 576 |                28 138 |            23 513 | mmap tmpfs  |
+|          1 |   64 KiB |                3 903 |                 3 642 |             2 503 | mmap file   |
+|          8 |   64 KiB |                2 289 |                 2 868 |             3 985 | Unix socket |
+
+В каждом окружении все 16 740 candidates были валидированы, установлены и подтверждены без ошибок. Ни один transport
+не выигрывает стабильно. Параллельные readers выполнили 158 526 чтений active state на aarch64 и 84 677 на x86_64 и
+видели только точные известные старый или новый snapshots. В обоих окружениях пройдены все 78 внутри-контейнерных и
+обе внешние проверки.
 
 ### Correctness и failure behavior
 
@@ -115,9 +122,10 @@ count. Elapsed заканчивается только после всех ackno
 
 ### Ресурсы
 
-`resources.tsv` сообщает CPU на принятый snapshot. Для 8 publishers/4 KiB значения составили `17 267 ns` для file
-mmap, `16 138 ns` для tmpfs mmap и `26 787 ns` для socket. Peak RSS достиг `21 576 KiB`. Это environment-specific
-observations, а не acceptance limits.
+`resources.tsv` сообщает CPU на принятый snapshot. Для 8 publishers/4 KiB на aarch64 значения составили `17 267 ns`
+для file mmap, `16 138 ns` для tmpfs mmap и `26 787 ns` для socket; на x86_64 — `133 576 ns`, `122 461 ns` и
+`232 871 ns`. Peak RSS составил соответственно `21 576 KiB` и `19 828 KiB`. Это environment-specific observations,
+а не acceptance limits.
 
 ## Оценка гипотезы
 
@@ -129,7 +137,7 @@ observations, а не acceptance limits.
 
 ### Выигрыш не оправдывает общую client complexity
 
-Предварительно подтверждено. Correctness требует binary mapping schema, cross-process atomics, правил alignment и memory
+Подтверждено. Correctness требует binary mapping schema, cross-process atomics, правил alignment и memory
 order, per-slot commit visibility, поведения overflow, capacity enforcement и crash handling. Ничто из этого не заменяет
 ADR-004 validation или atomic replacement active snapshot; это дополнительная transport complexity.
 
@@ -141,9 +149,8 @@ binary ABI и memory-order contract. Benchmark одного extension не ус�
 
 ### Portability слабее socket adapter
 
-Предварительно подтверждено. File mmap широко доступен, но atomics, endianness, alignment, mapping lifetime, tmpfs
-sizing,
-descriptor inheritance и SIGBUS behavior образуют платформозависимый ABI. Подтверждение Ubuntu остаётся обязательным.
+Подтверждено в пределах проверенного container scope. File mmap широко доступен, но atomics, endianness, alignment,
+mapping lifetime, tmpfs sizing, descriptor inheritance и SIGBUS behavior образуют платформозависимый ABI.
 
 ## Оценка по критериям
 
@@ -177,7 +184,8 @@ descriptor inheritance и SIGBUS behavior образуют платформоз�
 
 ## Ограничения прототипа
 
-- Зафиксированы только доказательства macOS/LinuxKit aarch64; Ubuntu ожидается.
+- Оба окружения доказательств используют LinuxKit. Совпавшие прогоны aarch64/x86_64 не проверяют native non-LinuxKit
+  Linux, containerd, CRI-O или Kubernetes.
 - Прототип проверяет transport publication полных candidates, а не production Prometheus parsing, все structural
   conflicts ADR-004, scrape concurrency active state или final-state freezing. Они остаются обязательными implementation
   tests и вопросами INV-010/INV-011.
@@ -204,27 +212,27 @@ descriptor inheritance и SIGBUS behavior образуют платформоз�
 | correctness acknowledged/accepted count          | покрыто          | `assertions.tsv`                                           |
 | overwrite, crash/torn candidate, schema и reopen | покрыто          | `assertions.tsv`                                           |
 | permissions и cgroup OOM                         | покрыто          | exit 137 и `OOMKilled=true`                                |
-| Ubuntu repeat с совпадающим fingerprint          | ожидается        | тот же `run-bench.sh`; обязателен до ADR                   |
+| Ubuntu repeat с совпадающим fingerprint          | покрыто          | идентичный fingerprint; 80/80 проверок пройдено            |
 | PHP FFI/extension                                | adoption blocker | нет переносимого extension-free atomic mmap API            |
 | полная Prometheus structural validation          | не дублируется   | requirement ADR-004; integration INV-010                   |
 | concurrent scrape во время replacement           | не дублируется   | requirement ADR-004/INV-010                                |
-| native perf/eBPF и 30+ повторов                  | рекомендуется    | после Ubuntu fingerprint confirmation                      |
+| native perf/eBPF и 30+ повторов                  | рекомендуется    | native non-LinuxKit Linux с закреплением CPU               |
 | production wraparound soak                       | отложен          | требует выбранных ABI и backpressure policy                |
 
 ## Вывод
 
-Исходная гипотеза подтверждена лишь частично, исследование остаётся в процессе. Shared memory уменьшает стоимость
+Исходная гипотеза подтверждена частично, исследование завершено. Shared memory уменьшает стоимость
 publisher commit, но в сопоставимом end-to-end acceptance нет стабильного победителя. Он добавляет native binary ABI с
 рисками synchronization и memory safety, не уменьшая ни одной обязанности ADR-004.
 
-Текущая рекомендация — не добавлять default shared-memory adapter. Сохранить его только как возможный expert opt-in,
-если production profiling обнаружит small-snapshot transport bottleneck, не решаемый batching или socket path. ADR не
-должен выпускаться до повторения неизменённого fingerprint на Ubuntu.
+Итоговое решение — не добавлять default shared-memory adapter. Сохранить его только как возможный expert opt-in,
+если production profiling обнаружит small-snapshot transport bottleneck, не решаемый batching или socket path.
+Решение зафиксировано в ADR-009.
 
 ## Выход решения
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Raw evidence: `results/20260802T162350Z/`
+- Raw evidence: `results/20260802T162350Z/`, `results/20260802T163406Z/`
 - Summary: только complete snapshots; никакой aggregation; end-to-end преимущество mmap нестабильно.
-- ADR: ожидает Ubuntu validation
+- ADR: [ADR-009](../../docs-ru/06-architecture/adr/ADR-009.md)

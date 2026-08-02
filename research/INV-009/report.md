@@ -1,16 +1,11 @@
 # INV-009 Report — Shared Memory and mmap Adapter
 
-Status: in progress
-
-Run date: 2026-08-02
-
-Docker server: 29.6.2
-
-Docker platform: linux/aarch64
-
-Reference run: `results/20260802T162350Z`
-
-Fingerprint: `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`
+**Status:** completed  
+**Run date:** 2026-08-02  
+**Docker servers:** 29.6.2 (macOS/LinuxKit), 27.4.0 (Ubuntu/LinuxKit)  
+**Docker platforms:** linux/aarch64, linux/x86_64  
+**Reference runs:** `results/20260802T162350Z`, `results/20260802T163406Z`  
+**Fingerprint:** `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`
 
 ## Goal
 
@@ -61,12 +56,12 @@ The same command and benchmark fingerprint are used on macOS and Ubuntu.
 
 ## Run Environments
 
-| Environment                      | Date       |  Docker | Architecture | Result                     | Status                |
-|----------------------------------|------------|--------:|--------------|----------------------------|-----------------------|
-| Docker Desktop on macOS/LinuxKit | 2026-08-02 |  29.6.2 | aarch64      | `results/20260802T162350Z` | 80/80 assertions pass |
-| Ubuntu                           | pending    | pending | pending      | pending                    | required before ADR   |
+| Environment                       | Date       | Docker | Architecture | Result                     | Status                |
+|-----------------------------------|------------|-------:|--------------|----------------------------|-----------------------|
+| Docker Desktop on macOS/LinuxKit  | 2026-08-02 | 29.6.2 | aarch64      | `results/20260802T162350Z` | 80/80 assertions pass |
+| Docker Desktop on Ubuntu/LinuxKit | 2026-08-02 | 27.4.0 | x86_64       | `results/20260802T163406Z` | 80/80 assertions pass |
 
-The reference run used benchmark fingerprint
+Both runs used benchmark fingerprint
 `41c97e834fba84c771980e2563a9817509add8fd419cde367b34cde5f2e77d07`. The repository SHA and image ID are retained as
 context only.
 
@@ -94,8 +89,20 @@ Elapsed time ends only after all acknowledgements.
 |          1 |   64 KiB |               15,528 |                19,222 |            14,536 | mmap tmpfs  |
 |          8 |   64 KiB |               21,240 |                24,282 |            28,513 | Unix socket |
 
-All 13,860 candidates were validated, installed and acknowledged with zero errors. No transport wins consistently.
-Parallel readers performed more than 150,000 active-state reads and observed only exact known old/new snapshots.
+Ubuntu/LinuxKit x86_64 end-to-end results:
+
+| Publishers | Snapshot | mmap file accepted/s | mmap tmpfs accepted/s | socket accepted/s | Fastest     |
+|-----------:|---------:|---------------------:|----------------------:|------------------:|-------------|
+|          1 |    128 B |              118,574 |               111,120 |            20,864 | mmap file   |
+|          8 |    128 B |              352,135 |               340,843 |           126,318 | mmap file   |
+|          1 |    4 KiB |               27,917 |                30,792 |             6,506 | mmap tmpfs  |
+|          8 |    4 KiB |               24,576 |                28,138 |            23,513 | mmap tmpfs  |
+|          1 |   64 KiB |                3,903 |                 3,642 |             2,503 | mmap file   |
+|          8 |   64 KiB |                2,289 |                 2,868 |             3,985 | Unix socket |
+
+All 16,740 candidates in each environment were validated, installed and acknowledged with zero errors. No transport
+wins consistently. Parallel readers performed 158,526 active-state reads on aarch64 and 84,677 on x86_64 and observed
+only exact known old/new snapshots. All 78 in-container and both external assertions passed in both environments.
 
 ### Correctness and failure behavior
 
@@ -113,9 +120,10 @@ Parallel readers performed more than 150,000 active-state reads and observed onl
 
 ### Resources
 
-`resources.tsv` reports CPU per accepted snapshot. Representative 8-publisher/4 KiB values were `17,267 ns` for file
-mmap, `16,138 ns` for tmpfs mmap and `26,787 ns` for the socket. Peak RSS reached `21,576 KiB`. These are
-environment-specific observations, not acceptance limits.
+`resources.tsv` reports CPU per accepted snapshot. Representative 8-publisher/4 KiB values on aarch64 were `17,267 ns`
+for file mmap, `16,138 ns` for tmpfs mmap and `26,787 ns` for the socket; on x86_64 they were `133,576 ns`, `122,461
+ns` and `232,871 ns`. Peak RSS was `21,576 KiB` and `19,828 KiB`, respectively. These are environment-specific
+observations, not acceptance limits.
 
 ## Hypothesis Evaluation
 
@@ -127,7 +135,7 @@ depends on snapshot size and concurrency. mmap wins the tested 128 B and 4 KiB s
 
 ### The gain does not justify general client complexity
 
-Provisionally supported. Correctness requires a binary mapping schema, cross-process atomics, alignment and memory-order
+Supported. Correctness requires a binary mapping schema, cross-process atomics, alignment and memory-order
 rules, per-slot commit visibility, overwrite behavior, capacity enforcement and crash handling. None of these replace
 ADR-004 validation or atomic active-snapshot replacement; they are additional transport complexity.
 
@@ -139,8 +147,8 @@ memory-order contract. Benchmarking one extension would not remove that deployme
 
 ### Portability is weaker than the socket adapter
 
-Provisionally supported. File mmap exists broadly, but atomics, endianness, alignment, mapping lifetime, tmpfs sizing,
-descriptor inheritance and SIGBUS behavior form a platform-sensitive ABI. Ubuntu confirmation remains required.
+Supported within the tested container scope. File mmap exists broadly, but atomics, endianness, alignment, mapping
+lifetime, tmpfs sizing, descriptor inheritance and SIGBUS behavior form a platform-sensitive ABI.
 
 ## Evaluation Against Criteria
 
@@ -173,7 +181,8 @@ descriptor inheritance and SIGBUS behavior form a platform-sensitive ABI. Ubuntu
 
 ## Prototype Limits
 
-- Only macOS/LinuxKit aarch64 evidence is recorded; Ubuntu is pending.
+- Both evidence environments use LinuxKit. The matching aarch64/x86_64 runs do not verify native non-LinuxKit Linux,
+  containerd, CRI-O or Kubernetes behavior.
 - The prototype tests complete-candidate transport publication, not production Prometheus parsing, all ADR-004
   structural conflicts, active-state scrape concurrency or final-state freezing. Those remain required implementation
   tests and INV-010/INV-011 concerns.
@@ -200,27 +209,27 @@ descriptor inheritance and SIGBUS behavior form a platform-sensitive ABI. Ubuntu
 | acknowledged/accepted count correctness            | covered          | `assertions.tsv`                                        |
 | overwrite, crash/torn candidate, schema and reopen | covered          | `assertions.tsv`                                        |
 | permissions and cgroup OOM                         | covered          | exit 137 and `OOMKilled=true`                           |
-| matching-fingerprint Ubuntu repeat                 | pending          | same `run-bench.sh`; required before ADR                |
+| matching-fingerprint Ubuntu repeat                 | covered          | identical fingerprint; 80/80 assertions pass            |
 | PHP FFI/extension                                  | adoption blocker | no portable extension-free atomic mmap API              |
 | complete Prometheus structural validation          | not duplicated   | ADR-004 implementation requirement; INV-010 integration |
 | concurrent scrape during replacement               | not duplicated   | ADR-004/INV-010 implementation requirement              |
-| native perf/eBPF and 30+ repetitions               | recommended      | after Ubuntu fingerprint confirmation                   |
+| native perf/eBPF and 30+ repetitions               | recommended      | native non-LinuxKit Linux with pinned CPUs              |
 | production wraparound soak                         | deferred         | requires selected ABI and backpressure policy           |
 
 ## Conclusion
 
-The initial hypothesis is only partially confirmed and the investigation remains in progress. Shared memory reduces
+The initial hypothesis is partially confirmed and the investigation is completed. Shared memory reduces
 publisher commit cost, but comparable end-to-end acceptance has no consistent winner. It adds a native binary ABI with
 synchronization and memory-safety risks without reducing any ADR-004 responsibility.
 
-The current recommendation is no default shared-memory adapter. Retain it only as a possible expert opt-in if production
-profiling finds a small-snapshot transport bottleneck that batching or the socket path cannot solve. No ADR should be
-issued until the unchanged fingerprint is repeated on Ubuntu.
+The final decision is no default shared-memory adapter. Retain it only as a possible expert opt-in if production
+profiling finds a small-snapshot transport bottleneck that batching or the socket path cannot solve. ADR-009 records
+this decision.
 
 ## Decision Output
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
-- Raw evidence: `results/20260802T162350Z/`
+- Raw evidence: `results/20260802T162350Z/`, `results/20260802T163406Z/`
 - Summary: complete snapshots only; no aggregation; end-to-end mmap advantage is inconsistent.
-- ADR: pending Ubuntu validation
+- ADR: [ADR-009](../../docs/06-architecture/adr/ADR-009.md)

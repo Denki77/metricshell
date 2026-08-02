@@ -8,3 +8,4 @@
 - [ADR-006 — File Ingestion Uses Directory inotify with Periodic Reconciliation](ADR-006.md)
 - [ADR-007 — Complete Snapshots Use Acknowledged Unix Stream Framing](ADR-007.md)
 - [ADR-008 — Unix Socket Remains the Default Local Ingestion Transport](ADR-008.md)
+- [ADR-009 — Do Not Add Shared Memory as a Default Ingestion Adapter](ADR-009.md)
