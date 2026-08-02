@@ -1,0 +1,5 @@
+key	value
+go_version	go1.25.12
+architecture	arm64
+os	linux
+cpu_count	6

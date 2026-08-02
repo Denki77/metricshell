@@ -542,7 +542,7 @@ Shared memory may offer the best raw performance but may not justify client comp
 
 ### Status
 
-Not started.
+In progress.
 
 ---
 
