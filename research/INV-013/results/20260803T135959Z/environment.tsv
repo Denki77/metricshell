@@ -1,0 +1,15 @@
+key	value
+investigation	INV-013
+run_date_utc	2026-08-03T14:03:52Z
+repository_head_sha	2edcaacf4c98bb3b54e60172e624eddddb1efe82
+benchmark_scope_diff_clean	true
+benchmark_code_fingerprint_sha256	01b04f50305cce6474d74f9fa196d35bcd60dd65281134056d568cb2d4e96ea4
+host_uname	Linux denis-fomenkov 6.8.0-124-generic #124~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 21:05:19 UTC  x86_64 x86_64 x86_64 GNU/Linux 
+docker_server_version	27.4.0
+docker_architecture	x86_64
+container_kernel	Linux a92e962883a1 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+golang_image	golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f
+php_image	php:8.3-cli-alpine@sha256:afdf8b1fee58486ccc0dab5f30f634b86873d56dac985f71ba217945647c05ad
+alpine_image	alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+artifact_sha256	2f8ebdad4808bafcf775a8ed10f21a46e1e6b4c16cfcc2eb40bd245fd0b9aac7
+binfmt_image	tonistiigi/binfmt:qemu-v9.2.2@sha256:1b804311fe87047a4c96d38b4b3ef6f62fca8cd125265917a9e3dc3c996c39e6
