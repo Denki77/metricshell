@@ -584,7 +584,7 @@ internal state, disconnected scraper, slow scraper и несколько concurr
 
 ### Статус
 
-Не начато.
+Завершено.
 
 ---
 
@@ -634,7 +634,7 @@ Runtime self-metrics могут продолжать изменяться, по�
 
 ### Статус
 
-Не начато.
+Завершено.
 
 ---
 
@@ -669,7 +669,7 @@ CronJob, termination, `activeDeadlineSeconds`, `ttlSecondsAfterFinished` и over
 
 ### Статус
 
-Не начато.
+Завершено.
 
 ---
 
@@ -701,7 +701,7 @@ CronJob, termination, `activeDeadlineSeconds`, `ttlSecondsAfterFinished` и over
 
 ### Статус
 
-Не начато.
+Завершено.
 
 ---
 
@@ -735,7 +735,7 @@ CronJob, termination, `activeDeadlineSeconds`, `ttlSecondsAfterFinished` и over
 
 ### Статус
 
-Не начато.
+Завершено.
 
 ---
 
@@ -809,4 +809,4 @@ CPU/memory limits, host load и commit SHA.
 
 ### Статус
 
-Не начато.
+Завершено.

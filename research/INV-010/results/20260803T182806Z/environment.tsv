@@ -1,0 +1,11 @@
+key	value
+investigation	INV-010
+run_date_utc	2026-08-03T18:28:16Z
+repository_head_sha	c873df2aebe5f9e43402639285b4abd9b45ceeba
+benchmark_scope_diff_clean	false
+benchmark_code_fingerprint_sha256	edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456
+host_uname	Darwin Deniss-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:24 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6020 arm64 
+docker_server_version	29.6.2
+docker_architecture	aarch64
+docker_operating_system	Docker Desktop 
+container_kernel	Linux 8c8da032ec89 6.12.76-linuxkit #1 SMP Sat Jul 11 11:18:11 UTC 2026 aarch64 Linux

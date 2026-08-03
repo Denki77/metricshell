@@ -1,0 +1,4 @@
+case	metric	value	unit	note
+image_size	metricshell-inv013-binary	1507480	bytes	
+image_size	metricshell-inv013-multistage	97875364	bytes	
+image_size	metricshell-inv013-base	10333271	bytes	

@@ -1,0 +1,14 @@
+case	metric	value	unit	note
+cardinality	response_bytes_0	874	bytes	complete application snapshot
+cardinality	install_ns_0	22947072	ns	host-side wall time
+cardinality	scrape_ns_0	21257728	ns	host-side wall time
+cardinality	response_bytes_1000	58734	bytes	complete application snapshot
+cardinality	install_ns_1000	29487104	ns	host-side wall time
+cardinality	scrape_ns_1000	21736704	ns	host-side wall time
+cardinality	response_bytes_10000	608735	bytes	complete application snapshot
+cardinality	install_ns_10000	60979712	ns	host-side wall time
+cardinality	scrape_ns_10000	48559104	ns	host-side wall time
+cardinality	response_bytes_100000	6378736	bytes	complete application snapshot
+cardinality	install_ns_100000	305845760	ns	host-side wall time
+cardinality	scrape_ns_100000	64312064	ns	host-side wall time
+multiple_scrapers	wall_time_ns	1243343872	ns	32 concurrent complete responses

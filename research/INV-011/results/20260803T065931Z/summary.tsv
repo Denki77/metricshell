@@ -1,0 +1,11 @@
+case	result	details
+startup_repetitions	pass	all portable assertions passed
+frozen_state	pass	all portable assertions passed
+immediate	pass	all portable assertions passed
+duration	pass	all portable assertions passed
+one_scrape	pass	all portable assertions passed
+n_scrapes	pass	all portable assertions passed
+concurrent_scrapes	pass	all portable assertions passed
+eligibility_token	pass	all portable assertions passed
+aborted_scrape	pass	all portable assertions passed
+timeout	pass	all portable assertions passed

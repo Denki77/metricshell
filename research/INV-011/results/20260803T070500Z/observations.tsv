@@ -1,0 +1,36 @@
+case	metric	value	unit	note
+startup-repeat-1	published_host_port	36253	port	
+startup-repeat-1	http_ready_ns	4014317056	ns	
+startup-repeat-2	published_host_port	46827	port	
+startup-repeat-2	http_ready_ns	3008189952	ns	
+startup-repeat-3	published_host_port	37891	port	
+startup-repeat-3	http_ready_ns	3207596032	ns	
+startup-repeat-4	published_host_port	33025	port	
+startup-repeat-4	http_ready_ns	3494155008	ns	
+startup-repeat-5	published_host_port	43747	port	
+startup-repeat-5	http_ready_ns	3352883712	ns	
+startup-repeat-6	published_host_port	41655	port	
+startup-repeat-6	http_ready_ns	3174896128	ns	
+startup-repeat-7	published_host_port	44825	port	
+startup-repeat-7	http_ready_ns	3596256000	ns	
+startup-repeat-8	published_host_port	45729	port	
+startup-repeat-8	http_ready_ns	3276141056	ns	
+startup-repeat-9	published_host_port	41837	port	
+startup-repeat-9	http_ready_ns	3385686016	ns	
+startup-repeat-10	published_host_port	33421	port	
+startup-repeat-10	http_ready_ns	3123060224	ns	
+frozen_state	published_host_port	34061	port	
+frozen_state	http_ready_ns	3711178240	ns	
+immediate	container_lifecycle_ns	3673784064	ns	
+duration	container_lifecycle_ns	4155559936	ns	configured 500 ms
+one_scrape	published_host_port	33231	port	
+one_scrape	http_ready_ns	3581820160	ns	
+n_scrapes	published_host_port	38007	port	
+n_scrapes	http_ready_ns	3180609792	ns	
+concurrent_scrapes	published_host_port	41999	port	
+concurrent_scrapes	http_ready_ns	2638161408	ns	
+eligibility_token	published_host_port	44283	port	
+eligibility_token	http_ready_ns	2941996288	ns	
+aborted_scrape	published_host_port	40183	port	
+aborted_scrape	http_ready_ns	2864352256	ns	
+timeout	container_lifecycle_ns	4108645888	ns	configured 500 ms

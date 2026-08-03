@@ -1,0 +1,12 @@
+case	result	details
+distribution	pass	all assertions passed
+standalone_copy	pass	all assertions passed
+version_pin	pass	all assertions passed
+supply_chain	pass	all assertions passed
+non_root	pass	all assertions passed
+libc	pass	all assertions passed
+architecture_amd64	pass	all assertions passed
+architecture_arm64	pass	all assertions passed
+reproducibility	pass	all assertions passed
+sbom	pass	all assertions passed
+image_size	pass	all assertions passed

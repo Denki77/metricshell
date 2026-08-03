@@ -1,0 +1,15 @@
+FROM golang:1.23-alpine@sha256:383395b794dffa5b53012a212365d40c8e37109a626ca30d6151c8348d380b5f AS build
+WORKDIR /src
+ARG VERSION=0.0.0-research
+COPY ["go.mod", "./"]
+COPY ["cmd", "./cmd/"]
+RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags="-s -w -X main.version=${VERSION}" -o /out/metricshell ./cmd/inv013
+
+FROM alpine:3.20@sha256:d9e853e87e55526f6b2917df91a2115c36dd7c696a35be12163d44e6e2a4b6bc
+ARG VERSION=0.0.0-research
+LABEL org.opencontainers.image.title="MetricShell base image research" \
+      org.opencontainers.image.version="${VERSION}"
+RUN addgroup -S application && adduser -S -G application application
+COPY --from=build /out/metricshell /usr/local/bin/metricshell
+USER application
+ENTRYPOINT ["/usr/local/bin/metricshell"]

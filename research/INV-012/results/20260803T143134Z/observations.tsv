@@ -1,0 +1,6 @@
+case	metric	value	unit	note
+direct_pod_discovery	completion_ms	8017.520	ms	
+service_monitor	http_scrapes	51	count	aggregate handler observation; not replica attribution
+service_monitor	completion_ms	63724.188	ms	
+readiness_false	service_monitor_scrapes	1	count	observed behavior; required-scrapes=0 forces full window
+termination	deletion_ms	2022.144	ms	

@@ -1,0 +1,4 @@
+case	metric	value	unit	note
+concurrency_limit	accepted	4	requests	
+concurrency_limit	rejected_429	8	requests	
+path_permissions	mode_uid_gid	700:100:101	text	

@@ -1,0 +1,3 @@
+case	metric	value	unit	note
+concurrent_scrape_10	wall_ns	321664000	ns	
+shutdown	drain_stop_ns	1364388096	ns	

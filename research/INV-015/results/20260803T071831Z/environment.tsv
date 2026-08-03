@@ -1,0 +1,15 @@
+key	value
+investigation	INV-015
+run_date_utc	2026-08-03T07:20:44Z
+repository_head_sha	79b0eefd9c492bb131c0ec362a5c2acb21c04732
+benchmark_scope_diff_clean	true
+benchmark_code_fingerprint_sha256	ffd49f1d5a23d5484a270329c6610d99196480228f4b84ad6b1aac10bbd9a807
+host_uname	Linux denis-fomenkov 6.8.0-124-generic #124~22.04.1-Ubuntu SMP PREEMPT_DYNAMIC Tue May 26 21:05:19 UTC  x86_64 x86_64 x86_64 GNU/Linux 
+host_load	 10:20:44 up 13:38,  1 user,  load average: 1.50, 1.88, 1.52 
+host_cpu_count	8
+host_memory_bytes	unknown
+docker_server_version	27.4.0
+docker_architecture	x86_64
+container_kernel	Linux 660b609491ad 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+container_go_version	go version go1.23.12 linux/amd64
+benchmark_iterations	10

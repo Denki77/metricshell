@@ -165,7 +165,7 @@ All safe, locally executable variants identified for this research were run:
 | shutdown, retained state and restart        | covered                                                                                      |
 | idle CPU, active CPU and peak RSS           | covered                                                                                      |
 | matching-fingerprint Ubuntu run             | covered: `results/20260728T114459Z`                                                          |
-| native non-LinuxKit Linux                   | pending; no such environment available                                                       |
+| native non-LinuxKit Linux                   | not covered; no such environment was available                                               |
 | PHP HTTP client                             | covered by INV-005; protocol compatibility is unchanged                                      |
 | PHP gRPC client                             | not locally executable; requires extension/toolchain and is itself adoption-cost evidence    |
 | TLS/mTLS and remote authentication          | not applicable to the selected local-only default; required if exposure is added             |

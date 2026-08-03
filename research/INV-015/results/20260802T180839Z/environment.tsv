@@ -1,0 +1,15 @@
+key	value
+investigation	INV-015
+run_date_utc	2026-08-02T18:09:23Z
+repository_head_sha	1f5745dffc0c857a3a3d4a1d888a16e768dfd2e5
+benchmark_scope_diff_clean	false
+benchmark_code_fingerprint_sha256	ffd49f1d5a23d5484a270329c6610d99196480228f4b84ad6b1aac10bbd9a807
+host_uname	Darwin Deniss-MacBook-Pro.local 25.5.0 Darwin Kernel Version 25.5.0: Tue Jun  9 22:28:24 PDT 2026; root:xnu-12377.121.10~1/RELEASE_ARM64_T6020 arm64 
+host_load	21:09  up 6 days, 11:27, 4 users, load averages: 5.75 5.87 5.08 
+host_cpu_count	12
+host_memory_bytes	17179869184
+docker_server_version	29.6.2
+docker_architecture	aarch64
+container_kernel	Linux afb35cc1b159 6.12.76-linuxkit #1 SMP Sat Jul 11 11:18:11 UTC 2026 aarch64 Linux
+container_go_version	go version go1.23.12 linux/arm64
+benchmark_iterations	10
