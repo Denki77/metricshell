@@ -1,0 +1,15 @@
+case	result	details
+toolchain	pass	all assertions passed
+two_prometheus	pass	all assertions passed
+direct_pod_discovery	pass	all assertions passed
+service_monitor	pass	all assertions passed
+prometheus_replicas	pass	all assertions passed
+readiness_true	pass	all assertions passed
+readiness_false	pass	all assertions passed
+pod_monitor	pass	all assertions passed
+active_deadline	pass	all assertions passed
+ttl_after_finished	pass	all assertions passed
+termination	pass	all assertions passed
+cronjob	pass	all assertions passed
+overlap	pass	all assertions passed
+job_post_exit	pass	all assertions passed
