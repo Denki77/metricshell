@@ -1,0 +1,12 @@
+case	result	details
+startup	pass	all portable assertions passed
+formats	pass	all portable assertions passed
+optional_timestamp	pass	all portable assertions passed
+malformed_candidate	pass	all portable assertions passed
+concurrent_replace	pass	all portable assertions passed
+cardinality	pass	all portable assertions passed
+multiple_scrapers	pass	all portable assertions passed
+compression	pass	all portable assertions passed
+slow_client	pass	all portable assertions passed
+aborted_client	pass	all portable assertions passed
+response_limit	pass	all portable assertions passed
