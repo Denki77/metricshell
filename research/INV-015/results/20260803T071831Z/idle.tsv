@@ -1,0 +1,11 @@
+sample	cpu_percent	memory_usage	open_fds
+1	0.00%	2.926MiB / 128MiB	6
+2	0.00%	2.949MiB / 128MiB	6
+3	0.00%	2.973MiB / 128MiB	6
+4	0.00%	2.945MiB / 128MiB	6
+5	0.00%	2.945MiB / 128MiB	6
+6	0.00%	2.941MiB / 128MiB	6
+7	0.00%	2.941MiB / 128MiB	6
+8	0.00%	2.945MiB / 128MiB	6
+9	0.00%	2.945MiB / 128MiB	6
+10	0.00%	2.953MiB / 128MiB	6
