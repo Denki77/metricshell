@@ -1,0 +1,27 @@
+case	assertion	expected	actual	result
+startup_repetitions	complete_cycles	10	10	pass
+frozen_state	application_value_immutable	42	42	pass
+frozen_state	self_metrics_continue	true	true	pass
+frozen_state	ingestion_closed_after_finalization	409	409	pass
+frozen_state	exit_code	0	0	pass
+immediate	exit_code	0	0	pass
+immediate	reason	immediate	immediate	pass
+duration	exit_code	0	0	pass
+duration	reason	duration_elapsed	duration_elapsed	pass
+one_scrape	health_and_readiness_count	completed=0 attempted=0	completed=0 attempted=0	pass
+one_scrape	manual_curl_counts	0	0	pass
+one_scrape	final_count	1	1	pass
+n_scrapes	before_n	completed=2 attempted=2	completed=2 attempted=2	pass
+n_scrapes	still_running_before_n	true	true	pass
+n_scrapes	exit_code	0	0	pass
+n_scrapes	same_client_counted_independently	3	3	pass
+concurrent_scrapes	exit_code	0	0	pass
+concurrent_scrapes	all_client_responses_complete	0	0	pass
+concurrent_scrapes	counter_saturates_at_n	10	10	pass
+eligibility_token	ordinary_response_not_eligible	completed=0 attempted=1	completed=0 attempted=1	pass
+eligibility_token	eligible_response_exits	0	0	pass
+aborted_scrape	disconnected_not_counted	0	0	pass
+aborted_scrape	attempt_observed	true	true	pass
+aborted_scrape	later_complete_response_counts	0	0	pass
+timeout	exit_code	0	0	pass
+timeout	zero_completed	0	0	pass
