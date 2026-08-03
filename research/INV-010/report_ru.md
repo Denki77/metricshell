@@ -1,16 +1,14 @@
 # Отчёт INV-010 — Prometheus Exposition
 
-**Статус:** в процессе
-**Дата прогона:** 2026-08-02
-**Docker server:** 29.6.2 (macOS/LinuxKit)
-**Docker platform:** linux/aarch64
-**Эталонный прогон:** `results/20260803T182806Z`
+**Статус:** завершено
+**Даты прогонов:** 2026-08-03
+**Эталонные прогоны:** `results/20260803T182806Z`, `results/20260803T184050Z`
 **Fingerprint:** `edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`
 
 ## Цель
 
 Определить минимальный корректный Prometheus-compatible exposition contract, доказать consistency scrape при замене
-полных snapshot’ов и выбрать предварительные policies формата, concurrency и resource limits без нарушения ADR-004.
+полных snapshot’ов и выбрать policies формата, concurrency и resource limits без нарушения ADR-004.
 
 ## Граница ADR-004
 
@@ -35,18 +33,18 @@ cat "$latest/concurrent-scrapes.tsv"
 cat "$latest/environment.tsv"
 ```
 
-Закреплённый digest Prometheus image запускает `promtool check metrics`. На Ubuntu используются тот же runner и тот же
+Закреплённый digest Prometheus image запускает `promtool check metrics`. Обе среды используют один runner и один
 fingerprint; отдельной копии кода для Ubuntu нет.
 
 ## Среды прогонов
 
-| Среда                          |       Дата |    Docker | Архитектура      | Результат                  | Статус                |
-|--------------------------------|-----------:|----------:|------------------|----------------------------|-----------------------|
-| Docker Desktop macOS/LinuxKit  | 2026-08-02 |    29.6.2 | aarch64          | `results/20260803T182806Z` | 18/18 assertions pass |
-| Docker Desktop Ubuntu/LinuxKit |  ожидается | ожидается | x86_64 ожидается | ожидается                  | не запускалось        |
+| Среда                          |       Дата | Docker | Архитектура | Результат                  | Статус                |
+|--------------------------------|-----------:|-------:|-------------|----------------------------|-----------------------|
+| Docker Desktop macOS/LinuxKit  | 2026-08-03 | 29.6.2 | aarch64     | `results/20260803T182806Z` | 18/18 assertions pass |
+| Docker Desktop Ubuntu/LinuxKit | 2026-08-03 | 27.4.0 | x86_64      | `results/20260803T184050Z` | 18/18 assertions pass |
 
-Fingerprint macOS: `edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`. Ubuntu evidence
-сопоставимо только при точном совпадении.
+Оба прогона имеют fingerprint `edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`.
+Все 18 assertions прошли в обеих средах.
 
 ## Результаты
 
@@ -64,12 +62,12 @@ Runner чередовал 120 полных A/B installations одновреме�
 
 ### Cardinality observations
 
-| Gauge series приложения | Response bytes | Install wall time | Scrape wall time |
-|------------------------:|---------------:|------------------:|-----------------:|
-|                       0 |            874 |         25.611 ms |        23.163 ms |
-|                   1 000 |         58 734 |         31.138 ms |        22.968 ms |
-|                  10 000 |        608 735 |         66.632 ms |        30.785 ms |
-|                 100 000 |      6 378 736 |        305.967 ms |       115.676 ms |
+| Series приложения | Response bytes | macOS install/scrape | Ubuntu install/scrape |
+|------------------:|---------------:|---------------------:|----------------------:|
+|                 0 |            874 |   22,947 / 21,258 ms |    21,884 / 21,182 ms |
+|             1 000 |         58 734 |   29,487 / 21,737 ms |    24,957 / 22,295 ms |
+|            10 000 |        608 735 |   60,980 / 48,559 ms |    80,620 / 30,728 ms |
+|           100 000 |      6 378 736 |  305,846 / 64,312 ms |  466,965 / 134,274 ms |
 
 Это single-run host wall time с curl и Docker Desktop scheduling, а не SLO или production limit.
 
@@ -83,7 +81,7 @@ decompressed body. Slow client 1 KiB/s с timeout 1 s и намеренно disc
 
 ### Использовать готовый Prometheus parser/encoder
 
-Предварительно подтверждено. Common library приняла валидный input, отклонила malformed syntax и создала canonical
+Подтверждено. Common library приняла валидный input, отклонила malformed syntax и создала canonical
 families, принятые `promtool`. HTTP negotiation, snapshot selection, preflight и lifecycle остаются кодом MetricShell,
 но grammar не следует писать вручную.
 
@@ -103,7 +101,7 @@ EOF. Exemplars/native histograms не покрыты.
 
 ## Оценка по критериям
 
-| Критерий                      | Предварительный результат               |
+| Критерий                      | Подтверждённый результат                |
 |-------------------------------|-----------------------------------------|
 | Prometheus compatibility      | text 0.0.4 принят `promtool`            |
 | OpenMetrics                   | negotiation 1.0 и EOF покрыты           |
@@ -113,9 +111,9 @@ EOF. Exemplars/native histograms не покрыты.
 | concurrent clients            | 32 clients                              |
 | slow/disconnected             | survival покрыт                         |
 | response limit                | preflight 503                           |
-| Ubuntu reproducibility        | ожидается                               |
+| Ubuntu reproducibility        | 18/18, fingerprint совпал               |
 
-## Предварительные policies
+## Принятые policies
 
 - Prometheus text 0.0.4 — default compatibility format.
 - OpenMetrics text 1.0 — по Accept negotiation и с EOF.
@@ -128,7 +126,8 @@ EOF. Exemplars/native histograms не покрыты.
 
 ## Ограничения
 
-- Только macOS/LinuxKit; Ubuntu ожидается.
+- Обе container-среды используют LinuxKit: macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64. Native Linux без LinuxKit
+  не проверен.
 - Не все structural rules ADR-004 и не explicit zero-family encoding.
 - Нет exemplars, native histograms, protobuf, TLS, HTTP/2 и proxy.
 - Timings single-run и включают host tools/Docker Desktop.
@@ -148,25 +147,25 @@ EOF. Exemplars/native histograms не покрыты.
 | 32 clients                     | покрыто       | assertion/observation                 |
 | gzip, slow, disconnect         | покрыто       | headers/logs/health                   |
 | size preflight                 | покрыто       | 1 024 bytes, HTTP 503                 |
-| Ubuntu fingerprint             | ожидается     | необходимо для завершения             |
+| Ubuntu fingerprint             | покрыто       | 18/18, fingerprint совпал             |
 | CPU/RSS/latency 30+            | рекомендуется | pinned CPUs на Ubuntu                 |
-| exemplars/native histograms    | отложено      | только при requirement                |
-| proxy/TLS/HTTP2                | отложено      | deployment research                   |
+| exemplars/native histograms    | не покрыто    | вне принятой области snapshot         |
+| proxy/TLS/HTTP2                | не покрыто    | область deployment                    |
 
 ## Вывод
 
-macOS evidence предварительно подтверждает library-based exposition. Prometheus text 0.0.4 и negotiated OpenMetrics
+Совпадающие результаты macOS и Ubuntu подтверждают library-based exposition. Prometheus text 0.0.4 и negotiated
+OpenMetrics
 1.0 достаточны для проверенных типов; immutable complete-snapshot replacement даёт consistent concurrent scrapes.
 Pre-encoding позволяет честно вернуть size failure до partial success.
 
-Исследование остаётся в процессе. ADR нельзя принимать до прогона неизменённого fingerprint на Ubuntu и сравнения
-environment-dependent observations.
+INV-010 завершено. Контракт зафиксирован в [ADR-010](../../docs-ru/06-architecture/adr/ADR-010.md).
 
 ## Выход исследования
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS evidence: `results/20260803T182806Z/`
-- Ubuntu evidence: ожидается
-- Предварительное направление: text default, OpenMetrics negotiated, immutable snapshot, preflight limit
-- ADR: ожидается
+- Ubuntu evidence: `results/20260803T184050Z/`
+- Направление: text default, OpenMetrics negotiated, immutable snapshot, preflight limit
+- ADR: [ADR-010](../../docs-ru/06-architecture/adr/ADR-010.md)

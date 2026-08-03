@@ -216,7 +216,7 @@ dependencies.
 | environment and code fingerprint         | covered                                | `environment.tsv`                               |
 | clean tracked benchmark scope            | covered: `true`, zero untracked files  | `environment.tsv`                               |
 | Ubuntu same-fingerprint repeat           | covered                                | `results/20260728T114459Z`                      |
-| native non-LinuxKit Linux                | pending                                | environment unavailable                         |
+| native non-LinuxKit Linux                | not covered                            | environment unavailable                         |
 | PHP HTTP interoperability                | already covered by INV-005             | no new wire requirement                         |
 | PHP gRPC                                 | unavailable locally                    | extension/generated-stub cost is material       |
 | streaming gRPC                           | not selected                           | would add a fourth protocol/lifecycle candidate |

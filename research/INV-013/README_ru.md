@@ -1,9 +1,10 @@
 # INV-013 — Модели распространения
 
-**Статус:** в процессе
+**Статус:** завершено
 **Эталонный прогон macOS:** `results/20260803T103140Z`
-**Прогон Ubuntu/LinuxKit:** ожидается
+**Эталонный прогон Ubuntu/LinuxKit:** `results/20260803T135959Z`
 **Отчёт:** [report_ru.md](report_ru.md)
+**Решение:** [ADR-013](../../docs-ru/06-architecture/adr/ADR-013.md)
 
 ## Вопрос
 
@@ -31,9 +32,10 @@ standalone artifact, multi-stage input и в небольшом base image. Lang
 - автоматическая регистрация pinned binfmt/QEMU для cross-architecture execution в обычном Docker Engine;
 - Ubuntu repeat с тем же fingerprint.
 
-## Текущий результат
+## Подтверждённый результат
 
-Пройдено 24/24 assertions. Один CGO-free artifact работал в scratch, Alpine и PHP Alpine. amd64 и arm64 images реально
+В обеих средах пройдено 24/24 assertions. Один CGO-free artifact работал в scratch, Alpine и PHP Alpine. amd64 и arm64
+images реально
 выполнены, включая amd64 emulation на arm64 host. No-cache rebuild дал тот же SHA-256
 `f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486`.
 
@@ -44,10 +46,11 @@ standalone artifact, multi-stage input и в небольшом base image. Lang
 `sha256:1b804311fe87047a4c96d38b4b3ef6f62fca8cd125265917a9e3dc3c996c39e6`. Выбранные platform image IDs записаны в
 `base-images.tsv`.
 
-Размеры: scratch 1 507 480 B, Alpine base 10 333 271 B, PHP example 97 875 364 B. Статус остаётся «в процессе» до
-Ubuntu.
+Размеры на macOS/aarch64: 1 507 480, 10 333 271 и 97 875 364 bytes; на Ubuntu/x86_64: 678 173, 4 310 805 и
+38 301 971 bytes для scratch, Alpine base и PHP multi-stage соответственно. Fingerprint обоих прогонов:
+`01b04f50305cce6474d74f9fa196d35bcd60dd65281134056d568cb2d4e96ea4`.
 
-## Предварительные значения
+## Принятые значения
 
 - CGO-free static linux/amd64 и linux/arm64 artifact;
 - version в binary/OCI, опубликованный SHA-256;
@@ -104,8 +107,10 @@ Linux scope. Sizes зависят от upstream bases.
 Проверка static linking выполняется внутри уже собранного Alpine-кандидата и не требует host bind mount.
 Cross-architecture execution регистрирует binfmt через privileged helper container. Это меняет регистрацию эмуляции
 в Docker host/VM и требует соответствующего разрешения Docker.
-Byte-identical rebuild разделяет один Docker daemon и pinned toolchain. Совпадение на Ubuntu подтвердит переносимость
-benchmark, но само по себе не докажет independent-builder или полную supply-chain reproducibility.
+Byte-identical rebuild подтверждён отдельно в каждой pinned toolchain/daemon environment. Совпадение между средами
+подтверждает переносимость benchmark, но не independent-builder или полную supply-chain reproducibility.
+Обе container-среды используют LinuxKit: macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64. Native Linux без LinuxKit
+не проверен.
 
 ## Additional Benchmarks
 
@@ -120,19 +125,18 @@ benchmark, но само по себе не докажет independent-builder �
 | immutable image digests        | покрыто           |
 | pinned binfmt/QEMU setup       | покрыто           |
 | sizes/SPDX                     | покрыто           |
-| Ubuntu fingerprint             | ожидается         |
+| Ubuntu fingerprint             | покрыто: 24/24    |
 | cosign/SLSA/full SBOM/CVE scan | release follow-up |
 
 ## Лучший follow-up
 
-Запустить unchanged fingerprint на Ubuntu и потребовать те же immutable references из `base-images.tsv`, затем
-проверить published multi-arch manifest, signatures, provenance и full SBOM. Только независимый clean CI worker может
+Проверить published multi-arch manifest, signatures, provenance и full SBOM. Только независимый clean CI worker может
 расширить вывод до independent-builder reproducibility.
 
 ## Выход
 
 - Prototype: `prototype/`
 - macOS evidence: `results/20260803T103140Z/`
-- Ubuntu: ожидается
+- Ubuntu: `results/20260803T135959Z/`
 - Отчёт: [report_ru.md](report_ru.md)
-- ADR: ожидается
+- ADR: [ADR-013](../../docs-ru/06-architecture/adr/ADR-013.md)

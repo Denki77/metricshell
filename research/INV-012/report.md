@@ -1,11 +1,11 @@
 # INV-012 Report — Kubernetes Job and CronJob Viability
 
-**Status:** in progress
+**Status:** completed
 **Run date:** 2026-08-03
 **Runtime:** Minikube v1.38.1, Kubernetes v1.34.0
 **Monitoring:** kube-prometheus-stack 88.1.2, two Prometheus replicas
-**Reference run:** `results/20260803T143134Z`
-**Summary:** [summary.tsv](results/20260803T143134Z/summary.tsv)
+**Reference runs:** `results/20260803T143134Z`, `results/20260803T153300Z`
+**Summaries:** [macOS](results/20260803T143134Z/summary.tsv), [Ubuntu](results/20260803T153300Z/summary.tsv)
 
 ## Goal
 
@@ -58,14 +58,13 @@ failure: inspect `run-summary.tsv`, `failure.tsv` and the phase log named there.
 
 ## Run Environments
 
-| Environment                       | Date       | Docker server | Architecture    | Result set                 | Status                  |
-|-----------------------------------|------------|--------------:|-----------------|----------------------------|-------------------------|
-| Docker Desktop on macOS, Minikube | 2026-08-03 |        29.6.2 | aarch64         | `results/20260803T143134Z` | 21/21 assertions passed |
-| Docker on Ubuntu, Minikube        | pending    |       pending | x86_64 expected | pending                    | not run                 |
+| Environment                        | Date       | Docker server | Architecture | Result set                 | Status                  |
+|------------------------------------|------------|--------------:|--------------|----------------------------|-------------------------|
+| Docker Desktop on macOS, Minikube  | 2026-08-03 |        29.6.2 | aarch64      | `results/20260803T143134Z` | 21/21 assertions passed |
+| Docker Desktop on Ubuntu, Minikube | 2026-08-03 |        27.4.0 | x86_64       | `results/20260803T153300Z` | 21/21 assertions passed |
 
-The macOS benchmark fingerprint is
-`caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c`. Ubuntu validation must use this exact
-fingerprint. `repository_head_sha` is context only and may differ after documentation changes.
+Both runs have benchmark fingerprint `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c`, and all
+21 assertions passed in both environments. `repository_head_sha` is context only.
 
 ## Results
 
@@ -89,13 +88,13 @@ fingerprint. `repository_head_sha` is context only and may differ after document
 
 Measured observations:
 
-| Observation                           |         Value |
-|---------------------------------------|--------------:|
-| Direct discovery completion           |  8,017.520 ms |
-| ServiceMonitor completion             | 63,724.188 ms |
-| Aggregate ServiceMonitor HTTP scrapes |            51 |
-| Unready ServiceMonitor scrapes        |             1 |
-| Explicit Pod deletion                 |  2,022.144 ms |
+| Observation                           | macOS/LinuxKit | Ubuntu/LinuxKit |
+|---------------------------------------|---------------:|----------------:|
+| Direct discovery completion           |   8,017.520 ms |    9,124.833 ms |
+| ServiceMonitor completion             |  63,724.188 ms |   66,243.703 ms |
+| Aggregate ServiceMonitor HTTP scrapes |             51 |              73 |
+| Unready ServiceMonitor scrapes        |              1 |               0 |
+| Explicit Pod deletion                 |   2,022.144 ms |    4,250.833 ms |
 
 ## Hypothesis Evaluation
 
@@ -138,7 +137,8 @@ finished in about 2.0 seconds; and `concurrencyPolicy: Forbid` kept one Job/Pod 
 
 ## Prototype Limits
 
-- Only Minikube was tested, with a macOS Docker Desktop host. Ubuntu confirmation is pending.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Only Minikube was
+  tested; managed clusters and native non-LinuxKit Linux remain outside the evidence.
 - Helm chart and Kubernetes versions are pinned; later versions may reconcile endpoints differently.
 - Replica storage is verified through separate Prometheus API connections. The historical evaluation time is required
   because current-time queries correctly omit the series after the target receives a stale marker.
@@ -148,26 +148,27 @@ finished in about 2.0 seconds; and `concurrencyPolicy: Forbid` kept one Job/Pod 
 
 ## Additional Benchmarking
 
-| Benchmark                                      | Status  | Evidence                                                       |
-|------------------------------------------------|---------|----------------------------------------------------------------|
-| Direct `kubernetes_sd_configs` Pod discovery   | covered | `direct-job.log`                                               |
-| Two-replica ServiceMonitor                     | covered | `service-ready.log`, `helm-manifest.yaml`                      |
-| Stored sample in each replica TSDB             | covered | `prometheus-replica-evidence.tsv`, replica query JSON files    |
-| Ready/unready ServiceMonitor behavior          | covered | `service-ready.log`, `service-unready.log`, `observations.tsv` |
-| Unready PodMonitor                             | covered | `pod-unready.log`, `monitors.yaml`                             |
-| Active deadline and TTL                        | covered | `assertions.tsv`, `events.txt`, `ttl.log`                      |
-| Explicit termination latency                   | covered | `observations.tsv`                                             |
-| Real CronJob overlap across schedule tick      | covered | `assertions.tsv`, `events.txt`                                 |
-| Same-fingerprint Ubuntu run                    | pending | must create the sole Ubuntu reference result                   |
-| Managed cluster/CNI comparison                 | pending | separate explicitly named environment                          |
-| NetworkPolicy, disruption and node-drain cases | pending | environment-specific extension                                 |
+| Benchmark                                      | Status      | Evidence                                                       |
+|------------------------------------------------|-------------|----------------------------------------------------------------|
+| Direct `kubernetes_sd_configs` Pod discovery   | covered     | `direct-job.log`                                               |
+| Two-replica ServiceMonitor                     | covered     | `service-ready.log`, `helm-manifest.yaml`                      |
+| Stored sample in each replica TSDB             | covered     | `prometheus-replica-evidence.tsv`, replica query JSON files    |
+| Ready/unready ServiceMonitor behavior          | covered     | `service-ready.log`, `service-unready.log`, `observations.tsv` |
+| Unready PodMonitor                             | covered     | `pod-unready.log`, `monitors.yaml`                             |
+| Active deadline and TTL                        | covered     | `assertions.tsv`, `events.txt`, `ttl.log`                      |
+| Explicit termination latency                   | covered     | `observations.tsv`                                             |
+| Real CronJob overlap across schedule tick      | covered     | `assertions.tsv`, `events.txt`                                 |
+| Same-fingerprint Ubuntu run                    | covered     | 21/21 assertions, identical fingerprint                        |
+| Managed cluster/CNI comparison                 | not covered | outside the explicitly Minikube-scoped environment             |
+| NetworkPolicy, disruption and node-drain cases | not covered | require a separately named managed-cluster environment         |
 
 ## Conclusion
 
-INV-012 is supported by the macOS/Minikube evidence. A Job Pod can remain available for final complete-snapshot scrapes,
+INV-012 is supported by matching-fingerprint macOS/Minikube and Ubuntu/Minikube evidence. A Job Pod can remain available
+for final complete-snapshot scrapes,
 including multiple scrapers, and Kubernetes can bound the lifecycle. PodMonitor/direct Pod discovery is the safest
 direction when post-workload readiness is false. The unready ServiceMonitor result is recorded as an observation and
 does not establish a universal zero-scrape guarantee.
 
-Status remains **in progress** until the identical fingerprint passes under Docker/Minikube on Ubuntu and an ADR records
-the selected production policy.
+INV-012 is completed. The selected production policy is recorded in
+[ADR-012](../../docs/06-architecture/adr/ADR-012.md).

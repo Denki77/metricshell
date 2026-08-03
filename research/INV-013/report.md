@@ -1,101 +1,145 @@
 # INV-013 Report — Distribution Models
 
-**Status:** in progress
+**Status:** completed
 **Run date:** 2026-08-03
-**Reference run:** `results/20260803T103140Z`
-**Docker platform:** 29.6.2, LinuxKit aarch64
+**Reference runs:** `results/20260803T103140Z`, `results/20260803T135959Z`
 **Fingerprint:** `01b04f50305cce6474d74f9fa196d35bcd60dd65281134056d568cb2d4e96ea4`
+**Decision:** [ADR-013](../../docs/06-architecture/adr/ADR-013.md)
 
 ## Goal and Scope
 
-Compare standalone, multi-stage, base-image and language-convenience distribution without changing MetricShell behavior
-or ADR-004 complete-snapshot semantics. The prototype is a versioned process identity executable; metric processing is
-intentionally not duplicated in this packaging investigation.
+Compare standalone, multi-stage, base-image and language-convenience distribution without changing MetricShell runtime
+behavior or ADR-004 complete-snapshot semantics. Packaging must preserve one versioned executable and must not introduce
+a second metrics implementation.
 
 ## Prototype
 
-- `cmd/inv013` emits version, OS, architecture, UID and GID;
-- `Dockerfile.binary` creates a scratch artifact image;
-- `Dockerfile.base` creates a non-root Alpine base candidate;
+- `cmd/inv013` reports version, OS, architecture, UID and GID;
+- `Dockerfile.binary` produces a scratch artifact image;
+- `Dockerfile.base` produces a non-root Alpine base candidate;
 - `Dockerfile.multistage` demonstrates a non-root PHP Alpine application image;
-- `run-bench.sh` registers pinned binfmt/QEMU, builds, executes and cross-builds candidates, exports the standalone
-  filesystem directly through BuildKit, hashes it and performs a no-cache export for comparison.
+- `run-bench.sh` registers pinned binfmt/QEMU, builds and executes both architectures, exports the standalone artifact
+  through BuildKit local output, checks its hash and performs a no-cache rebuild comparison.
 
-## Environment and Results
+All external build and helper images use immutable multi-platform manifest digests. Artifact extraction does not create
+a stopped container and static-link checking executes inside the already built Alpine candidate.
 
-| Candidate          |         Size | Runtime        | User                           | Result |
-|--------------------|-------------:|----------------|--------------------------------|--------|
-| standalone/scratch |  1,507,480 B | no libc        | root in scratch research image | pass   |
-| Alpine base        | 10,333,271 B | musl userspace | non-root                       | pass   |
-| PHP multi-stage    | 97,875,364 B | PHP 8.3 Alpine | non-root                       | pass   |
+## Run Environments
 
-All 24 assertions passed. The artifact ran as arm64 natively and amd64 through Docker emulation. Image metadata reported
-the correct architecture. Every candidate returned version `0.13.0-research`. The rebuilt artifact exactly matched
-SHA-256 `f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486`.
+| Environment                       | Date       | Docker | Architecture | Result                     | Status                |
+|-----------------------------------|------------|-------:|--------------|----------------------------|-----------------------|
+| Docker Desktop on macOS/LinuxKit  | 2026-08-03 | 29.6.2 | aarch64      | `results/20260803T103140Z` | 24/24 assertions pass |
+| Docker Desktop on Ubuntu/LinuxKit | 2026-08-03 | 27.4.0 | x86_64       | `results/20260803T135959Z` | 24/24 assertions pass |
 
-Every external image, including the binfmt/QEMU helper, is pinned by immutable multi-platform digest. `base-images.tsv`
-also records the native arm64 image IDs selected from those manifests, so Ubuntu comparison can verify both the same
-index identity and its x86_64 platform selection. The runner registers both benchmark architectures itself so a plain
-Ubuntu Docker Engine does not depend on manually prepared emulation.
+Both runs have the same benchmark fingerprint shown above. Every assertion passed in both environments. Both container
+environments use LinuxKit; the comparison covers LinuxKit aarch64 and x86_64, not native non-LinuxKit Linux.
 
-The static-link check executes `ldd` inside the built Alpine candidate. It does not mount the exported host artifact;
-the exact exported artifact is independently proven executable in the scratch candidate, where no dynamic loader exists.
+## Results
+
+### Runtime and architecture matrix
+
+The same CGO-free artifact executed in scratch, Alpine/musl and PHP Alpine. Both `linux/amd64` and `linux/arm64` images
+were built and executed in each run, using digest-pinned binfmt/QEMU where emulation was needed. Every candidate
+reported
+version `0.13.0-research`, and OCI architecture metadata matched the requested platform.
+
+### Artifact identity and rebuild
+
+The exported artifact and no-cache rebuild were byte-identical within each pinned Docker/toolchain environment. The
+artifact SHA-256 was:
+
+```text
+f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486
+```
+
+This establishes deterministic rebuild behavior for the tested pinned environment. It is not a claim that independent
+builders or the complete release supply chain are reproducible.
+
+### Image-size observations
+
+| Candidate          | macOS/LinuxKit aarch64 | Ubuntu/LinuxKit x86_64 | Runtime        | User          |
+|--------------------|-----------------------:|-----------------------:|----------------|---------------|
+| standalone/scratch |            1,507,480 B |              678,173 B | no libc        | research root |
+| Alpine base        |           10,333,271 B |            4,310,805 B | musl userspace | non-root      |
+| PHP multi-stage    |           97,875,364 B |           38,301,971 B | PHP 8.3 Alpine | non-root      |
+
+The architecture-dependent sizes are observations of the pinned platform variants, not universal release-size limits.
+The standalone candidate remained the smallest in both environments.
+
+### Immutable inputs
+
+The Go, PHP, Alpine and binfmt/QEMU references were identical immutable multi-platform digests in both runs.
+`base-images.tsv` records the selected native platform image ID separately, so an expected arm64/x86_64 platform-ID
+difference is not confused with mutable-tag drift.
+
+### Supply-chain evidence
+
+The runner retained the artifact checksum, OCI version metadata and an SPDX artifact record. Registry publication,
+signatures, transparency-log entries, SLSA provenance, full package inventory and vulnerability scanning are release
+pipeline responsibilities and were not fabricated by this prototype.
 
 ## Hypothesis Evaluation
 
 ### Static artifact plus multi-stage copy is sufficient
 
-Provisionally supported. One CGO-free binary worked without libc and inside both tested musl images. Applications keep
-their own base and dependency policy.
+Confirmed. One static executable worked without libc and inside both tested musl-based application environments on both
+architectures. A pinned multi-stage copy preserves the application's base-image and dependency choices.
 
-### A MetricShell base image is operationally useful
+### A MetricShell base image is useful
 
-Supported as optional convenience, not as a mandatory integration. It supplies a non-root default but adds an Alpine
-base and constrains downstream `FROM` selection.
+Confirmed as an optional convenience. It supplies a non-root default but constrains the downstream `FROM` choice and
+adds runtime layers, so it is not required by the core distribution contract.
 
 ### Language-specific convenience images should be primary
 
-Not supported. The PHP example was roughly 65 times the scratch candidate size and couples MetricShell release work to a
-language runtime lifecycle without changing core functionality.
+Rejected. The PHP example was materially larger than the scratch artifact in both architectures and couples
+MetricShell releases to a language-runtime lifecycle without adding core behavior.
 
-## Evaluation Criteria
+## Accepted Policy
 
-| Criterion             | Result                                                            |
-|-----------------------|-------------------------------------------------------------------|
-| image size            | scratch is smallest; base/convenience add expected runtime layers |
-| libc compatibility    | static artifact ran in scratch and musl images                    |
-| amd64/arm64           | both built and executed                                           |
-| non-root              | base and multi-stage examples passed                              |
-| version pinning       | binary and OCI labels agree                                       |
-| reproducibility       | byte-identical rebuild in one pinned toolchain environment passed |
-| supply-chain identity | immutable image digests, artifact SHA-256 and SPDX recorded       |
-| application freedom   | multi-stage copy preserves chosen application base                |
+- Publish checksummed static `linux/amd64` and `linux/arm64` artifacts.
+- Expose explicit version output and matching OCI labels.
+- Document verified artifact copy and pinned multi-stage copy as the default container integrations.
+- Keep a minimal non-root base image optional.
+- Treat language-specific images as examples, not required release units.
+- Pin every build and helper image by immutable multi-platform digest.
+- Publish checksum, OCI metadata, SBOM, signatures and provenance for production releases.
+- Describe byte-identical local rebuild and independent supply-chain reproducibility as separate claims.
 
-## Provisional Policy
+## Limitations
 
-Publish checksummed static binaries and a multi-architecture artifact/image. Document a pinned multi-stage copy as the
-default container integration. Keep a minimal base image optional. Do not make language-specific images a required
-distribution surface. Release engineering must add cryptographic signatures, full SBOM and provenance.
+- Both container environments use LinuxKit; native non-LinuxKit Linux was not tested.
+- The prototype is not a registry, signing service or complete release pipeline.
+- SPDX evidence identifies the primary artifact but is not a full transitive package inventory.
+- Scratch, Alpine and PHP Alpine were tested; distroless, Debian/glibc and Windows were outside the selected scope.
+- Cross-architecture execution requires permission to run a privileged binfmt helper.
+- Image sizes depend on the pinned architecture-specific upstream layers.
 
-## Limitations and Additional Benchmarking
+## Additional Benchmarking
 
-The macOS run uses LinuxKit; Ubuntu is pending. Although the toolchain and helper images are immutable, the local
-rebuild
-still shares one Docker daemon/toolchain environment. A matching Ubuntu fingerprint proves the portable benchmark with
-the same declared inputs; it does not by itself prove full reproducible-build supply-chain behavior. Registry manifest
-publication, cosign, SLSA provenance, an independent clean-builder rebuild and CVE scanning remain release-pipeline
-work. The complete local matrix—artifact copy, pinned images, three runtimes, both architectures, non-root, versioning,
-sizes, checksum, rebuild and SPDX—was executed and is not delegated.
+| Benchmark                                   | Status    | Evidence/Boundary                             |
+|---------------------------------------------|-----------|-----------------------------------------------|
+| standalone artifact extraction and checksum | covered   | artifact directory and `SHA256SUMS`           |
+| scratch, Alpine and PHP Alpine execution    | covered   | assertions and per-image logs                 |
+| non-root base and application images        | covered   | UID/GID assertions                            |
+| amd64 and arm64 build/execution             | covered   | `architectures.tsv`                           |
+| immutable base/helper digests               | covered   | `base-images.tsv`                             |
+| byte-identical local no-cache rebuild       | covered   | artifact hash assertion                       |
+| image-size comparison                       | covered   | `observations.tsv` in both environments       |
+| matching Ubuntu fingerprint                 | covered   | 24/24 assertions, identical fingerprint       |
+| independent clean-builder rebuild           | follow-up | required for a stronger reproducibility claim |
+| cosign/SLSA/full SBOM/CVE scan              | follow-up | production release engineering                |
 
 ## Conclusion
 
-The evidence provisionally favors the standalone static artifact and pinned multi-stage copy. The base image is an
-optional convenience; language-specific images do not justify primary status. Final completion and ADR remain blocked
-only on the matching Ubuntu run and release-supply-chain validation.
+INV-013 is confirmed by matching-fingerprint macOS/LinuxKit and Ubuntu/LinuxKit runs. The primary distribution model is
+a checksummed static artifact with a pinned multi-stage copy. A minimal base image is optional, and language-specific
+images are examples rather than primary release surfaces. The decision is recorded in
+[ADR-013](../../docs/06-architecture/adr/ADR-013.md).
 
 ## Decision Output
 
-- Raw evidence: `results/20260803T103140Z/`
-- Artifact SHA-256: `f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486`
-- Ubuntu evidence: pending
-- ADR: pending
+- macOS evidence: `results/20260803T103140Z/`
+- Ubuntu evidence: `results/20260803T135959Z/`
+- artifact SHA-256: `f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486`
+- ADR: [ADR-013](../../docs/06-architecture/adr/ADR-013.md)

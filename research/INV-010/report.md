@@ -1,16 +1,14 @@
 # INV-010 Report — Prometheus Exposition
 
-**Status:** in progress
-**Run date:** 2026-08-02
-**Docker server:** 29.6.2 (macOS/LinuxKit)
-**Docker platform:** linux/aarch64
-**Reference run:** `results/20260803T182806Z`
+**Status:** completed
+**Run dates:** 2026-08-03
+**Reference runs:** `results/20260803T182806Z`, `results/20260803T184050Z`
 **Fingerprint:** `edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`
 
 ## Goal
 
 Determine the minimum correct Prometheus-compatible exposition contract, prove scrape consistency under complete
-snapshot replacement, and select provisional format, concurrency and resource-limit policies without violating
+snapshot replacement, and select format, concurrency and resource-limit policies without violating
 ADR-004.
 
 ## ADR-004 Boundary
@@ -36,19 +34,19 @@ cat "$latest/concurrent-scrapes.tsv"
 cat "$latest/environment.tsv"
 ```
 
-The pinned Prometheus image digest runs `promtool check metrics`. The same runner and fingerprint are intended for
-Ubuntu; there is no separate Ubuntu script or code copy.
+The pinned Prometheus image digest runs `promtool check metrics`. Both environments used the same runner and
+fingerprint;
+there is no separate Ubuntu script or code copy.
 
 ## Run Environment
 
-| Environment                       |       Date |  Docker | Architecture    | Result                     | Status                |
-|-----------------------------------|-----------:|--------:|-----------------|----------------------------|-----------------------|
-| Docker Desktop on macOS/LinuxKit  | 2026-08-02 |  29.6.2 | aarch64         | `results/20260803T182806Z` | 18/18 assertions pass |
-| Docker Desktop on Ubuntu/LinuxKit |    pending | pending | x86_64 expected | pending                    | not run               |
+| Environment                       |       Date | Docker | Architecture | Result                     | Status                |
+|-----------------------------------|-----------:|-------:|--------------|----------------------------|-----------------------|
+| Docker Desktop on macOS/LinuxKit  | 2026-08-03 | 29.6.2 | aarch64      | `results/20260803T182806Z` | 18/18 assertions pass |
+| Docker Desktop on Ubuntu/LinuxKit | 2026-08-03 | 27.4.0 | x86_64       | `results/20260803T184050Z` | 18/18 assertions pass |
 
-The macOS benchmark fingerprint is
-`edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`. Ubuntu evidence is comparable only when this
-value matches.
+Both reference runs have benchmark fingerprint
+`edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`. All 18 assertions passed in both environments.
 
 ## Results
 
@@ -68,12 +66,12 @@ visible. These results support whole-candidate validation and atomic replacement
 
 ### Cardinality observations
 
-| Application gauge series | Response bytes | Install wall time | Scrape wall time |
-|-------------------------:|---------------:|------------------:|-----------------:|
-|                        0 |            874 |         25.611 ms |        23.163 ms |
-|                    1,000 |         58,734 |         31.138 ms |        22.968 ms |
-|                   10,000 |        608,735 |         66.632 ms |        30.785 ms |
-|                  100,000 |      6,378,736 |        305.967 ms |       115.676 ms |
+| Application series | Response bytes | macOS install/scrape | Ubuntu install/scrape |
+|-------------------:|---------------:|---------------------:|----------------------:|
+|                  0 |            874 |   22.947 / 21.258 ms |    21.884 / 21.182 ms |
+|              1,000 |         58,734 |   29.487 / 21.737 ms |    24.957 / 22.295 ms |
+|             10,000 |        608,735 |   60.980 / 48.559 ms |    80.620 / 30.728 ms |
+|            100,000 |      6,378,736 |  305.846 / 64.312 ms |  466.965 / 134.274 ms |
 
 These host-side single-run values include curl and Docker Desktop scheduling. They describe scale, not an SLO or an
 accepted production limit.
@@ -89,7 +87,7 @@ series, the server returned HTTP 503 with a small error body before committing e
 
 ### Use an existing Prometheus parser/encoder
 
-Supported provisionally. The existing common library parsed candidates, rejected malformed syntax and generated
+Supported. The existing common library parsed candidates, rejected malformed syntax and generated
 canonical family text accepted by official `promtool`. Handwritten code remains necessary for HTTP negotiation,
 snapshot selection, response preflight and lifecycle policy, but not for metric grammar.
 
@@ -110,7 +108,7 @@ production implementation must preserve this ordering when adding all structural
 
 ## Evaluation Against Criteria
 
-| Criterion                     | Provisional result                               |
+| Criterion                     | Confirmed result                                 |
 |-------------------------------|--------------------------------------------------|
 | Prometheus compatibility      | text 0.0.4 accepted by pinned `promtool`         |
 | OpenMetrics                   | 1.0 negotiation and EOF covered                  |
@@ -120,9 +118,9 @@ production implementation must preserve this ordering when adding all structural
 | concurrent clients            | 32 complete clients covered                      |
 | slow/disconnected clients     | server survival covered                          |
 | response limit                | preflight 503 covered                            |
-| Ubuntu reproducibility        | pending matching-fingerprint run                 |
+| Ubuntu reproducibility        | 18/18 with matching fingerprint                  |
 
-## Provisional Acceptable Values and Policies
+## Accepted Values and Policies
 
 - Prometheus text 0.0.4 is the default compatibility format.
 - OpenMetrics text 1.0 is opt-in through Accept negotiation and ends with EOF.
@@ -135,7 +133,8 @@ production implementation must preserve this ordering when adding all structural
 
 ## Prototype Limits
 
-- One macOS/LinuxKit environment; Ubuntu evidence is not yet present.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux is not covered.
 - No complete implementation of every ADR-004 structural rule or explicit zero-family product encoding.
 - No exemplars, native histograms, protobuf, TLS, HTTP/2 or reverse proxy.
 - Single-run wall times include host tools and Docker Desktop.
@@ -144,36 +143,36 @@ production implementation must preserve this ordering when adding all structural
 
 ## Additional Benchmarking
 
-| Item                                | Status      | Evidence/Reason                       |
-|-------------------------------------|-------------|---------------------------------------|
-| formats, negotiation and metadata   | covered     | response bodies and headers           |
-| classic histogram and timestamp     | covered     | `prometheus.txt`, `timestamp.metrics` |
-| official promtool validation        | covered     | `promtool.log`, exit assertion        |
-| malformed candidate retention       | covered     | HTTP 400 and retained timestamp       |
-| concurrent replace/scrape           | covered     | `concurrent-scrapes.tsv`              |
-| 0/1k/10k/100k cardinality           | covered     | `cardinality.tsv`                     |
-| 32 concurrent clients               | covered     | assertion and wall observation        |
-| gzip, slow and disconnected clients | covered     | headers/logs and health assertions    |
-| response-size preflight             | covered     | 1,024-byte bound, HTTP 503            |
-| Ubuntu matching fingerprint         | pending     | required before completion            |
-| repeated CPU/RSS/latency profile    | recommended | 30+ Ubuntu repetitions, pinned CPUs   |
-| exemplars/native histograms         | deferred    | add only with explicit requirements   |
-| proxy/TLS/HTTP2                     | deferred    | deployment-layer research             |
+| Item                                | Status      | Evidence/Reason                         |
+|-------------------------------------|-------------|-----------------------------------------|
+| formats, negotiation and metadata   | covered     | response bodies and headers             |
+| classic histogram and timestamp     | covered     | `prometheus.txt`, `timestamp.metrics`   |
+| official promtool validation        | covered     | `promtool.log`, exit assertion          |
+| malformed candidate retention       | covered     | HTTP 400 and retained timestamp         |
+| concurrent replace/scrape           | covered     | `concurrent-scrapes.tsv`                |
+| 0/1k/10k/100k cardinality           | covered     | `cardinality.tsv`                       |
+| 32 concurrent clients               | covered     | assertion and wall observation          |
+| gzip, slow and disconnected clients | covered     | headers/logs and health assertions      |
+| response-size preflight             | covered     | 1,024-byte bound, HTTP 503              |
+| Ubuntu matching fingerprint         | covered     | 18/18 assertions, identical fingerprint |
+| repeated CPU/RSS/latency profile    | recommended | 30+ Ubuntu repetitions, pinned CPUs     |
+| exemplars/native histograms         | not covered | outside the accepted snapshot scope     |
+| proxy/TLS/HTTP2                     | not covered | deployment-layer scope                  |
 
 ## Conclusion
 
-The macOS result provisionally confirms the library-based exposition direction. Prometheus text 0.0.4 plus negotiated
+The matching macOS and Ubuntu results confirm the library-based exposition direction. Prometheus text 0.0.4 plus
+negotiated
 OpenMetrics 1.0 is sufficient for the tested types, and immutable complete-snapshot replacement provides consistent
 concurrent scrapes. Pre-encoding enables a truthful response-size failure before partial success.
 
-The investigation remains in progress. No final ADR should be accepted until the unchanged fingerprint passes on the
-Ubuntu Docker environment and the environment-dependent observations are compared.
+INV-010 is completed. The selected contract is recorded in [ADR-010](../../docs/06-architecture/adr/ADR-010.md).
 
 ## Decision Output
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS raw evidence: `results/20260803T182806Z/`
-- Ubuntu raw evidence: pending
-- Provisional direction: Prometheus text default, negotiated OpenMetrics, immutable snapshot per scrape, preflight bound
-- ADR: pending
+- Ubuntu raw evidence: `results/20260803T184050Z/`
+- Direction: Prometheus text default, negotiated OpenMetrics, immutable snapshot per scrape, preflight bound
+- ADR: [ADR-010](../../docs/06-architecture/adr/ADR-010.md)

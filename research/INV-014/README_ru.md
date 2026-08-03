@@ -1,9 +1,10 @@
 # INV-014 — Безопасность и resource limits
 
-**Статус:** в процессе
+**Статус:** завершено
 **Эталонный прогон macOS:** `results/20260802T173138Z`
-**Ubuntu/LinuxKit:** ожидается
+**Эталонный прогон Ubuntu/LinuxKit:** `results/20260803T071713Z`
 **Отчёт:** [report_ru.md](report_ru.md)
+**Решение:** [ADR-014](../../docs-ru/06-architecture/adr/ADR-014.md)
 
 ## Вопрос и контекст
 
@@ -15,14 +16,15 @@
 Complete replacement, malformed/duplicate retention, payload/series/label bounds, secret policy, concurrency/slow
 clients, non-root/loopback/read-only/NNP/cap-drop, FD/memory/private path, bind failure, OOM и Ubuntu repeat.
 
-## Текущий результат
+## Подтверждённый результат
 
-Пройдено 27/27. Двухсерийный snapshot заменён одно-серийным, omitted series исчезла без sum. Все invalid/oversized
+В обеих средах пройдено 27/27 assertions с одинаковым fingerprint. Двухсерийный snapshot заменён одно-серийным,
+omitted series исчезла без sum. Все invalid/oversized
 candidates отклонены с last-valid retention. Из 12 held requests принято 4, восемь получили 429. Server пережил slow
 body и 100 malformed requests. Container: non-root, read-only, NNP, cap-drop ALL, 64 MiB, 64 FD, path 0700. 128 MiB
 allocation под 32 MiB дала OOMKilled/137.
 
-## Предварительные значения
+## Принятые значения
 
 - payload 64 KiB; 1 000 series; 8 labels; 64 bytes на label field;
 - concurrency 4, excess 429;
@@ -49,24 +51,26 @@ OOM case намеренно ограничен named 32 MiB container. На Ubun
 
 Attacker имеет доступ только к local ingestion/scrape и может слать malformed/large/concurrent/slow complete candidates.
 Docker control, host root и kernel compromise не входят. Parser упрощён; secret detection name-based. Unix ACL,
-SELinux/AppArmor/seccomp и production parser требуют отдельных deployment tests.
+SELinux/AppArmor/seccomp и production parser требуют отдельных deployment tests. Обе container-среды используют
+LinuxKit: macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64; native Linux без LinuxKit не проверен.
 
 ## Additional Benchmarks
 
-| Пункт                         | Статус    |
-|-------------------------------|-----------|
-| ADR replacement/no sum        | покрыто   |
-| validation/last-valid         | покрыто   |
-| payload/series/labels         | покрыто   |
-| concurrency/slow/fuzz         | покрыто   |
-| container hardening           | покрыто   |
-| FD/memory/path/bind/OOM       | покрыто   |
-| Ubuntu                        | ожидается |
-| ACL/MAC/full parser fuzz/soak | follow-up |
+| Пункт                         | Статус         |
+|-------------------------------|----------------|
+| ADR replacement/no sum        | покрыто        |
+| validation/last-valid         | покрыто        |
+| payload/series/labels         | покрыто        |
+| concurrency/slow/fuzz         | покрыто        |
+| container hardening           | покрыто        |
+| FD/memory/path/bind/OOM       | покрыто        |
+| Ubuntu                        | покрыто: 27/27 |
+| ACL/MAC/full parser fuzz/soak | follow-up      |
 
 ## Выход
 
 - Prototype: `prototype/`
-- Evidence: `results/20260802T173138Z/`
-- Ubuntu/ADR: ожидаются
+- macOS evidence: `results/20260802T173138Z/`
+- Ubuntu evidence: `results/20260803T071713Z/`
+- ADR: [ADR-014](../../docs-ru/06-architecture/adr/ADR-014.md)
 - Report: [report_ru.md](report_ru.md)

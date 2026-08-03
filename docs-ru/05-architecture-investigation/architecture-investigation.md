@@ -1,6 +1,6 @@
 # Архитектурное исследование
 
-> Статус: выполняется  
+> Статус: завершено
 > Назначение: оценить архитектурные варианты до создания ADR и начала реализации  
 > Область: runtime MetricShell, жизненный цикл процессов, ingestion метрик, exposition и координация shutdown
 
@@ -96,23 +96,23 @@ MetricShell:
 
 ## 6. Отслеживание исследований
 
-| ID      | Тема                                                            | Статус     | Доказательства                                 | Решение                                      |
-|---------|-----------------------------------------------------------------|------------|------------------------------------------------|----------------------------------------------|
-| INV-001 | [PID 1 и модель процесса](architecture-research.md#inv-001)     | Завершено  | [INV-001](../../research/INV-001/README_ru.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
-| INV-002 | [Жизненный цикл workload](architecture-research.md#inv-002)     | Завершено  | [INV-002](../../research/INV-002/README_ru.md) | [ADR-002](../06-architecture/adr/ADR-002.md) |
-| INV-003 | [Shutdown budgeting](architecture-research.md#inv-003)          | Завершено  | [INV-003](../../research/INV-003/README_ru.md) | [ADR-003](../06-architecture/adr/ADR-003.md) |
-| INV-004 | [Семантика metric state](architecture-research.md#inv-004)      | Завершено  | [INV-004](../../research/INV-004/README_ru.md) | [ADR-004](../06-architecture/adr/ADR-004.md) |
-| INV-005 | [Сравнение transports](architecture-research.md#inv-005)        | Завершено  | [INV-005](../../research/INV-005/README_ru.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
-| INV-006 | [File ingestion](architecture-research.md#inv-006)              | Завершено  | [INV-006](../../research/INV-006/README_ru.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
-| INV-007 | [Socket ingestion](architecture-research.md#inv-007)            | Завершено  | [INV-007](../../research/INV-007/README_ru.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
-| INV-008 | [Local push](architecture-research.md#inv-008)                  | Завершено  | [INV-008](../../research/INV-008/README_ru.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
-| INV-009 | [Shared memory/mmap](architecture-research.md#inv-009)          | Завершено  | [INV-009](../../research/INV-009/README_ru.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
-| INV-010 | [Exposition](architecture-research.md#inv-010)                  | В процессе | [INV-010](../../research/INV-010/README_ru.md) | —                                            |
-| INV-011 | [Семантика финального scrape](architecture-research.md#inv-011) | В процессе | [INV-011](../../research/INV-011/README_ru.md) | —                                            |
-| INV-012 | [Пригодность Kubernetes](architecture-research.md#inv-012)      | В процессе | [INV-012](../../research/INV-012/README_ru.md) | —                                            |
-| INV-013 | [Распространение](architecture-research.md#inv-013)             | В процессе | [INV-013](../../research/INV-013/README_ru.md) | —                                            |
-| INV-014 | [Безопасность и лимиты](architecture-research.md#inv-014)       | В процессе | [INV-014](../../research/INV-014/README_ru.md) | —                                            |
-| INV-015 | [Benchmarks](architecture-research.md#inv-015)                  | В процессе | [INV-015](../../research/INV-015/README_ru.md) | —                                            |
+| ID      | Тема                                                            | Статус    | Доказательства                                 | Решение                                      |
+|---------|-----------------------------------------------------------------|-----------|------------------------------------------------|----------------------------------------------|
+| INV-001 | [PID 1 и модель процесса](architecture-research.md#inv-001)     | Завершено | [INV-001](../../research/INV-001/README_ru.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
+| INV-002 | [Жизненный цикл workload](architecture-research.md#inv-002)     | Завершено | [INV-002](../../research/INV-002/README_ru.md) | [ADR-002](../06-architecture/adr/ADR-002.md) |
+| INV-003 | [Shutdown budgeting](architecture-research.md#inv-003)          | Завершено | [INV-003](../../research/INV-003/README_ru.md) | [ADR-003](../06-architecture/adr/ADR-003.md) |
+| INV-004 | [Семантика metric state](architecture-research.md#inv-004)      | Завершено | [INV-004](../../research/INV-004/README_ru.md) | [ADR-004](../06-architecture/adr/ADR-004.md) |
+| INV-005 | [Сравнение transports](architecture-research.md#inv-005)        | Завершено | [INV-005](../../research/INV-005/README_ru.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
+| INV-006 | [File ingestion](architecture-research.md#inv-006)              | Завершено | [INV-006](../../research/INV-006/README_ru.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
+| INV-007 | [Socket ingestion](architecture-research.md#inv-007)            | Завершено | [INV-007](../../research/INV-007/README_ru.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
+| INV-008 | [Local push](architecture-research.md#inv-008)                  | Завершено | [INV-008](../../research/INV-008/README_ru.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
+| INV-009 | [Shared memory/mmap](architecture-research.md#inv-009)          | Завершено | [INV-009](../../research/INV-009/README_ru.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
+| INV-010 | [Exposition](architecture-research.md#inv-010)                  | Завершено | [INV-010](../../research/INV-010/README_ru.md) | [ADR-010](../06-architecture/adr/ADR-010.md) |
+| INV-011 | [Семантика финального scrape](architecture-research.md#inv-011) | Завершено | [INV-011](../../research/INV-011/README_ru.md) | [ADR-011](../06-architecture/adr/ADR-011.md) |
+| INV-012 | [Пригодность Kubernetes](architecture-research.md#inv-012)      | Завершено | [INV-012](../../research/INV-012/README_ru.md) | [ADR-012](../06-architecture/adr/ADR-012.md) |
+| INV-013 | [Распространение](architecture-research.md#inv-013)             | Завершено | [INV-013](../../research/INV-013/README_ru.md) | [ADR-013](../06-architecture/adr/ADR-013.md) |
+| INV-014 | [Безопасность и лимиты](architecture-research.md#inv-014)       | Завершено | [INV-014](../../research/INV-014/README_ru.md) | [ADR-014](../06-architecture/adr/ADR-014.md) |
+| INV-015 | [Benchmarks](architecture-research.md#inv-015)                  | Завершено | [INV-015](../../research/INV-015/README_ru.md) | [ADR-015](../06-architecture/adr/ADR-015.md) |
 
 ## 7. Критерии завершения
 

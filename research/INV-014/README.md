@@ -1,9 +1,10 @@
 # INV-014 — Security and Resource Limits
 
-**Status:** in progress
+**Status:** completed
 **macOS reference run:** `results/20260802T173138Z`
-**Ubuntu/LinuxKit run:** pending
+**Ubuntu/LinuxKit reference run:** `results/20260803T071713Z`
 **Report:** [report.md](report.md)
+**Decision:** [ADR-014](../../docs/06-architecture/adr/ADR-014.md)
 
 ## Question
 
@@ -29,9 +30,10 @@ payload, cardinality, labels, concurrency, descriptors, memory and timeouts.
 - endpoint bind failure and controlled cgroup OOM;
 - matching Ubuntu fingerprint.
 
-## Current Result
+## Confirmed Result
 
-The macOS Docker/LinuxKit run passed 27/27 assertions. A two-series snapshot was replaced by a one-series snapshot and
+Both matching-fingerprint Docker/LinuxKit runs passed 27/27 assertions. A two-series snapshot was replaced by a
+one-series snapshot and
 the omitted series disappeared; no values were summed. Malformed, duplicate, secret-like, over-label, over-series and
 oversized candidates were rejected while the last valid snapshot remained available.
 
@@ -40,7 +42,7 @@ and 100 malformed producer requests. The container ran non-root with a read-only
 capabilities dropped, 64 MiB memory, 64 FDs and private mode 0700. A 128 MiB touched allocation under 32 MiB was
 confirmed as `OOMKilled=true`, exit 137.
 
-## Provisional Admissible Values
+## Accepted Values
 
 - complete candidate payload: 64 KiB default research bound;
 - active application cardinality: 1,000 series;
@@ -84,7 +86,8 @@ values cannot be reliably inferred; instrumentation policy remains an applicatio
 - Host loopback publication is tested through Docker; Unix socket ownership and SELinux/AppArmor profiles need
   deployment-specific tests.
 - One OOM size and one FD/memory configuration were tested.
-- LinuxKit aarch64 only until Ubuntu confirmation.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux is not covered.
 
 ## Additional Benchmarks
 
@@ -99,13 +102,13 @@ values cannot be reliably inferred; instrumentation policy remains an applicatio
 | loopback/FD/memory/path permissions            | covered                             |
 | bind failure                                   | covered: exit 70                    |
 | cgroup OOM                                     | covered: 32 MiB limit, exit 137     |
-| Ubuntu matching fingerprint                    | pending                             |
+| Ubuntu matching fingerprint                    | covered: 27/27 assertions           |
 | Unix socket/file ACL, SELinux/AppArmor/seccomp | deployment follow-up                |
 | full parser corpus and property fuzzing        | production implementation follow-up |
 
 ## Better Follow-up Benchmarking
 
-Repeat unchanged on Ubuntu, then exercise a full production parser corpus, long fuzz/soak runs, cgroup v2 `memory.high`,
+Exercise a full production parser corpus, long fuzz/soak runs, cgroup v2 `memory.high`,
 several FD/PID limits and deployment MAC policies. Every failure test must assert last-valid complete-snapshot
 retention.
 
@@ -113,6 +116,6 @@ retention.
 
 - Prototype: `prototype/`
 - macOS evidence: `results/20260802T173138Z/`
-- Ubuntu evidence: pending
+- Ubuntu evidence: `results/20260803T071713Z/`
 - Report: [report.md](report.md)
-- ADR: pending
+- ADR: [ADR-014](../../docs/06-architecture/adr/ADR-014.md)

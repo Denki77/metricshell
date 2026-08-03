@@ -1,9 +1,9 @@
 # INV-012 — Kubernetes Job and CronJob Viability
 
-**Status:** in progress
-**Reference run:** `results/20260803T143134Z`
+**Status:** completed
+**Reference runs:** `results/20260803T143134Z`, `results/20260803T153300Z`
 **Report:** [report.md](report.md)
-**Decision:** pending Ubuntu confirmation and ADR
+**Decision:** [ADR-012](../../docs/06-architecture/adr/ADR-012.md)
 
 ## Question
 
@@ -99,24 +99,25 @@ A real once-per-minute CronJob runs longer than the following schedule tick. The
 
 ## Results
 
-| Environment                       | Date       | Result set                 | Summary                                             | Benchmark fingerprint                                              |
-|-----------------------------------|------------|----------------------------|-----------------------------------------------------|--------------------------------------------------------------------|
-| Docker Desktop on macOS, Minikube | 2026-08-03 | `results/20260803T143134Z` | [summary.tsv](results/20260803T143134Z/summary.tsv) | `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c` |
-| Docker on Ubuntu, Minikube        | pending    | pending                    | pending                                             | must match macOS                                                   |
+| Environment                        | Date       | Result set                 | Summary                                             | Benchmark fingerprint                                              |
+|------------------------------------|------------|----------------------------|-----------------------------------------------------|--------------------------------------------------------------------|
+| Docker Desktop on macOS, Minikube  | 2026-08-03 | `results/20260803T143134Z` | [summary.tsv](results/20260803T143134Z/summary.tsv) | `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c` |
+| Docker Desktop on Ubuntu, Minikube | 2026-08-03 | `results/20260803T153300Z` | [summary.tsv](results/20260803T153300Z/summary.tsv) | `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c` |
 
-Key findings from the macOS reference run:
+Key findings from both reference runs:
 
-- all 21 portable assertions and all 14 scenario summaries passed;
+- all 21 portable assertions and all 14 scenario summaries passed in each environment;
 - checksum-verified Minikube `v1.38.1` supplied effective kubectl `v1.34.0`; the system kubectl was not used;
-- direct Pod discovery completed after an observed scrape in `8,017.520 ms`;
-- the ServiceMonitor handler observed 51 aggregate HTTP scrapes during its `63,724.188 ms` bounded execution;
+- direct Pod discovery completed in `8,017.520 ms` on macOS and `9,124.833 ms` on Ubuntu;
+- ServiceMonitor observed 51/73 aggregate HTTP scrapes during `63,724.188/66,243.703 ms` on macOS/Ubuntu;
 - Prometheus replicas 0 and 1 were queried separately after Job completion; each TSDB returned the exact
   `inv012_final_snapshot` series for the current `service-ready` Job Pod with sample value `42`;
-- the unready ServiceMonitor scenario observed 1 scrape in this run. The count remains an environment-dependent
+- the unready ServiceMonitor scenario observed 1 scrape on macOS and 0 on Ubuntu. The count remains an
+  environment-dependent
   observation rather than a portable invariant;
 - PodMonitor scraped an unready Pod at least twice;
 - active deadline produced `DeadlineExceeded`, TTL deleted the completed Job, and explicit Pod deletion took
-  `2,022.144 ms`;
+  `2,022.144 ms` on macOS and `4,250.833 ms` on Ubuntu;
 - the real CronJob retained one active Pod and one Job across the next schedule tick under `Forbid`.
 
 ## Conclusion
@@ -126,15 +127,14 @@ snapshot long enough for multiple Prometheus scrapers, and Kubernetes lifetime c
 PodMonitor is viable for direct discovery of an unready Pod. ServiceMonitor readiness behavior must be treated as
 observed implementation behavior, not reduced to an assumed zero-scrape rule.
 
-The investigation remains **in progress** until the exact benchmark fingerprint is rerun under Docker on Ubuntu and an
-ADR is accepted.
+INV-012 is completed. The production direction is recorded in [ADR-012](../../docs/06-architecture/adr/ADR-012.md).
 
 ## Decision output
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS raw evidence: `results/20260803T143134Z/`
-- Ubuntu raw evidence: pending
+- Ubuntu raw evidence: `results/20260803T153300Z/`
 - Report: [report.md](report.md)
 - Recommended ADR input: use direct Pod discovery/PodMonitor for an intentionally unready post-workload endpoint;
   retain explicit lifetime and overlap limits; never sum snapshots or scrape values.
@@ -203,7 +203,8 @@ Run the same command on macOS and Ubuntu. Compare
 
 - The target is checksum-verified Minikube `v1.38.1` with Kubernetes and effective kubectl `v1.34.0`, not a managed
   production cluster.
-- The macOS host uses Docker Desktop and an arm64 Docker engine; Ubuntu evidence is still pending.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. The tested Kubernetes
+  environment is Minikube rather than a managed cluster or native non-LinuxKit Linux.
 - Prometheus Operator is installed by `kube-prometheus-stack` `88.1.2`; a separate Prometheus `v3.5.0` covers direct
   Pod discovery.
 - Scheduler and scrape timings are observations, not production SLOs.

@@ -1,9 +1,10 @@
 # INV-011 — Final Application State and Scrape Counting
 
-**Status:** in progress
+**Status:** completed
 **macOS reference run:** `results/20260803T065931Z`
-**Ubuntu/LinuxKit run:** pending
+**Ubuntu/LinuxKit reference run:** `results/20260803T070500Z`
 **Report:** [report.md](report.md)
+**Decision:** [ADR-011](../../docs/06-architecture/adr/ADR-011.md)
 
 ## Question
 
@@ -31,9 +32,10 @@ eligibility token is configured.
 - disconnected large response not counted, later complete response counted;
 - one matching-fingerprint Ubuntu/LinuxKit repeat.
 
-## Current Result
+## Confirmed Result
 
-The macOS Docker Desktop/LinuxKit aarch64 run passed all 26 portable assertions. Ten repeated ephemeral-port startup
+Both matching-fingerprint runs passed all 26 portable assertions. In each environment, ten repeated ephemeral-port
+startup
 cycles each returned HTTP 200 with curl/container exit 0. Application value `42` and its SHA-256
 identity remained fixed while scrape-attempt self-metrics advanced; post-finalization publication returned HTTP 409.
 Immediate and fixed-duration modes exited cleanly. Health/readiness left counts at zero. One manual curl satisfied
@@ -42,9 +44,9 @@ the configured count saturated at 10 during a 500 ms completion-drain window.
 
 An 8 MiB chunked response whose TCP client disconnected was observed as an attempt but remained at zero completed
 scrapes. A later full response counted and released the wait. A 500 ms timeout exited with zero completed scrapes. The
-investigation remains in progress pending an unchanged-fingerprint Ubuntu run.
+behavior is confirmed on macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64.
 
-## Provisional Admissible Values
+## Accepted Values
 
 - freeze order: stop accepting application publications, freeze the last valid complete snapshot, then begin waiting;
 - application state: immutable through the final-wait phase; no summation, merge or late replacement;
@@ -59,7 +61,7 @@ investigation remains in progress pending an unchanged-fingerprint Ubuntu run.
 - authentication/eligibility: optional explicit token may gate counting, but does not prove TSDB persistence;
 - timeout: exit according to lifecycle policy without fabricating a completed scrape.
 
-These values are provisional until Ubuntu confirmation and an ADR.
+These values are adopted by [ADR-011](../../docs/06-architecture/adr/ADR-011.md).
 
 ## Running the Prototype
 
@@ -108,7 +110,12 @@ curl http://127.0.0.1:19111/metrics
 - Counter saturation at N makes the release condition deterministic. A bounded completion grace lets already accepted
   concurrent handlers finish their HTTP responses before server shutdown.
 - Timing observations include Docker startup and host polling and are not shutdown-budget recommendations.
-- macOS evidence is LinuxKit aarch64 only; native Linux and Kubernetes discovery/lifecycle belong to later work.
+- An operator observed several intermittent empty HTTP replies outside the retained benchmark evidence. The reference
+  lifecycle matrix reproduced none of them (10/10 HTTP 200 with clean curl/container exits), so the observation is not
+  classified as a failed assertion or as a proven server defect. A future reproduction must retain client stderr,
+  server logs, container state and port-binding state for the same request.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux is not covered; Kubernetes discovery/lifecycle is covered separately by INV-012.
 
 ## Additional Benchmarks
 
@@ -126,17 +133,18 @@ curl http://127.0.0.1:19111/metrics
 | concurrent counting and response drain                  | covered: 20 complete responses, count saturated at 10                         |
 | ephemeral port publication/readiness race               | covered: inspect polling plus HTTP readiness; early exit fails                |
 | repeated ephemeral-port lifecycle                       | covered: 10/10 HTTP 200, curl 0 and container 0 cycles                        |
+| operator-observed intermittent empty reply              | not reproduced; no retained per-request evidence                              |
 | optional eligibility token                              | covered                                                                       |
 | aborted response                                        | covered with 8 MiB chunked response                                           |
 | bounded timeout                                         | covered at 500 ms with zero fabricated completions                            |
-| matching-fingerprint Ubuntu/LinuxKit repeat             | pending                                                                       |
+| matching-fingerprint Ubuntu/LinuxKit repeat             | covered: 26/26 assertions with identical fingerprint                          |
 | real Prometheus scrape and TSDB query                   | cannot establish causal persistence without explicit acknowledgement protocol |
 | HTTP/2, proxy buffering and TLS                         | recommended after deployment topology is selected                             |
 | shutdown race with real workload/signals                | integrate after INV-003 and production lifecycle code                         |
 
 ## Better Follow-up Benchmarking
 
-Run the unchanged fingerprint on Ubuntu first. Then repeat abort timing at several body sizes/socket buffer settings,
+For follow-up characterization, repeat abort timing at several body sizes/socket buffer settings,
 exercise HTTP/2 and a reverse proxy, and use a real Prometheus instance to demonstrate the distinction between response
 completion and later query visibility. Do not reinterpret multiple responses as metric aggregation: every response must
 still contain the same frozen complete application snapshot plus independently changing self-metrics.
@@ -146,6 +154,6 @@ still contain the same frozen complete application snapshot plus independently c
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS raw evidence: `results/20260803T065931Z/`
-- Ubuntu raw evidence: pending, to be produced by the same runner and fingerprint
+- Ubuntu raw evidence: `results/20260803T070500Z/`
 - Detailed analysis: [report.md](report.md)
-- ADR: pending after Ubuntu confirmation
+- ADR: [ADR-011](../../docs/06-architecture/adr/ADR-011.md)

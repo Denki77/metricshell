@@ -1,9 +1,10 @@
 # INV-010 — Prometheus Exposition
 
-**Status:** in progress
+**Status:** completed
 **macOS reference run:** `results/20260803T182806Z`
-**Ubuntu/LinuxKit run:** pending
+**Ubuntu/LinuxKit reference run:** `results/20260803T184050Z`
 **Report:** [report.md](report.md)
+**Decision:** [ADR-010](../../docs/06-architecture/adr/ADR-010.md)
 
 ## Question
 
@@ -31,19 +32,19 @@ offered by content negotiation. Response limits must fail before a partial succe
 - gzip negotiation and response-size enforcement;
 - one matching-fingerprint Ubuntu/LinuxKit repeat.
 
-## Current Result
+## Confirmed Result
 
-The macOS Docker Desktop/LinuxKit aarch64 run passed all 18 portable assertions. The official Prometheus `promtool`
-image accepted the generated text. Across 120 scrapes concurrent with 120 alternating complete A/B replacements, every
-body contained exactly 250 series from one generation and no mixed snapshot. A malformed candidate returned `400` and
-the prior timestamped snapshot remained active. The 100k-series response was 6,378,736 bytes and completed without an
-architecture assertion failure.
+The matching-fingerprint macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64 runs each passed all 18 portable assertions.
+The official Prometheus `promtool` image accepted the generated text in both environments. In each run, all 120 scrapes
+concurrent with 120 alternating complete A/B replacements contained exactly 250 series from one generation and no
+empty, partial or mixed snapshot. A malformed candidate returned `400` and retained the previous complete snapshot.
+The 100k-series response was 6,378,736 bytes in both environments.
 
-The prototype also passed 32 concurrent scrapers, gzip, slow-client and disconnected-client survival, and returned a
-preflight `503` under a 1,024-byte response limit. This is one-environment evidence only; the investigation remains in
-progress until the same fingerprint is run on Ubuntu.
+Both runs also passed 32 concurrent scrapers, gzip, slow-client and disconnected-client survival, and returned a
+preflight `503` under a 1,024-byte response limit. The identical fingerprint is
+`edfea8c5efb2528bb1a131b8e1125c4a00aa354a011a5015272bb83086969456`.
 
-## Provisional Admissible Values
+## Accepted Values
 
 - application state: one immutable, complete accepted snapshot loaded once per scrape;
 - snapshot update: whole-candidate validation followed by atomic replacement, never summation or merge;
@@ -56,7 +57,7 @@ progress until the same fingerprint is run on Ubuntu.
 - self-metrics: appended from MetricShell-owned state and never folded into application state;
 - measured research envelope: 0–100,000 synthetic application gauge series and 1–32 concurrent scrapers.
 
-These values are provisional until Ubuntu confirmation and an ADR.
+These values are adopted by [ADR-010](../../docs/06-architecture/adr/ADR-010.md).
 
 ## Running the Prototype
 
@@ -101,8 +102,8 @@ curl -H 'Accept: application/openmetrics-text; version=1.0.0' http://127.0.0.1:1
   and protobuf exposition are not evaluated.
 - The cardinality numbers are single-run Docker Desktop observations, not SLOs or accepted defaults.
 - A successful HTTP write proves only completion of the server-side write operation, not Prometheus TSDB persistence.
-- macOS evidence runs inside LinuxKit aarch64. Native non-LinuxKit Linux, other HTTP stacks and Kubernetes are outside
-  this investigation run.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux, other HTTP stacks and Kubernetes are outside this investigation.
 
 ## Additional Benchmarks
 
@@ -119,14 +120,14 @@ curl -H 'Accept: application/openmetrics-text; version=1.0.0' http://127.0.0.1:1
 | slow and disconnected scrapers                                | covered                                                                    |
 | response-size preflight failure                               | covered at 1,024 bytes                                                     |
 | runtime self-metrics beside application snapshot              | covered                                                                    |
-| matching-fingerprint Ubuntu/LinuxKit repeat                   | pending                                                                    |
+| matching-fingerprint Ubuntu/LinuxKit repeat                   | covered: 18/18 assertions with the same fingerprint                        |
 | repeated latency distribution, CPU/RSS and allocation profile | recommended on Ubuntu with 30+ repetitions                                 |
-| exemplars and native histograms                               | deferred until format requirements include them                            |
+| exemplars and native histograms                               | not covered; outside the accepted text/OpenMetrics snapshot scope          |
 | HTTP/2, TLS and reverse proxy behavior                        | outside local exposition decision; test after deployment model is selected |
 
 ## Better Follow-up Benchmarking
 
-On Ubuntu, run the unchanged runner first. For performance characterization, repeat each cardinality/concurrency shape
+For additional performance characterization, repeat each cardinality/concurrency shape
 at least 30 times, pin CPUs where possible, record cgroup CPU/RSS and allocations, and report median plus p95/p99 rather
 than promoting this macOS timing to a limit. Any extension must continue to publish complete snapshots and assert that
 each scrape sees one old or new snapshot, never a sum or partial merge.
@@ -136,6 +137,6 @@ each scrape sees one old or new snapshot, never a sum or partial merge.
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS raw evidence: `results/20260803T182806Z/`
-- Ubuntu raw evidence: pending, to be produced by the same runner and fingerprint
+- Ubuntu raw evidence: `results/20260803T184050Z/`
 - Detailed analysis: [report.md](report.md)
-- ADR: pending after Ubuntu confirmation
+- ADR: [ADR-010](../../docs/06-architecture/adr/ADR-010.md)

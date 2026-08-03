@@ -1,9 +1,10 @@
 # INV-011 — Финальное состояние application metrics и подсчёт scrape
 
-**Статус:** в процессе
+**Статус:** завершено
 **Эталонный прогон macOS:** `results/20260803T065931Z`
-**Прогон Ubuntu/LinuxKit:** ожидается
+**Эталонный прогон Ubuntu/LinuxKit:** `results/20260803T070500Z`
 **Отчёт:** [report_ru.md](report_ru.md)
+**Решение:** [ADR-011](../../docs-ru/06-architecture/adr/ADR-011.md)
 
 ## Вопрос
 
@@ -30,9 +31,10 @@ response считается только после успешной запис�
 - disconnected large response не считается, последующий complete response считается;
 - Ubuntu/LinuxKit повтор с тем же fingerprint.
 
-## Текущий результат
+## Подтверждённый результат
 
-Прогон macOS Docker Desktop/LinuxKit aarch64 прошёл 26/26 assertions. Десять повторных ephemeral-port startup cycles
+Оба прогона с одинаковым fingerprint прошли 26/26 assertions. В каждой среде десять повторных ephemeral-port startup
+cycles
 дали HTTP 200, curl exit 0 и container exit 0. Application value `42` и его SHA-256 оставались
 неизменны, self-metric попыток росла; публикация после finalization вернула HTTP 409. Immediate и duration modes
 завершились корректно. Health/readiness оставили count нулевым. Один manual curl выполнил `N=1`, три запроса того же
@@ -40,10 +42,10 @@ client выполнили `N=3`, а все 20 concurrent clients получил�
 500 ms completion-drain window.
 
 TCP client отключился во время 8 MiB chunked response: attempt был виден, completed count остался 0. Последующий полный
-response засчитался и завершил wait. Timeout 500 ms завершился с нулём completed scrapes. До Ubuntu-повтора с тем же
-fingerprint статус остаётся «в процессе».
+response засчитался и завершил wait. Timeout 500 ms завершился с нулём completed scrapes. Поведение подтверждено на
+macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64.
 
-## Предварительно допустимые значения
+## Принятые значения
 
 - порядок: закрыть application publications, заморозить последний валидный полный snapshot, затем ждать;
 - application state immutable; никаких sum, merge или late replacement;
@@ -58,7 +60,7 @@ fingerprint статус остаётся «в процессе».
 - optional token может задавать eligibility, но не доказывает TSDB persistence;
 - timeout не создаёт фиктивный completed scrape.
 
-Значения предварительны до Ubuntu-подтверждения и ADR.
+Значения приняты в [ADR-011](../../docs-ru/06-architecture/adr/ADR-011.md).
 
 ## Запуск прототипа
 
@@ -106,35 +108,42 @@ curl http://127.0.0.1:19111/metrics
 - Counter saturation делает release condition детерминированным. Ограниченный completion grace позволяет уже принятым
   concurrent handlers полностью завершить HTTP responses до shutdown.
 - Timings включают Docker startup и polling и не являются shutdown budget recommendations.
-- macOS evidence — LinuxKit aarch64; native Linux и Kubernetes discovery относятся к последующим исследованиям.
+- Оператор наблюдал несколько периодических пустых HTTP-ответов вне сохранённых benchmark evidence. Эталонная lifecycle
+  matrix их не воспроизвела: 10/10 циклов завершились с HTTP 200 и нулевыми exit code curl/container. Поэтому наблюдение
+  не классифицируется ни как failed assertion, ни как доказанный дефект сервера. При воспроизведении необходимо
+  сохранить
+  stderr клиента, server logs, состояние контейнера и port binding для одного и того же запроса.
+- Обе container-среды используют LinuxKit: macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64. Native Linux без LinuxKit
+  не проверен; Kubernetes discovery/lifecycle отдельно исследован в INV-012.
 
 ## Дополнительные benchmarks
 
-| Benchmark                                    | Статус                                                |
-|----------------------------------------------|-------------------------------------------------------|
-| immutable application и mutable self-metrics | покрыто                                               |
-| ingestion rejected after finalization        | покрыто: HTTP 409                                     |
-| immediate                                    | покрыто                                               |
-| fixed duration                               | покрыто при 500 ms test setting                       |
-| one completed scrape                         | покрыто                                               |
-| configurable N                               | покрыто при N=3 и N=10                                |
-| health/readiness exclusion                   | покрыто                                               |
-| manual curl                                  | покрыто: считается без gate                           |
-| same-client uniqueness                       | покрыто: requests независимы                          |
-| concurrent counting и response drain         | покрыто: 20 полных responses, saturation 10           |
-| ephemeral port/readiness race                | покрыто: inspect polling, HTTP readiness, strict exit |
-| repeated ephemeral-port lifecycle            | покрыто: 10/10 HTTP 200, curl 0, container 0          |
-| optional token                               | покрыто                                               |
-| aborted response                             | покрыто, 8 MiB chunks                                 |
-| timeout                                      | покрыто, 500 ms и 0 synthetic completions             |
-| Ubuntu matching fingerprint                  | ожидается                                             |
-| real Prometheus/TSDB query                   | не создаёт causal proof без acknowledgement protocol  |
-| HTTP/2/proxy/TLS                             | после выбора deployment topology                      |
-| real workload/signal race                    | после интеграции INV-003 и lifecycle code             |
+| Benchmark                                          | Статус                                                |
+|----------------------------------------------------|-------------------------------------------------------|
+| immutable application и mutable self-metrics       | покрыто                                               |
+| ingestion rejected after finalization              | покрыто: HTTP 409                                     |
+| immediate                                          | покрыто                                               |
+| fixed duration                                     | покрыто при 500 ms test setting                       |
+| one completed scrape                               | покрыто                                               |
+| configurable N                                     | покрыто при N=3 и N=10                                |
+| health/readiness exclusion                         | покрыто                                               |
+| manual curl                                        | покрыто: считается без gate                           |
+| same-client uniqueness                             | покрыто: requests независимы                          |
+| concurrent counting и response drain               | покрыто: 20 полных responses, saturation 10           |
+| ephemeral port/readiness race                      | покрыто: inspect polling, HTTP readiness, strict exit |
+| repeated ephemeral-port lifecycle                  | покрыто: 10/10 HTTP 200, curl 0, container 0          |
+| периодический пустой ответ по наблюдению оператора | не воспроизведено; per-request evidence не сохранены  |
+| optional token                                     | покрыто                                               |
+| aborted response                                   | покрыто, 8 MiB chunks                                 |
+| timeout                                            | покрыто, 500 ms и 0 synthetic completions             |
+| Ubuntu matching fingerprint                        | покрыто: 26/26 assertions                             |
+| real Prometheus/TSDB query                         | не создаёт causal proof без acknowledgement protocol  |
+| HTTP/2/proxy/TLS                                   | после выбора deployment topology                      |
+| real workload/signal race                          | после интеграции INV-003 и lifecycle code             |
 
 ## Как лучше снять дополнительные benchmarks
 
-Сначала запустить неизменённый fingerprint на Ubuntu. Затем повторить abort на нескольких размерах body и socket buffer,
+Для дополнительной характеристики повторить abort на нескольких размерах body и socket buffer,
 проверить HTTP/2 и reverse proxy, подключить реальный Prometheus, чтобы явно показать различие response completion и
 query visibility. Multiple responses нельзя трактовать как aggregation: каждый response обязан содержать тот же frozen
 полный application snapshot плюс отдельно изменяющиеся self-metrics.
@@ -144,6 +153,6 @@ query visibility. Multiple responses нельзя трактовать как ag
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS evidence: `results/20260803T065931Z/`
-- Ubuntu evidence: ожидается от того же runner/fingerprint
+- Ubuntu evidence: `results/20260803T070500Z/`
 - Подробный анализ: [report_ru.md](report_ru.md)
-- ADR: после Ubuntu-подтверждения
+- ADR: [ADR-011](../../docs-ru/06-architecture/adr/ADR-011.md)

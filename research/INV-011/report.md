@@ -1,10 +1,8 @@
 # INV-011 Report — Final Application State and Scrape Counting
 
-**Status:** in progress
-**Run date:** 2026-08-02
-**Docker server:** 29.6.2 (macOS/LinuxKit)
-**Docker platform:** linux/aarch64
-**Reference run:** `results/20260803T065931Z`
+**Status:** completed
+**Run dates:** 2026-08-03
+**Reference runs:** `results/20260803T065931Z`, `results/20260803T070500Z`
 **Fingerprint:** `4b8b5d48b85b5c3c2c74e94c2b0ed59494708110ce53b6f8645d16e4d5d0c7d9`
 
 ## Goal
@@ -39,13 +37,20 @@ macOS and Ubuntu use the same command and benchmark fingerprint.
 
 ## Run Environment
 
-| Environment                       |       Date |  Docker | Architecture    | Result                     | Status                |
-|-----------------------------------|-----------:|--------:|-----------------|----------------------------|-----------------------|
-| Docker Desktop on macOS/LinuxKit  | 2026-08-03 |  29.6.2 | aarch64         | `results/20260803T065931Z` | 26/26 assertions pass |
-| Docker Desktop on Ubuntu/LinuxKit |    pending | pending | x86_64 expected | pending                    | not run               |
+| Environment                       |       Date | Docker | Architecture | Result                     | Status                |
+|-----------------------------------|-----------:|-------:|--------------|----------------------------|-----------------------|
+| Docker Desktop on macOS/LinuxKit  | 2026-08-03 | 29.6.2 | aarch64      | `results/20260803T065931Z` | 26/26 assertions pass |
+| Docker Desktop on Ubuntu/LinuxKit | 2026-08-03 | 27.4.0 | x86_64       | `results/20260803T070500Z` | 26/26 assertions pass |
 
-The macOS fingerprint is `4b8b5d48b85b5c3c2c74e94c2b0ed59494708110ce53b6f8645d16e4d5d0c7d9`.
-Ubuntu evidence is comparable only if that value matches.
+Both runs have fingerprint `4b8b5d48b85b5c3c2c74e94c2b0ed59494708110ce53b6f8645d16e4d5d0c7d9`, and all
+26 assertions passed in both environments.
+
+| Observation                          | macOS/LinuxKit aarch64 | Ubuntu/LinuxKit x86_64 |
+|--------------------------------------|-----------------------:|-----------------------:|
+| Repeated startup readiness range     |     239.767–302.485 ms | 3,008.190–4,014.317 ms |
+| Configured 500 ms duration lifecycle |             813.244 ms |           4,155.560 ms |
+| Configured 500 ms no-scrape timeout  |             858.604 ms |           4,108.646 ms |
+| Repeated startup successful cycles   |                  10/10 |                  10/10 |
 
 ## Results
 
@@ -94,7 +99,7 @@ distinguished the tested disconnect from a completed handler write.
 
 ### Default required scrape count should be one
 
-Provisionally supported. N=1 gives the smallest useful final-wait contract. It needs a bounded timeout because no
+Supported. N=1 gives the smallest useful final-wait contract. It needs a bounded timeout because no
 scraper may arrive. N>1 works but increases waiting and does not by itself improve persistence certainty.
 
 ### A scrape counts only after the complete response is written successfully
@@ -118,7 +123,7 @@ optional request token can prove configured eligibility but still cannot prove d
 
 ## Evaluation Against Criteria
 
-| Criterion                       | Provisional result                            |
+| Criterion                       | Confirmed result                              |
 |---------------------------------|-----------------------------------------------|
 | immutable application state     | stable value and SHA-256 across wait          |
 | live self-metrics               | attempt counter changed independently         |
@@ -130,9 +135,9 @@ optional request token can prove configured eligibility but still cannot prove d
 | optional eligibility            | token gate demonstrated                       |
 | abort handling                  | 8 MiB disconnected write did not count        |
 | timeout                         | bounded exit with zero fabricated completions |
-| Ubuntu reproducibility          | pending matching-fingerprint run              |
+| Ubuntu reproducibility          | 26/26 with matching fingerprint               |
 
-## Provisional Acceptable Values and Policies
+## Accepted Values and Policies
 
 - Freeze the last valid complete application snapshot and close ingestion before entering final wait.
 - Keep application metric identity immutable; self-metrics remain mutable and separate.
@@ -148,50 +153,56 @@ optional request token can prove configured eligibility but still cannot prove d
 
 ## Prototype Limits
 
-- One macOS/LinuxKit environment; Ubuntu is pending.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux is not covered.
 - Synthetic already-final workload state rather than full process supervision and signal races.
 - Go server-side write completion cannot prove remote or durable receipt.
 - Token gate is illustrative, with no credential lifecycle or threat model.
 - HTTP/1.1 direct connection only; no proxy, TLS or HTTP/2 buffering behavior.
 - Host lifecycle timings are not shutdown budget limits.
+- Several intermittent empty HTTP replies were observed manually outside the retained benchmark stream. They were not
+  reproduced by the 10/10 successful lifecycle repetitions, and no correlated client/server/port-state evidence was
+  retained. This remains an unclassified operational observation, not a failed assertion and not proof of a server bug.
 - The tested 500 ms completion grace drained 20 local clients; production values still require deployment-specific
   proxy/network testing.
 
 ## Additional Benchmarking
 
-| Item                                        | Status      | Evidence/Reason                                            |
-|---------------------------------------------|-------------|------------------------------------------------------------|
-| application freeze and self-metric mutation | covered     | two bodies and stable hash                                 |
-| ingestion close before wait                 | covered     | HTTP 409                                                   |
-| immediate and duration                      | covered     | per-case logs                                              |
-| one and N completed scrapes                 | covered     | N=1, 3 and 10                                              |
-| health/readiness exclusion                  | covered     | zero attempts/counts                                       |
-| manual and repeated same client             | covered     | all eligible by default                                    |
-| concurrent completions and drain            | covered     | 20 complete responses, saturation at 10                    |
-| ephemeral port/readiness startup            | covered     | inspect polling, numeric binding and HTTP readiness        |
-| repeated ephemeral-port lifecycle           | covered     | 10/10 HTTP 200, curl 0 and container 0 cycles              |
-| eligibility token                           | covered     | ineligible and eligible responses                          |
-| aborted connection                          | covered     | 8 MiB chunked response                                     |
-| bounded timeout                             | covered     | 500 ms setting, zero count                                 |
-| Ubuntu matching fingerprint                 | pending     | required before completion                                 |
-| real Prometheus/TSDB visibility             | follow-up   | illustrates non-equivalence, cannot be inferred from write |
-| proxy/TLS/HTTP2 abort matrix                | recommended | deployment-dependent buffering                             |
-| real workload/signal finalization race      | recommended | production integration with INV-003                        |
+| Item                                        | Status         | Evidence/Reason                                            |
+|---------------------------------------------|----------------|------------------------------------------------------------|
+| application freeze and self-metric mutation | covered        | two bodies and stable hash                                 |
+| ingestion close before wait                 | covered        | HTTP 409                                                   |
+| immediate and duration                      | covered        | per-case logs                                              |
+| one and N completed scrapes                 | covered        | N=1, 3 and 10                                              |
+| health/readiness exclusion                  | covered        | zero attempts/counts                                       |
+| manual and repeated same client             | covered        | all eligible by default                                    |
+| concurrent completions and drain            | covered        | 20 complete responses, saturation at 10                    |
+| ephemeral port/readiness startup            | covered        | inspect polling, numeric binding and HTTP readiness        |
+| repeated ephemeral-port lifecycle           | covered        | 10/10 HTTP 200, curl 0 and container 0 cycles              |
+| operator-observed intermittent empty reply  | not reproduced | no correlated retained request evidence                    |
+| eligibility token                           | covered        | ineligible and eligible responses                          |
+| aborted connection                          | covered        | 8 MiB chunked response                                     |
+| bounded timeout                             | covered        | 500 ms setting, zero count                                 |
+| Ubuntu matching fingerprint                 | covered        | 26/26 assertions, identical fingerprint                    |
+| real Prometheus/TSDB visibility             | follow-up      | illustrates non-equivalence, cannot be inferred from write |
+| proxy/TLS/HTTP2 abort matrix                | recommended    | deployment-dependent buffering                             |
+| real workload/signal finalization race      | recommended    | production integration with INV-003                        |
 
 ## Conclusion
 
-The macOS evidence provisionally supports a default of one eligible completed scrape plus a finite timeout. Application
+The matching macOS and Ubuntu evidence supports a default of one eligible completed scrape plus a finite timeout.
+Application
 metrics freeze before waiting; self-metrics remain live. Health/readiness never count, repeated and concurrent eligible
 responses count independently up to N, and a server-observed failed/aborted write does not count.
 
-The guarantee must be worded narrowly: complete successful server write, not TSDB persistence. The investigation stays
-in progress until the identical fingerprint passes on Ubuntu and no final ADR is produced before that confirmation.
+The guarantee is intentionally narrow: complete successful server write, not TSDB persistence. INV-011 is completed;
+the policy is recorded in [ADR-011](../../docs/06-architecture/adr/ADR-011.md).
 
 ## Decision Output
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS raw evidence: `results/20260803T065931Z/`
-- Ubuntu raw evidence: pending
-- Provisional direction: freeze then wait; default N=1; count complete eligible writes; finite timeout
-- ADR: pending
+- Ubuntu raw evidence: `results/20260803T070500Z/`
+- Direction: freeze then wait; default N=1; count complete eligible writes; finite timeout
+- ADR: [ADR-011](../../docs/06-architecture/adr/ADR-011.md)

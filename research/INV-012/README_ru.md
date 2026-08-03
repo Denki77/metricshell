@@ -1,9 +1,9 @@
 # INV-012 — Пригодность Kubernetes Job и CronJob
 
-**Статус:** в процессе
-**Эталонный прогон:** `results/20260803T143134Z`
+**Статус:** завершено
+**Эталонные прогоны:** `results/20260803T143134Z`, `results/20260803T153300Z`
 **Отчёт:** [report_ru.md](report_ru.md)
-**Решение:** ожидаются подтверждение на Ubuntu и ADR
+**Решение:** [ADR-012](../../docs-ru/06-architecture/adr/ADR-012.md)
 
 ## Вопрос
 
@@ -99,24 +99,26 @@ Runner проверяет `activeDeadlineSeconds`, `ttlSecondsAfterFinished` и 
 
 ## Результаты
 
-| Окружение                         | Дата       | Набор результатов          | Сводка                                              | Отпечаток benchmark                                                |
-|-----------------------------------|------------|----------------------------|-----------------------------------------------------|--------------------------------------------------------------------|
-| Docker Desktop на macOS, Minikube | 2026-08-03 | `results/20260803T143134Z` | [summary.tsv](results/20260803T143134Z/summary.tsv) | `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c` |
-| Docker на Ubuntu, Minikube        | ожидается  | ожидается                  | ожидается                                           | должен совпасть с macOS                                            |
+| Окружение                          | Дата       | Набор результатов          | Сводка                                              | Отпечаток benchmark                                                |
+|------------------------------------|------------|----------------------------|-----------------------------------------------------|--------------------------------------------------------------------|
+| Docker Desktop на macOS, Minikube  | 2026-08-03 | `results/20260803T143134Z` | [summary.tsv](results/20260803T143134Z/summary.tsv) | `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c` |
+| Docker Desktop на Ubuntu, Minikube | 2026-08-03 | `results/20260803T153300Z` | [summary.tsv](results/20260803T153300Z/summary.tsv) | `caa34fb8ba97176b3c199b56ffaeb21dcabbb654fa5efd2b4da3203d79274e6c` |
 
-Основные результаты эталонного прогона на macOS:
+Основные результаты обоих эталонных прогонов:
 
-- прошли все 21 переносимый assertion и все 14 сценариев сводки;
+- в каждой среде прошли все 21 переносимый assertion и все 14 сценариев сводки;
 - проверенный по checksum Minikube `v1.38.1` предоставил effective kubectl `v1.34.0`; системный kubectl не
   использовался;
-- прямой Pod discovery завершился после наблюдаемого scrape за `8 017,520 ms`;
-- handler ServiceMonitor получил 51 агрегированный HTTP scrape за ограниченное выполнение `63 724,188 ms`;
+- direct Pod discovery завершился за `8 017,520 ms` на macOS и `9 124,833 ms` на Ubuntu;
+- ServiceMonitor получил 51/73 агрегированных HTTP scrape за `63 724,188/66 243,703 ms` на macOS/Ubuntu;
 - после завершения Job Prometheus replicas 0 и 1 были опрошены отдельно; каждая TSDB вернула точную серию
   `inv012_final_snapshot` для текущего Pod Job `service-ready` со значением `42`;
-- неготовый ServiceMonitor получил 1 scrape в этом прогоне. Число остаётся зависящим от окружения observation, а не
+- неготовый ServiceMonitor получил 1 scrape на macOS и 0 на Ubuntu. Число остаётся зависящим от окружения observation, а
+  не
   переносимым инвариантом;
 - PodMonitor опросил неготовый Pod не менее двух раз;
-- active deadline дал `DeadlineExceeded`, TTL удалил завершённый Job, явное удаление Pod заняло `2 022,144 ms`;
+- active deadline дал `DeadlineExceeded`, TTL удалил завершённый Job, явное удаление Pod заняло `2 022,144 ms` на macOS
+  и `4 250,833 ms` на Ubuntu;
 - настоящий CronJob сохранил один активный Pod и один Job на следующем тике расписания при `Forbid`.
 
 ## Вывод
@@ -126,15 +128,14 @@ Runner проверяет `activeDeadlineSeconds`, `ttlSecondsAfterFinished` и 
 PodMonitor пригоден для прямого discovery неготового Pod. Поведение ServiceMonitor относительно readiness нужно считать
 наблюдаемым поведением реализации, а не сводить к неподтверждённому правилу «ноль scrape».
 
-Исследование остаётся **в процессе**, пока точный отпечаток benchmark не будет повторён под Docker на Ubuntu и не будет
-принят ADR.
+INV-012 завершено. Production-направление зафиксировано в [ADR-012](../../docs-ru/06-architecture/adr/ADR-012.md).
 
 ## Выход решения
 
 - Прототип: `prototype/`
 - Runner: `run-bench.sh`
 - Доказательства macOS: `results/20260803T143134Z/`
-- Доказательства Ubuntu: ожидаются
+- Доказательства Ubuntu: `results/20260803T153300Z/`
 - Отчёт: [report_ru.md](report_ru.md)
 - Рекомендация для ADR: использовать прямой Pod discovery/PodMonitor для намеренно неготового endpoint после workload;
   сохранять явные lifetime/overlap limits; никогда не суммировать snapshots или значения разных scrape.
@@ -202,7 +203,8 @@ cat "$latest/helm-install.log"
 
 - Целью является проверенный по checksum Minikube `v1.38.1` с Kubernetes и effective kubectl `v1.34.0`, а не production
   managed cluster.
-- macOS-host использует Docker Desktop и arm64 Docker engine; подтверждение на Ubuntu ещё не снято.
+- Обе container-среды используют LinuxKit: macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64. Kubernetes проверен в
+  Minikube, а не в managed cluster или native Linux без LinuxKit.
 - Prometheus Operator установлен через `kube-prometheus-stack` `88.1.2`; отдельный Prometheus `v3.5.0` проверяет
   прямой Pod discovery.
 - Время scheduler и scrape является наблюдением, но не production SLO.

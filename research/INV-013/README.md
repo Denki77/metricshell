@@ -1,9 +1,10 @@
 # INV-013 — Distribution Models
 
-**Status:** in progress
+**Status:** completed
 **macOS reference run:** `results/20260803T103140Z`
-**Ubuntu/LinuxKit run:** pending
+**Ubuntu/LinuxKit reference run:** `results/20260803T135959Z`
 **Report:** [report.md](report.md)
+**Decision:** [ADR-013](../../docs/06-architecture/adr/ADR-013.md)
 
 ## Question
 
@@ -33,9 +34,10 @@ should not become the primary distribution model.
 - automatic pinned binfmt/QEMU registration for cross-architecture execution on plain Docker Engine;
 - matching-fingerprint Ubuntu repeat.
 
-## Current Result
+## Confirmed Result
 
-The macOS Docker Desktop/LinuxKit run passed 24/24 assertions. The same CGO-free artifact ran in scratch, Alpine and PHP
+Both matching-fingerprint Docker Desktop/LinuxKit runs passed 24/24 assertions. The same CGO-free artifact ran in
+scratch, Alpine and PHP
 Alpine. Both amd64 and arm64 images were built and executed, including amd64 emulation on the arm64 host. A no-cache
 rebuild produced the same artifact SHA-256
 `f7df9d9d1b96ea9c36e387fe6178df3125490539bb09cbb17e5b8cb3393c5486`.
@@ -47,10 +49,11 @@ All external images are pinned to immutable multi-platform manifest digests: Go
 `sha256:1b804311fe87047a4c96d38b4b3ef6f62fca8cd125265917a9e3dc3c996c39e6`. The selected platform image IDs are recorded
 in `base-images.tsv`.
 
-Measured image sizes were 1,507,480 bytes for scratch, 10,333,271 bytes for the Alpine base candidate and 97,875,364
-bytes for the PHP multi-stage application example. The investigation remains in progress pending Ubuntu confirmation.
+On macOS/aarch64 the measured sizes were 1,507,480, 10,333,271 and 97,875,364 bytes; on Ubuntu/x86_64 they were
+678,173, 4,310,805 and 38,301,971 bytes for scratch, Alpine base and PHP multi-stage respectively. Both runs used
+fingerprint `01b04f50305cce6474d74f9fa196d35bcd60dd65281134056d568cb2d4e96ea4`.
 
-## Provisional Admissible Values
+## Accepted Values
 
 - primary artifact: CGO-free static linux/amd64 and linux/arm64 executable;
 - pinning: explicit version in binary and OCI labels plus published SHA-256;
@@ -110,8 +113,10 @@ cat "$latest/arm64.build.log"
 - Image sizes depend on pinned upstream bases and are observations, not fixed limits.
 - Cross-architecture execution registers binfmt through a privileged helper container; it changes the Docker host/VM
   emulation registration and therefore requires the corresponding Docker permission.
-- The byte-identical rebuild shares one Docker daemon and pinned toolchain environment. Ubuntu matching will confirm
-  portability of this benchmark, not by itself prove independent-builder or full supply-chain reproducibility.
+- The byte-identical rebuild claim is limited to each pinned toolchain/daemon environment. Matching cross-environment
+  evidence confirms benchmark portability, not independent-builder or full supply-chain reproducibility.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux is not covered.
 
 ## Additional Benchmarks
 
@@ -127,14 +132,13 @@ cat "$latest/arm64.build.log"
 | pinned binfmt/QEMU setup for plain Ubuntu Docker | covered                             |
 | image sizes                                      | covered                             |
 | SPDX artifact record                             | covered                             |
-| matching Ubuntu fingerprint                      | pending                             |
+| matching Ubuntu fingerprint                      | covered: 24/24 assertions           |
 | cosign/SLSA provenance and registry verification | recommended for release engineering |
 | vulnerability scan of final release bases        | recommended at release time         |
 
 ## Better Follow-up Benchmarking
 
-Run the unchanged fingerprint on Ubuntu and require the same immutable image references from `base-images.tsv`, then
-attach registry-published multi-architecture manifests, signatures, provenance and a full generated SBOM. Rebuild in
+Attach registry-published multi-architecture manifests, signatures, provenance and a full generated SBOM. Rebuild in
 an independent clean CI worker before making an independent-builder or full supply-chain reproducibility claim.
 
 ## Decision Output
@@ -142,6 +146,6 @@ an independent clean CI worker before making an independent-builder or full supp
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS evidence: `results/20260803T103140Z/`
-- Ubuntu evidence: pending
+- Ubuntu evidence: `results/20260803T135959Z/`
 - Detailed report: [report.md](report.md)
-- ADR: pending
+- ADR: [ADR-013](../../docs/06-architecture/adr/ADR-013.md)

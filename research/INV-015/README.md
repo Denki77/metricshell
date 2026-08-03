@@ -1,9 +1,10 @@
 # INV-015 — Benchmarks and Final Comparison
 
-**Status:** in progress
+**Status:** completed
 **macOS reference run:** `results/20260802T180839Z`
-**Ubuntu/LinuxKit run:** pending
+**Ubuntu/LinuxKit reference run:** `results/20260803T071831Z`
 **Report:** [report.md](report.md)
+**Decision:** [ADR-015](../../docs/06-architecture/adr/ADR-015.md)
 
 ## Question
 
@@ -29,9 +30,10 @@ observations, not pass thresholds.
 - malformed input, bind failure and queue overflow;
 - matching Ubuntu fingerprint.
 
-## Current Result
+## Confirmed Result
 
-The macOS Docker/LinuxKit run passed 23/23 assertions. Ten repeated iterations were recorded per in-container shape.
+Both matching-fingerprint Docker/LinuxKit runs passed 23/23 assertions. Ten repeated iterations were recorded per
+in-container shape.
 Complete-snapshot replacement under 100 concurrent publications exposed exactly 100 series from one generation. The
 HTTP cardinality response grew from 5,120 bytes at 100 series to 5,677,820 bytes at 100k; observed host scrape time grew
 from 20.927 ms to 73.183 ms.
@@ -41,14 +43,14 @@ In-container 100k encoding p50/p95 was 42.053/43.892 ms. File-detection p50 was 
 in-flight 800 ms response and completed in 1.364 s. Final-scrape, aborted-large-response, timeout, malformed, queue,
 bind-failure and OOM profiles all passed.
 
-## Provisional Interpretation
+## Final Interpretation
 
 - immutable pointer replacement keeps concurrent scrape correctness simple;
 - complete-snapshot cost scales approximately with cardinality and must be bounded;
 - inotify/hybrid has materially lower detection latency than polling in LinuxKit, but polling remains portable fallback;
 - final-scrape completion must be counted after successful full response write;
 - queue, parser, bind and cgroup failures need explicit bounded policies;
-- these single-environment numbers are not production SLOs or saturation limits.
+- these cross-environment research numbers are not production SLOs or saturation limits.
 
 ## Running the Prototype
 
@@ -76,6 +78,8 @@ investigations. macOS and Ubuntu use the same fingerprint.
 - Concurrent in-process scrape work isolates snapshot read/body access; the external 10-client case includes HTTP.
 - Docker Desktop host timing includes scheduler and curl overhead.
 - Only Linux inotify is compared; kqueue and other platforms are outside Linux deployment scope.
+- Both container environments use LinuxKit: macOS/LinuxKit aarch64 and Ubuntu/LinuxKit x86_64. Native non-LinuxKit
+  Linux is not covered.
 
 ## Additional Benchmarks
 
@@ -92,13 +96,13 @@ investigations. macOS and Ubuntu use the same fingerprint.
 | graceful HTTP drain                       | covered                             |
 | final one/abort/timeout                   | covered locally                     |
 | malformed/bind/queue/OOM                  | covered locally                     |
-| Ubuntu matching fingerprint               | pending                             |
+| Ubuntu matching fingerprint               | covered: 23/23 assertions           |
 | 30+ iterations, pinned CPU and perf/eBPF  | recommended on native Ubuntu        |
 | production transports side-by-side        | repeat after production integration |
 
 ## Better Follow-up Benchmarking
 
-Run this unchanged fingerprint on Ubuntu, then repeat 30–100 times with pinned CPUs, cgroup CPU quotas and controlled
+Repeat 30–100 times with pinned CPUs, cgroup CPU quotas and controlled
 host load. Record allocations, cycles, cache misses and context switches. Run the same semantic complete snapshots
 through production file/socket/HTTP adapters; never compare partial updates with complete snapshots.
 
@@ -106,6 +110,6 @@ through production file/socket/HTTP adapters; never compare partial updates with
 
 - Prototype: `prototype/`
 - macOS evidence: `results/20260802T180839Z/`
-- Ubuntu evidence: pending
+- Ubuntu evidence: `results/20260803T071831Z/`
 - Report: [report.md](report.md)
-- Final architecture completion/ADR: pending Ubuntu and production integration
+- ADR: [ADR-015](../../docs/06-architecture/adr/ADR-015.md)

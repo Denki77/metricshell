@@ -1,10 +1,8 @@
 # Отчёт INV-011 — Финальное состояние и подсчёт scrape
 
-**Статус:** в процессе
-**Дата прогона:** 2026-08-02
-**Docker server:** 29.6.2 (macOS/LinuxKit)
-**Docker platform:** linux/aarch64
-**Эталонный прогон:** `results/20260803T065931Z`
+**Статус:** завершено
+**Даты прогонов:** 2026-08-03
+**Эталонные прогоны:** `results/20260803T065931Z`, `results/20260803T070500Z`
 **Fingerprint:** `4b8b5d48b85b5c3c2c74e94c2b0ed59494708110ce53b6f8645d16e4d5d0c7d9`
 
 ## Цель
@@ -39,13 +37,20 @@ macOS и Ubuntu используют одну команду и benchmark finger
 
 ## Среды прогонов
 
-| Среда                          |       Дата |    Docker | Архитектура      | Результат                  | Статус                |
-|--------------------------------|-----------:|----------:|------------------|----------------------------|-----------------------|
-| Docker Desktop macOS/LinuxKit  | 2026-08-03 |    29.6.2 | aarch64          | `results/20260803T065931Z` | 26/26 assertions pass |
-| Docker Desktop Ubuntu/LinuxKit |  ожидается | ожидается | x86_64 ожидается | ожидается                  | не запускалось        |
+| Среда                          |       Дата | Docker | Архитектура | Результат                  | Статус                |
+|--------------------------------|-----------:|-------:|-------------|----------------------------|-----------------------|
+| Docker Desktop macOS/LinuxKit  | 2026-08-03 | 29.6.2 | aarch64     | `results/20260803T065931Z` | 26/26 assertions pass |
+| Docker Desktop Ubuntu/LinuxKit | 2026-08-03 | 27.4.0 | x86_64      | `results/20260803T070500Z` | 26/26 assertions pass |
 
-Fingerprint macOS: `4b8b5d48b85b5c3c2c74e94c2b0ed59494708110ce53b6f8645d16e4d5d0c7d9`. Ubuntu evidence
-сопоставимо только при совпадении.
+Оба прогона имеют fingerprint `4b8b5d48b85b5c3c2c74e94c2b0ed59494708110ce53b6f8645d16e4d5d0c7d9`; все 26
+assertions прошли в обеих средах.
+
+| Наблюдение                              | macOS/LinuxKit aarch64 | Ubuntu/LinuxKit x86_64 |
+|-----------------------------------------|-----------------------:|-----------------------:|
+| Диапазон readiness повторных startup    |     239,767–302,485 ms | 3 008,190–4 014,317 ms |
+| Lifecycle duration при настройке 500 ms |             813,244 ms |           4 155,560 ms |
+| Timeout без scrape при настройке 500 ms |             858,604 ms |           4 108,646 ms |
+| Успешные повторные startup cycles       |                  10/10 |                  10/10 |
 
 ## Результаты
 
@@ -90,7 +95,7 @@ request. State показал 0 completed и как минимум 1 attempt. З
 
 ### Default count равен одному
 
-Предварительно подтверждено. N=1 — минимальный полезный contract. Нужен bounded timeout, потому что scraper может не
+Подтверждено. N=1 — минимальный полезный contract. Нужен bounded timeout, потому что scraper может не
 прийти. N>1 работает, но увеличивает ожидание и не повышает certainty persistence.
 
 ### Count только после полной успешной write
@@ -114,7 +119,7 @@ uniqueness не требуется.
 
 ## Оценка по критериям
 
-| Критерий                    | Предварительный результат            |
+| Критерий                    | Подтверждённый результат             |
 |-----------------------------|--------------------------------------|
 | immutable application state | stable value/SHA-256                 |
 | live self-metrics           | attempt counter изменялся            |
@@ -126,9 +131,9 @@ uniqueness не требуется.
 | optional eligibility        | token gate показан                   |
 | abort                       | disconnected 8 MiB write не засчитан |
 | timeout                     | bounded exit, 0 fake completions     |
-| Ubuntu reproducibility      | ожидается                            |
+| Ubuntu reproducibility      | 26/26, fingerprint совпал            |
 
-## Предварительные policies
+## Принятые policies
 
 - До final wait закрыть ingestion и заморозить last valid complete application snapshot.
 - Application identity immutable, self-metrics mutable и separate.
@@ -144,50 +149,57 @@ uniqueness не требуется.
 
 ## Ограничения
 
-- Только macOS/LinuxKit; Ubuntu ожидается.
+- Обе container-среды используют LinuxKit: macOS/LinuxKit aarch64 и Ubuntu/LinuxKit x86_64. Native Linux без LinuxKit
+  не проверен.
 - Synthetic final state, без full process supervision/signal race.
 - Go write completion не доказывает remote/durable receipt.
 - Token без threat model и credential lifecycle.
 - Только direct HTTP/1.1, без proxy/TLS/HTTP2.
 - Host lifecycle times не являются shutdown limits.
+- Несколько периодических пустых HTTP-ответов наблюдались вручную вне сохранённого benchmark stream. Они не
+  воспроизвелись в 10/10 успешных lifecycle repetitions, а коррелированные evidence клиента, сервера и port state не
+  сохранены. Это неклассифицированное эксплуатационное наблюдение, а не failed assertion и не доказательство дефекта
+  сервера.
 - Проверенный 500 ms completion grace дренировал 20 local clients; production value требует отдельной проверки с
   выбранными proxy/network.
 
 ## Дополнительные benchmarks
 
-| Пункт                   | Статус        | Доказательство/причина              |
-|-------------------------|---------------|-------------------------------------|
-| freeze и mutable self   | покрыто       | bodies/stable hash                  |
-| ingestion close         | покрыто       | HTTP 409                            |
-| immediate/duration      | покрыто       | logs                                |
-| one/N                   | покрыто       | N=1, 3, 10                          |
-| health/readiness        | покрыто       | zero counters                       |
-| manual/same client      | покрыто       | default eligible                    |
-| concurrent и drain      | покрыто       | 20 полных responses, saturation 10  |
-| port/readiness startup  | покрыто       | inspect polling и strict readiness  |
-| repeated port lifecycle | покрыто       | 10/10 HTTP 200, curl 0, container 0 |
-| token                   | покрыто       | ineligible/eligible                 |
-| aborted connection      | покрыто       | 8 MiB chunks                        |
-| timeout                 | покрыто       | 500 ms, zero count                  |
-| Ubuntu fingerprint      | ожидается     | требуется до завершения             |
-| real Prometheus/TSDB    | follow-up     | write не равен persistence          |
-| proxy/TLS/HTTP2         | рекомендуется | deployment-dependent                |
-| workload/signal race    | рекомендуется | integration с INV-003               |
+| Пункт                                | Статус            | Доказательство/причина               |
+|--------------------------------------|-------------------|--------------------------------------|
+| freeze и mutable self                | покрыто           | bodies/stable hash                   |
+| ingestion close                      | покрыто           | HTTP 409                             |
+| immediate/duration                   | покрыто           | logs                                 |
+| one/N                                | покрыто           | N=1, 3, 10                           |
+| health/readiness                     | покрыто           | zero counters                        |
+| manual/same client                   | покрыто           | default eligible                     |
+| concurrent и drain                   | покрыто           | 20 полных responses, saturation 10   |
+| port/readiness startup               | покрыто           | inspect polling и strict readiness   |
+| repeated port lifecycle              | покрыто           | 10/10 HTTP 200, curl 0, container 0  |
+| пустой ответ по наблюдению оператора | не воспроизведено | нет коррелированных request evidence |
+| token                                | покрыто           | ineligible/eligible                  |
+| aborted connection                   | покрыто           | 8 MiB chunks                         |
+| timeout                              | покрыто           | 500 ms, zero count                   |
+| Ubuntu fingerprint                   | покрыто           | 26/26, fingerprint совпал            |
+| real Prometheus/TSDB                 | follow-up         | write не равен persistence           |
+| proxy/TLS/HTTP2                      | рекомендуется     | deployment-dependent                 |
+| workload/signal race                 | рекомендуется     | integration с INV-003                |
 
 ## Вывод
 
-macOS evidence предварительно поддерживает default: один eligible completed scrape плюс finite timeout. Application
+Совпадающие evidence macOS и Ubuntu поддерживают default: один eligible completed scrape плюс finite timeout.
+Application
 metrics замораживаются до wait, self-metrics остаются live. Health/readiness не считаются, repeated/concurrent eligible
 responses считаются независимо до N, failed/aborted server write не считается.
 
-Гарантию нужно формулировать узко: полная успешная server write, не TSDB persistence. Исследование остаётся в процессе
-до identical-fingerprint Ubuntu run; финальный ADR до этого не создаётся.
+Гарантия сформулирована узко: полная успешная server write, не TSDB persistence. INV-011 завершено; policy зафиксирована
+в [ADR-011](../../docs-ru/06-architecture/adr/ADR-011.md).
 
 ## Выход исследования
 
 - Prototype: `prototype/`
 - Runner: `run-bench.sh`
 - macOS evidence: `results/20260803T065931Z/`
-- Ubuntu evidence: ожидается
-- Предварительное направление: freeze then wait, default N=1, complete eligible writes, finite timeout
-- ADR: ожидается
+- Ubuntu evidence: `results/20260803T070500Z/`
+- Направление: freeze then wait, default N=1, complete eligible writes, finite timeout
+- ADR: [ADR-011](../../docs-ru/06-architecture/adr/ADR-011.md)

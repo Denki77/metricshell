@@ -1,6 +1,6 @@
 # Architecture Investigation
 
-> Status: In progress  
+> Status: Completed
 > Purpose: Evaluate architecture options before ADRs and implementation  
 > Scope: MetricShell runtime, process lifecycle, metrics ingestion, exposition and shutdown coordination
 
@@ -95,23 +95,23 @@ Architecture investigation may refine how these capabilities are implemented.
 
 ## 6. Investigation Tracking
 
-| ID      | Topic                                                       | Status      | Evidence                                    | Decision                                     |
-|---------|-------------------------------------------------------------|-------------|---------------------------------------------|----------------------------------------------|
-| INV-001 | [PID 1 and process model](architecture-research.md#INV-001) | Completed   | [INV-001](../../research/INV-001/README.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
-| INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | Completed   | [INV-002](../../research/INV-002/README.md) | [ADR-002](../06-architecture/adr/ADR-002.md) |
-| INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Completed   | [INV-003](../../research/INV-003/README.md) | [ADR-003](../06-architecture/adr/ADR-003.md) |
-| INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Completed   | [INV-004](../../research/INV-004/README.md) | [ADR-004](../06-architecture/adr/ADR-004.md) |
-| INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Completed   | [INV-005](../../research/INV-005/README.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
-| INV-006 | [File ingestion](architecture-research.md#INV-006)          | Completed   | [INV-006](../../research/INV-006/README.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
-| INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Completed   | [INV-007](../../research/INV-007/README.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
-| INV-008 | [Local push](architecture-research.md#INV-008)              | Completed   | [INV-008](../../research/INV-008/README.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
-| INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Completed   | [INV-009](../../research/INV-009/README.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
-| INV-010 | [Exposition](architecture-research.md#INV-010)              | In progress | —                                           | —                                            |
-| INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | In progress | —                                           | —                                            |
-| INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | In progress | —                                           | —                                            |
-| INV-013 | [Distribution](architecture-research.md#INV-013)            | In progress | —                                           | —                                            |
-| INV-014 | [Security and limits](architecture-research.md#INV-014)     | In progress | —                                           | —                                            |
-| INV-015 | [Benchmarks](architecture-research.md#INV-015)              | In progress | —                                           | —                                            |
+| ID      | Topic                                                       | Status    | Evidence                                    | Decision                                     |
+|---------|-------------------------------------------------------------|-----------|---------------------------------------------|----------------------------------------------|
+| INV-001 | [PID 1 and process model](architecture-research.md#INV-001) | Completed | [INV-001](../../research/INV-001/README.md) | [ADR-001](../06-architecture/adr/ADR-001.md) |
+| INV-002 | [Workload lifecycle](architecture-research.md#INV-002)      | Completed | [INV-002](../../research/INV-002/README.md) | [ADR-002](../06-architecture/adr/ADR-002.md) |
+| INV-003 | [Shutdown budgeting](architecture-research.md#INV-003)      | Completed | [INV-003](../../research/INV-003/README.md) | [ADR-003](../06-architecture/adr/ADR-003.md) |
+| INV-004 | [Metric-state semantics](architecture-research.md#INV-004)  | Completed | [INV-004](../../research/INV-004/README.md) | [ADR-004](../06-architecture/adr/ADR-004.md) |
+| INV-005 | [Transport comparison](architecture-research.md#INV-005)    | Completed | [INV-005](../../research/INV-005/README.md) | [ADR-005](../06-architecture/adr/ADR-005.md) |
+| INV-006 | [File ingestion](architecture-research.md#INV-006)          | Completed | [INV-006](../../research/INV-006/README.md) | [ADR-006](../06-architecture/adr/ADR-006.md) |
+| INV-007 | [Socket ingestion](architecture-research.md#INV-007)        | Completed | [INV-007](../../research/INV-007/README.md) | [ADR-007](../06-architecture/adr/ADR-007.md) |
+| INV-008 | [Local push](architecture-research.md#INV-008)              | Completed | [INV-008](../../research/INV-008/README.md) | [ADR-008](../06-architecture/adr/ADR-008.md) |
+| INV-009 | [Shared memory/mmap](architecture-research.md#INV-009)      | Completed | [INV-009](../../research/INV-009/README.md) | [ADR-009](../06-architecture/adr/ADR-009.md) |
+| INV-010 | [Exposition](architecture-research.md#INV-010)              | Completed | [INV-010](../../research/INV-010/README.md) | [ADR-010](../06-architecture/adr/ADR-010.md) |
+| INV-011 | [Final scrape semantics](architecture-research.md#INV-011)  | Completed | [INV-011](../../research/INV-011/README.md) | [ADR-011](../06-architecture/adr/ADR-011.md) |
+| INV-012 | [Kubernetes viability](architecture-research.md#INV-012)    | Completed | [INV-012](../../research/INV-012/README.md) | [ADR-012](../06-architecture/adr/ADR-012.md) |
+| INV-013 | [Distribution](architecture-research.md#INV-013)            | Completed | [INV-013](../../research/INV-013/README.md) | [ADR-013](../06-architecture/adr/ADR-013.md) |
+| INV-014 | [Security and limits](architecture-research.md#INV-014)     | Completed | [INV-014](../../research/INV-014/README.md) | [ADR-014](../06-architecture/adr/ADR-014.md) |
+| INV-015 | [Benchmarks](architecture-research.md#INV-015)              | Completed | [INV-015](../../research/INV-015/README.md) | [ADR-015](../06-architecture/adr/ADR-015.md) |
 
 ## 7. Completion Criteria
 

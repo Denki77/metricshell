@@ -580,7 +580,7 @@ state, disconnected scraper, slow scraper and multiple concurrent scrapers.
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
@@ -630,7 +630,7 @@ Runtime self-metrics may continue changing while MetricShell waits and shuts dow
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
@@ -665,7 +665,7 @@ with two Prometheus instances.
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
@@ -697,7 +697,7 @@ How should MetricShell be added to application images?
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
@@ -731,7 +731,7 @@ Security and Resource Limits
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
@@ -805,4 +805,4 @@ Test malformed input, transport disconnect, endpoint bind failure, queue overflo
 
 ### Status
 
-In progress.
+Completed.
