@@ -4,14 +4,21 @@
 
 ## Значения по умолчанию
 
-- Стратегия shutdown по умолчанию: `delay`.
-- Задержка по умолчанию: 30 секунд.
-- Timeout ожидания scrape по умолчанию: 60 секунд.
-- Требуемое число scrapes по умолчанию: 1.
+Нормативные значения определены
+в [спецификации defaults и resource limits](../04-specification/runtime-defaults-and-resource-limits.md).
+
+- Default final-wait mode после natural completion: `scrapes`.
+- Default duration при явно выбранном `duration`: `30s`.
+- Default timeout ожидания scrape: `60s`.
+- Default required scrape count: `1`.
+- Default external shutdown total grace: `30s`.
+- Default workload shutdown timeout: `28s`.
+- Default shutdown reserve MetricShell: `2s`.
 
 ## Ограничения
 
-- Максимальное настраиваемое время ожидания scrape должно иметь верхнюю границу.
-- Runtime никогда не должен ожидать бесконечно.
-- Ошибка приложения никогда не должна превращаться в success только потому, что MetricShell завершился штатно.
-- Финальный snapshot неизменяем.
+- Maximum configurable scrape wait: `1h`.
+- Runtime никогда не ожидает бесконечно.
+- Ошибка application не превращается в success из-за штатного завершения MetricShell.
+- Final application snapshot immutable.
+- Каждый candidate и response ограничен явными resource limits.

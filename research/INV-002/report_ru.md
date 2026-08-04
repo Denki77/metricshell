@@ -13,7 +13,7 @@
 
 ## Цель
 
-Проверить гипотезу INV-002: один процесс MetricShell должен выполнять ровно один workload, владеть одним однозначным
+Проверить гипотезу INV-002: один процесс MetricShell должен выполнять только один workload, владеть одним однозначным
 epoch состояния метрик, при необходимости публиковать final state в течение ограниченного времени и оставлять retry
 policy Docker, Compose или Kubernetes.
 
@@ -195,7 +195,7 @@ runtime restart delay/backoff.
 
 ## Оценка гипотез
 
-### Ровно один workload execution
+### Только один workload execution
 
 Подтверждено: сохранены success, failure, TERM, KILL, container-OOM и start failure; 30 repetitions прошли.
 

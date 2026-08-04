@@ -2,12 +2,12 @@
 
 [English version](../../docs/03-requirements/non-functional-requirements.md)
 
-> Статус: черновик для архитектурных исследований
+> Статус: принятые нормативные требования
 
 ## Назначение
 
-Документ определяет атрибуты качества и измеримые инженерные ожидания. Итоговые числовые значения устанавливаются
-прототипами и benchmarks; `TBD` обозначает значения, которые должно определить архитектурное исследование.
+Документ определяет принятые атрибуты качества и измеримые инженерные ожидания. Числовые performance thresholds
+версионируются как release-certification gates по ADR-015 и не переоткрывают correctness semantics Core.
 
 ## Надёжность
 
@@ -44,21 +44,21 @@ Malformed input, client disconnects, concurrent scrapes и неподдержи�
 
 Startup overhead без учёта запуска workload ДОЛЖЕН измеряться в документированной reference environment.
 
-> Целевое значение для stable release: `TBD`.
+> Threshold stable release задаётся controlled benchmark suite до release certification.
 
 ### NFR-PERF-002 — Производительность ingestion
 
 Для каждого transport ДОЛЖНЫ быть документированы sustained throughput и latency при низкой, средней и высокой
 интенсивности updates.
 
-> Целевые значения: `TBD`.
+> Release thresholds задаются controlled benchmark suite до release certification.
 
 ### NFR-PERF-003 — Scrape latency
 
 Для registry в пределах поддерживаемых ограничений scrape latency ДОЛЖНА быть существенно ниже обычного scrape timeout
 Prometheus.
 
-> Точный размер registry и целевая latency: `TBD`.
+> Reference snapshot size и latency threshold задаются controlled benchmark suite до release certification.
 
 ### NFR-PERF-004 — Resource overhead
 

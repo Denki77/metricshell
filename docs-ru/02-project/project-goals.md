@@ -2,6 +2,10 @@
 
 [English version](../../docs/02-project/project-goals.md)
 
+## Назначение
+
+Документ определяет долгосрочные цели MetricShell.
+
 ## Видение
 
 MetricShell предоставляет переиспользуемый runtime-слой, который делает Prometheus-метрики доступными для CLI-нагрузок
@@ -20,5 +24,18 @@ MetricShell предоставляет переиспользуемый runtime-
 
 ## Не является целью
 
-MetricShell не заменяет Prometheus, Pushgateway, OpenTelemetry Collector, все sidecar exporter или клиентские библиотеки
-метрик.
+MetricShell не предназначен для того, чтобы:
+
+- заменять Prometheus;
+- заменять Pushgateway;
+- заменять OpenTelemetry Collector;
+- заменять sidecar exporters во всех сценариях;
+- заменять application metric libraries.
+
+Он предлагает другую deployment model с собственным набором компромиссов.
+
+---
+[Границы проекта](project-scope.md)
+
+---
+[README раздела](README.md) | [Общий README документации](../README.md)

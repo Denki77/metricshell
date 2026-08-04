@@ -2,6 +2,8 @@
 
 [English version](../../docs/02-project/README.md)
 
+Раздел содержит документацию целей, scope, glossary и terminology проекта.
+
 ## Навигация
 
 - [Цели проекта](project-goals.md)

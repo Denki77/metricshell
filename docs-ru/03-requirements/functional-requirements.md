@@ -2,7 +2,7 @@
 
 [English version](../../docs/03-requirements/functional-requirements.md)
 
-> Статус: черновик для архитектурных исследований
+> Статус: принятые нормативные требования
 
 ## Назначение
 
@@ -153,8 +153,8 @@ completeness producer или добавлять не относящиеся к w
 
 ### FR-034 — Семантика неуспешного scrape
 
-HTTP errors, partial responses и health indicators ДОЛЖНЫ подчиняться одной документированной policy, выбранной
-в ходе архитектурного исследования.
+HTTP errors, partial responses и health indicators ДОЛЖНЫ подчиняться принятым спецификациям exposition, state machine
+и resource limits.
 
 ## Поведение конечных workloads
 
@@ -264,20 +264,14 @@ Lifecycle, transport, exposition и final-wait behavior ДОЛЖНЫ явно н
 
 ### FR-081 — Детерминированные defaults
 
-У каждого необязательного свойства ДОЛЖЕН быть документированный default. Defaults выбираются после архитектурного
-исследования и проверки.
+У каждого необязательного свойства ДОЛЖЕН быть документированный deterministic default в принятых спецификациях
+configuration и defaults.
 
 ### FR-082 — Валидация до запуска workload
 
 Невалидная или противоречивая configuration ДОЛЖНА отклоняться до запуска workload во всех случаях, где это возможно.
 
-## Открытые архитектурные решения
+## Нормативное закрытие
 
-- точные socket- и push-протоколы;
-- file format и механизм обнаружения изменений;
-- registry и concurrency model;
-- поддерживаемые exposition versions;
-- eligibility и identity scraper;
-- default durations и scrape counts;
-- namespace exit codes runtime;
-- HTTP framework и внутренняя структура packages.
+Публичные protocols, lifecycle, defaults, exit codes и observable schemas определены принятыми спецификациями и
+ADR-001…ADR-015. Внутренние frameworks и package structure остаются implementation choices.
