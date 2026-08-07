@@ -1,6 +1,6 @@
 # Functional Requirements
 
-> Status: Draft for architecture investigation
+> Status: Accepted normative requirements
 
 ## Purpose
 
@@ -123,7 +123,8 @@ Metrics failures MUST NOT corrupt workload execution. Strict failure behavior MA
 
 Once a metric-family name is accepted with a Prometheus metric type during one workload execution, the same name MUST
 NOT be accepted with a different type until the next workload execution. Omitting every series of the family removes
-its values from active state but MUST NOT clear this name-to-type binding. HELP, unit, label names, histogram boundaries,
+its values from active state but MUST NOT clear this name-to-type binding. HELP, unit, label names, histogram
+boundaries,
 and other metadata MUST be validated for internal consistency within each candidate but are not lifetime-bound by this
 requirement.
 
@@ -140,7 +141,8 @@ While the workload runs, a successful scrape MUST return one internally consiste
 ### FR-032 — Response scope
 
 A normal scrape MUST include all series from the active complete application snapshot that remain after explicitly
-configured filtering, plus required **MetricShell** self-metrics. The active snapshot is the zero-series initial snapshot
+configured filtering, plus required **MetricShell** self-metrics. The active snapshot is the zero-series initial
+snapshot
 or the last accepted snapshot. A scrape MUST NOT silently omit accepted application metrics for producer completeness
 reasons or add unrelated host-wide metrics.
 
@@ -150,8 +152,8 @@ Operators SHOULD be able to include or exclude metric families or prefixes.
 
 ### FR-034 — Failed scrape semantics
 
-HTTP errors, partial responses, and health indicators MUST follow one documented policy selected during architecture
-investigation.
+HTTP errors, partial responses, and health indicators MUST follow the accepted exposition, state-machine, and resource
+limit specifications.
 
 ## Finite workload behavior
 
@@ -255,20 +257,14 @@ Lifecycle, transport, exposure, and final-wait behavior MUST be explicitly confi
 
 ### FR-081 — Deterministic defaults
 
-Every optional property MUST have a documented default. Defaults are selected after architecture investigation and
-validation.
+Every optional property MUST have a documented deterministic default in the accepted configuration and defaults
+specifications.
 
 ### FR-082 — Validate before workload start
 
 Invalid or contradictory configuration MUST be rejected before starting the workload whenever possible.
 
-## Open architecture decisions
+## Normative closure
 
-- exact socket and push protocols;
-- file format and change detection;
-- registry and concurrency model;
-- supported exposition versions;
-- scraper eligibility and identity;
-- default durations and scrape counts;
-- runtime exit-code namespace;
-- HTTP framework and internal package structure.
+Public protocols, lifecycle, defaults, exit codes, and observable schemas are defined by accepted specifications and
+ADR-001 through ADR-015. Internal frameworks and package structure remain implementation choices.

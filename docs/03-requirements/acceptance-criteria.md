@@ -1,6 +1,6 @@
 # Acceptance Criteria
 
-> Status: Draft for architecture investigation
+> Status: Accepted normative acceptance criteria
 
 ## Traceability
 

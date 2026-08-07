@@ -1,308 +1,164 @@
-# Runtime State Machine
+# Runtime State Machine Specification
 
-> Status: Non-normative lifecycle hypothesis
-> Purpose: Input for architecture investigation
+[Russian version](../../docs-ru/04-specification/runtime-state-machine.md)
 
-## Purpose
+> Status: Accepted normative specification
+> Requirements: FR-001–FR-006, FR-040–FR-050
+> Acceptance criteria: AC-RUN-001–AC-RUN-009, AC-FIN-001–AC-FIN-015
+> Decisions: ADR-001, ADR-002, ADR-003, ADR-011
 
-This document defines the observable lifecycle of MetricShell as a state machine.
+## Scope
 
-It describes:
-
-- runtime states;
-- external events;
-- valid transitions;
-- required outcomes;
-- terminal conditions.
-
-It does not prescribe:
-
-- internal package structure;
-- implementation language;
-- concurrency model;
-- storage technology;
-- process supervisor library;
-- transport implementation;
-- HTTP framework.
-
-The states and transitions in this document are provisional.
-Architecture investigation may merge, split, rename, or remove states while preserving approved functional requirements and acceptance criteria.
-
-## State Model
-
-```mermaid
-stateDiagram-v2
-    [*] --> Initializing
-    Initializing --> StartingWorkload: configuration valid
-    Initializing --> Failed: initialization error
-    StartingWorkload --> Running: workload started
-    StartingWorkload --> Failed: workload start failed
-    Running --> Finalizing: workload exited
-    Running --> Stopping: termination signal received
-    Running --> Failed: runtime failure
-    Stopping --> Finalizing: workload exited
-    Stopping --> ForcedTermination: shutdown deadline exceeded
-    Finalizing --> ImmediateExit: strategy = immediate
-    Finalizing --> DelayWait: strategy = delay
-    Finalizing --> ScrapeWait: strategy = wait-for-scrape
-    Finalizing --> ScrapeWait: strategy = wait-for-n-scrapes
-    Finalizing --> StrategyResolved: strategy = auto
-    StrategyResolved --> ImmediateExit
-    StrategyResolved --> DelayWait
-    StrategyResolved --> ScrapeWait
-    DelayWait --> Terminated: delay elapsed
-    DelayWait --> Terminated: termination signal received
-    ScrapeWait --> Terminated: required final scrapes observed
-    ScrapeWait --> Terminated: wait timeout elapsed
-    ScrapeWait --> Terminated: termination signal received
-    ImmediateExit --> Terminated
-    Failed --> Terminated
-    ForcedTermination --> Terminated
-    Terminated --> [*]
-```
+This specification is the single normative lifecycle model for MetricShell Core. State names are the exact values used
+by
+the runtime-state self-metric and structured logs. Implementations may use additional private substates, but they must
+not expose another public state vocabulary.
 
 ## States
 
-### Initializing
+The closed public state set is:
 
-The runtime validates configuration and prepares required resources.
+~~~text
+initializing
+starting_workload
+running
+stopping
+finalizing
+final_wait
+failed
+terminated
+~~~
 
-Observable requirements:
+| State             | Meaning                                                                                                  | Readiness   |
+|-------------------|----------------------------------------------------------------------------------------------------------|-------------|
+| initializing      | Validate all configuration and bind required resources before workload start.                            | not ready   |
+| starting_workload | Attempt exactly one workload start.                                                                      | not ready   |
+| running           | Workload is active; ingestion and exposition are available.                                              | ready       |
+| stopping          | External termination is active; forward the signal and perform bounded workload cleanup.                 | not ready   |
+| finalizing        | Capture the workload result, close ingestion, resolve in-flight ordering, and freeze the final snapshot. | not ready   |
+| final_wait        | Serve the frozen snapshot under the configured natural-completion wait policy.                           | not ready   |
+| failed            | An unrecoverable MetricShell-owned failure is recorded; bounded cleanup remains.                         | not ready   |
+| terminated        | No endpoint or child owned by MetricShell remains; the process exits exactly once.                       | unavailable |
 
-- no workload process has started;
-- `/metrics` may be unavailable or expose runtime-only initialization metrics;
-- invalid configuration must terminate deterministically.
-
-### StartingWorkload
-
-The runtime attempts to start the configured workload.
-
-Observable requirements:
-
-- startup failure must be distinguishable from workload failure;
-- no successful workload exit code exists yet;
-- startup timeout, when configured, must be bounded.
-
-### Running
-
-The workload is active.
-
-Observable requirements:
-
-- application metrics are accepted through enabled ingestion interfaces;
-- `/metrics` exposes the current observable metric state;
-- termination signals are forwarded according to runtime policy;
-- the runtime tracks workload completion.
-
-### Stopping
-
-The runtime has received a termination request while the workload is still active.
-
-Observable requirements:
-
-- the workload receives the configured termination signal;
-- the runtime waits only until the configured shutdown deadline;
-- forced termination may occur after the deadline;
-- final scrape waiting must not override an external termination request.
-
-### Finalizing
-
-The workload has stopped and the runtime prepares its terminal metric state.
-
-Observable requirements:
-
-- the workload exit result is captured;
-- the last accepted metric state is finalized;
-- the final snapshot generation is established;
-- no shutdown strategy has completed yet.
-
-### StrategyResolved
-
-The runtime resolves an automatic strategy into one explicit shutdown strategy.
-
-Observable requirements:
-
-- the selected strategy is visible through logs and runtime metrics;
-- the same input conditions must produce deterministic behavior;
-- automatic resolution must not introduce unbounded waiting.
-
-### ImmediateExit
-
-The runtime performs no post-workload waiting.
-
-Observable requirements:
-
-- the runtime exits as soon as finalization is complete;
-- the workload exit result is preserved.
-
-### DelayWait
-
-The final metrics endpoint remains available for a configured duration.
-
-Observable requirements:
-
-- the delay is bounded;
-- the final snapshot remains stable;
-- additional scrapes do not extend the delay unless explicitly configured;
-- external termination may end the wait early.
-
-### ScrapeWait
-
-The final metrics endpoint remains available until either:
-
-- the required number of eligible final snapshot scrapes is observed; or
-- the configured timeout expires; or
-- an external termination request ends the wait.
-
-Observable requirements:
-
-- only scrapes serving the final snapshot generation count;
-- repeated requests may count separately according to policy;
-- unrelated health requests must not count;
-- waiting must always have a timeout.
-
-### Failed
-
-The runtime cannot continue because of an internal or initialization failure.
-
-Observable requirements:
-
-- failure must be logged;
-- runtime failure must not be represented as successful workload completion;
-- exit behavior must be deterministic.
-
-### ForcedTermination
-
-The workload did not stop before the shutdown deadline.
-
-Observable requirements:
-
-- forced termination is recorded;
-- the final runtime exit status must reflect forced termination policy;
-- the runtime must not continue waiting for final scrapes.
-
-### Terminated
-
-The runtime has completed all shutdown work.
-
-Observable requirements:
-
-- no further metrics requests are served;
-- the final process exit status is emitted;
-- child processes are not left running.
+A workload exit is an event, not a persistent state. Forced termination is an action and outcome inside stopping, not a
+public state. The duration and scrape-count policies share final_wait; immediate mode bypasses it.
 
 ## Events
 
-| Event                       | Meaning                                           |
-|-----------------------------|---------------------------------------------------|
-| `ConfigurationValidated`    | Runtime configuration is valid.                   |
-| `InitializationFailed`      | Required runtime initialization failed.           |
-| `WorkloadStarted`           | Child workload process started successfully.      |
-| `WorkloadStartFailed`       | Child workload process could not be started.      |
-| `WorkloadExited`            | Workload terminated with an exit result.          |
-| `TerminationRequested`      | Runtime received an external stop request.        |
-| `ShutdownDeadlineExceeded`  | Workload did not terminate before deadline.       |
-| `FinalSnapshotCreated`      | Final metric generation became immutable.         |
-| `DelayElapsed`              | Configured post-exit delay expired.               |
-| `EligibleScrapeObserved`    | Final snapshot was served to an eligible scraper. |
-| `RequiredScrapesObserved`   | Configured scrape threshold was reached.          |
-| `FinalScrapeTimeoutElapsed` | Scrape waiting timeout expired.                   |
-| `RuntimeFailure`            | Internal unrecoverable runtime error occurred.    |
+The closed lifecycle event set is:
 
-## Transition Rules
+| Event                   | Valid source                                                     | Result                                  |
+|-------------------------|------------------------------------------------------------------|-----------------------------------------|
+| configuration_validated | initializing                                                     | starting_workload                       |
+| initialization_failed   | initializing                                                     | failed                                  |
+| workload_started        | starting_workload                                                | running                                 |
+| workload_start_failed   | starting_workload                                                | failed                                  |
+| workload_exited         | running, stopping                                                | finalizing                              |
+| termination_requested   | initializing, starting_workload, running, finalizing, final_wait | stopping or terminated as defined below |
+| runtime_failed          | any non-terminal state                                           | failed                                  |
+| finalization_completed  | finalizing                                                       | final_wait or terminated                |
+| final_wait_completed    | final_wait                                                       | terminated                              |
+| cleanup_completed       | failed                                                           | terminated                              |
 
-1. The runtime must not enter `Running` before the workload starts successfully.
-2. The runtime must not enter a post-workload waiting state before the workload exits.
-3. A final snapshot must be established before a final scrape can count.
-4. External termination always has precedence over final scrape waiting.
-5. No waiting state may be unbounded.
-6. The runtime must terminate exactly once.
-7. The workload exit result must be preserved unless runtime failure or forced termination policy explicitly overrides
-   it.
-8. The runtime must not return to `Running` after the workload exits.
-9. Final metrics must remain immutable during `DelayWait` and `ScrapeWait`.
-10. Health and readiness requests must not be treated as final metric scrapes.
+Repeated termination signals do not create a new state. They may shorten the remaining grace or trigger immediate forced
+cleanup according to shutdown policy and must be logged.
 
-## Final Scrape Counting
+## Normative transitions
 
-A scrape may count toward shutdown only when all configured eligibility conditions are satisfied.
+~~~mermaid
+stateDiagram-v2
+    [*] --> initializing
+    initializing --> starting_workload: configuration_validated
+    initializing --> failed: initialization_failed
+    initializing --> terminated: termination_requested
+    starting_workload --> running: workload_started
+    starting_workload --> failed: workload_start_failed
+    starting_workload --> stopping: termination_requested after spawn
+    starting_workload --> terminated: termination_requested before spawn
+    running --> finalizing: workload_exited
+    running --> stopping: termination_requested
+    running --> failed: runtime_failed
+    stopping --> finalizing: workload_exited after bounded cleanup
+    stopping --> failed: runtime_failed
+    finalizing --> final_wait: natural completion and mode duration or scrapes
+    finalizing --> terminated: natural completion and mode immediate
+    finalizing --> terminated: external termination already active
+    finalizing --> terminated: termination_requested
+    finalizing --> failed: runtime_failed
+    final_wait --> terminated: duration elapsed, required scrapes, or timeout
+    final_wait --> terminated: termination_requested
+    final_wait --> failed: runtime_failed
+    failed --> terminated: cleanup_completed
+    terminated --> [*]
+~~~
 
-Minimum conditions:
+No transition may return to running after workload_exited. Invalid transitions are internal failures.
 
-- the request targets the metrics endpoint;
-- the response contains the final snapshot generation;
-- the response completes successfully;
-- the request occurs after finalization.
+## Final-wait rules
 
-Optional conditions may include:
+The accepted modes are immediate, duration, and scrapes. There is no auto mode.
 
-- authentication;
-- source allowlist;
-- required request header;
-- unique scraper identity;
-- minimum interval between counted scrapes.
+- immediate transitions from finalizing directly to terminated;
+- duration enters final_wait until the configured duration expires;
+- scrapes enters final_wait until the saturating count reaches positive N or the finite timeout expires;
+- only a successful complete response for the frozen generation, completed after final_wait begins, is eligible;
+- health, readiness, debug, cancelled, failed, pre-final, and ineligible responses never count;
+- after N is reached, completion grace drains only handlers already accepted and cannot increase N;
+- external termination ends final_wait immediately and has precedence over its normal completion conditions.
 
-The state machine does not require a specific eligibility implementation.
+## Ingestion ordering at workload exit
 
-## Exit Result Rules
+The transition to finalizing closes admission first. A candidate admitted before closure may finish within the remaining
+finalization budget. If accepted, it becomes the final generation; otherwise the preceding last-valid snapshot is
+frozen.
+Candidates not admitted before closure receive frozen.
 
-The terminal result is derived from the following precedence:
+## Probe and endpoint semantics
 
-1. unrecoverable runtime failure;
-2. forced workload termination;
-3. workload exit result;
-4. successful runtime completion.
+| State             |                                 health |   readiness | metrics                            |
+|-------------------|---------------------------------------:|------------:|------------------------------------|
+| initializing      | 200 while bounded progress is possible |         503 | unavailable until bound            |
+| starting_workload |                                    200 |         503 | available after bind               |
+| running           |                                    200 |         200 | available                          |
+| stopping          |  200 while bounded cleanup is possible |         503 | available while server is open     |
+| finalizing        |                                    200 |         503 | frozen view available after freeze |
+| final_wait        |                                    200 |         503 | frozen view available              |
+| failed            |                                    500 |         503 | best effort until drain starts     |
+| terminated        |                            unavailable | unavailable | unavailable                        |
 
-A successful scrape must never convert a failed workload result into success.
+Probe requests never count as final scrapes. Readiness is intentionally false outside running.
 
-A final scrape timeout must not by itself change the workload exit result unless explicitly configured.
+## Termination precedence and process result
 
-## External Termination During Final Wait
+When conditions compete, MetricShell resolves them in this order:
 
-When an external termination request is received in `DelayWait` or `ScrapeWait`:
+1. unrecoverable MetricShell internal failure;
+2. external termination and forced-cleanup policy;
+3. preserved workload result;
+4. normal final-wait completion.
 
-1. the runtime stops waiting;
-2. the final snapshot may remain available only for a bounded shutdown grace period;
-3. the runtime terminates before the environment's external deadline;
-4. the original workload exit result is preserved where possible.
+A final-wait timeout is a normal bounded completion reason and does not replace the workload result. Forced cleanup is
+recorded independently; it changes the result only when the workload had not already produced a result. The permanent
+MetricShell-owned exit-code registry is defined by the configuration specification.
 
-## Invariants
+## Observability mapping
 
-The implementation must maintain the following invariants:
+Every transition emits exactly one state-change log after the new state becomes effective. The
+metricshell_runtime_state metric uses exactly the state values in this document. final_wait mode and completion reason
+use the closed enums in the self-metrics specification. Structured logs use the same state, mode, outcome, and reason
+registries.
 
-- one active workload process group at most;
-- one final snapshot generation at most;
-- one terminal transition;
-- no indefinite wait;
-- no silent exit-code substitution;
-- no mutable final snapshot;
-- no counted scrape before finalization.
+## Conformance
 
-## Non-normative Implementation Notes
+Table-driven tests must cover every valid and invalid transition, concurrent workload-exit/signal/publication races,
+probe responses in every state, all final-wait terminal conditions, repeated signals, forced cleanup, exactly one
+terminated transition, and race-detector execution.
 
-The state machine may be implemented using:
+## References
 
-- an explicit event loop;
-- channels;
-- actor-style message processing;
-- synchronized state transitions;
-- another concurrency model.
-
-The chosen implementation must not change the observable behavior defined in this document.
-
-## Open Questions
-
-The following items remain intentionally unresolved:
-
-- whether multiple workload restarts are ever supported;
-- exact scraper eligibility rules;
-- whether automatic strategy resolution is retained;
-- whether final scrape counting is global or scraper-specific;
-- how runtime failure exit codes are assigned;
-- whether forced termination preserves or replaces the workload exit code.
-
----
-[Behavioral Model](behavioral-model-draft.md)
-
----
-[Readme](README.md) | [Documentation Readme](../README.md)
+- [Configuration Specification](configuration.md)
+- [Self-Metrics Specification](self-metrics.md)
+- [Structured Logging Specification](structured-logging.md)
+- [ADR-002](../06-architecture/adr/ADR-002.md)
+- [ADR-003](../06-architecture/adr/ADR-003.md)
+- [ADR-011](../06-architecture/adr/ADR-011.md)

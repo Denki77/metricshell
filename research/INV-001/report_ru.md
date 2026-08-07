@@ -152,7 +152,7 @@ docker run --rm --init metricshell-inv001:prototype --http=:9090 --subreaper -- 
 ## Допустимые значения и политики
 
 - MetricShell по умолчанию работает как PID 1.
-- Запускается ровно один workload как direct child.
+- Запускается только один workload как direct child.
 - Process group создаётся при необходимости group-wide signal delivery.
 - TERM/INT/HUP/QUIT пересылаются group или direct child PID.
 - Для non-cooperative workload обязателен bounded force-kill fallback.

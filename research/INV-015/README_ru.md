@@ -19,13 +19,13 @@ final/abort/timeout, malformed/bind/queue/OOM и Ubuntu repeat.
 
 ## Подтверждённый результат
 
-В обеих средах пройдено 23/23 assertions с одинаковым fingerprint. Для каждого in-container shape выполнено 10
-iterations. 100 concurrent publications оставили ровно 100
-series одного generation. HTTP body вырос с 5 120 B при 100 до 5 677 820 B при 100k; host scrape — с 20.927 до 73.183
-ms. Encode 100k p50/p95 42.053/43.892 ms.
+В обеих средах пройдено 23/23 assertions с одинаковым fingerprint.
+Для каждого in-container shape выполнено 10 iterations.
+100 concurrent publications оставили только 100 series одного generation.
+HTTP body вырос с 5120B при 100 до 5677820B при 100k; host scrape — с 20.927 до 73.183ms. Encode 100k p50/p95 42.053/43.892 ms.
 
-File detection p50: polling 1.311 ms, inotify 54.541 µs, hybrid 36.167 µs. External 10 scrapes — 321.664 ms. Drain
-in-flight 800 ms завершился за 1.364 s. Final/abort/timeout и все failure profiles прошли.
+File detection p50: polling 1.311 ms, inotify 54.541µs, hybrid 36.167 µs. External 10 scrapes — 321.664 ms.
+Drain in-flight 800 ms завершился за 1.364 s. Final/abort/timeout и все failure profiles прошли.
 
 ## Итоговая интерпретация
 

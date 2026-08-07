@@ -1,11 +1,11 @@
 # Non-functional Requirements
 
-> Status: Draft for architecture investigation
+> Status: Accepted normative requirements
 
 ## Purpose
 
-This document defines quality attributes and measurable engineering expectations. Final numeric targets are established
-by prototypes and benchmarks; `TBD` marks values the architecture investigation must resolve.
+This document defines accepted quality attributes and measurable engineering expectations. Numeric performance
+thresholds are versioned release-certification gates under ADR-015 and do not reopen Core correctness semantics.
 
 ## Reliability
 
@@ -39,17 +39,18 @@ a combination.
 ### NFR-PERF-001 — Startup overhead
 
 Startup overhead excluding workload startup MUST be benchmarked on a documented reference environment.
-> Stable-release target: `TBD`.
+> The stable-release threshold is established by the controlled benchmark suite before release certification.
 
 ### NFR-PERF-002 — Ingestion performance
 
 Each transport MUST have documented sustained throughput and latency for low, moderate, and high update rates.
-> Targets: `TBD`.
+> Release thresholds are established by the controlled benchmark suite before release certification.
 
 ### NFR-PERF-003 — Scrape latency
 
 For a registry within supported limits, scrape latency MUST remain materially below Prometheus's normal scrape timeout.
-> Exact registry size and latency target: `TBD`.
+> The reference snapshot size and latency threshold are established by the controlled benchmark suite before release
+> certification.
 
 ### NFR-PERF-004 — Resource overhead
 
@@ -129,7 +130,8 @@ Oversized payloads, excessive connections, series, labels, and slow clients MUST
 
 ### NFR-SEC-005 — Secret safety
 
-**MetricShell** MUST NOT intentionally expose environment variables, arguments, credentials, or file contents as labels or
+**MetricShell** MUST NOT intentionally expose environment variables, arguments, credentials, or file contents as labels
+or
 normal logs.
 
 ### NFR-SEC-006 — Configurable HTTP binding

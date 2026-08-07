@@ -2,7 +2,8 @@
 
 [English version](../docs/README.md)
 
-Этот каталог содержит русскую версию документации MetricShell.
+Этот каталог содержит полноценную русскую версию документации MetricShell. Русская и английская версии равноправны и
+должны обновляться синхронно.
 
 ## Навигация
 
@@ -12,7 +13,5 @@
 - [Спецификация](04-specification/README.md)
 - [Архитектурные исследования](05-architecture-investigation/architecture-investigation.md)
 - [Архитектурные решения](06-architecture/adr/README.md)
-
-## Правило синхронизации
-
-Английская документация остаётся основной до тех пор, пока проект явно не изменит это правило.
+- [Завершение архитектурных изысканий до уровня CORE](06-architecture/CORE_COMPLETION.md)
+- [Delivery plans, epics и issues](07-delivery/README.md)

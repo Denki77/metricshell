@@ -121,7 +121,7 @@ workload завершён либо начато termination
 
 ### Варианты политики
 
-- ровно одно выполнение workload;
+- только одно выполнение workload;
 - необязательный restart workload;
 - делегирование restart container runtime/orchestrator.
 

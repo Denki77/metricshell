@@ -1,312 +1,162 @@
-# Машина состояний среды выполнения
+# Спецификация runtime state machine
 
 [English version](../../docs/04-specification/runtime-state-machine.md)
 
-> Статус: ненормативная гипотеза о жизненном цикле
-> Назначение: входные данные для архитектурного исследования
+> Статус: принятая нормативная спецификация
+> Требования: FR-001–FR-006, FR-040–FR-050
+> Критерии приёмки: AC-RUN-001–AC-RUN-009, AC-FIN-001–AC-FIN-015
+> Решения: ADR-001, ADR-002, ADR-003, ADR-011
 
-## Назначение
+## Scope
 
-Этот документ определяет наблюдаемый жизненный цикл MetricShell в виде машины состояний.
-
-Он описывает:
-
-- состояния среды выполнения;
-- внешние события;
-- допустимые переходы;
-- требуемые результаты;
-- терминальные условия.
-
-Он не предписывает:
-
-- внутреннюю структуру пакетов;
-- язык реализации;
-- модель конкурентного выполнения;
-- технологию хранения;
-- библиотеку управления процессами;
-- реализацию транспорта;
-- HTTP-фреймворк.
-
-Состояния и переходы в этом документе предварительные. По результатам архитектурного исследования состояния могут быть
-объединены, разделены, переименованы или удалены при условии сохранения утверждённых функциональных требований и
-критериев приёмки.
-
-## Модель состояний
-
-```mermaid
-stateDiagram-v2
-    [*] --> Initializing
-    Initializing --> StartingWorkload: конфигурация корректна
-    Initializing --> Failed: ошибка инициализации
-    StartingWorkload --> Running: workload запущена
-    StartingWorkload --> Failed: не удалось запустить workload
-    Running --> Finalizing: workload завершилась
-    Running --> Stopping: получен сигнал завершения
-    Running --> Failed: сбой среды выполнения
-    Stopping --> Finalizing: workload завершилась
-    Stopping --> ForcedTermination: превышен срок завершения
-    Finalizing --> ImmediateExit: strategy = immediate
-    Finalizing --> DelayWait: strategy = delay
-    Finalizing --> ScrapeWait: strategy = wait-for-scrape
-    Finalizing --> ScrapeWait: strategy = wait-for-n-scrapes
-    Finalizing --> StrategyResolved: strategy = auto
-    StrategyResolved --> ImmediateExit
-    StrategyResolved --> DelayWait
-    StrategyResolved --> ScrapeWait
-    DelayWait --> Terminated: задержка истекла
-    DelayWait --> Terminated: получен сигнал завершения
-    ScrapeWait --> Terminated: выполнены требуемые финальные scrape-запросы
-    ScrapeWait --> Terminated: истекло время ожидания
-    ScrapeWait --> Terminated: получен сигнал завершения
-    ImmediateExit --> Terminated
-    Failed --> Terminated
-    ForcedTermination --> Terminated
-    Terminated --> [*]
-```
+Это единая нормативная lifecycle model MetricShell Core. Имена состояний являются точными значениями self-metric
+runtime state и structured logs. Реализация может иметь приватные substates, но не может экспонировать другой публичный
+набор состояний.
 
 ## Состояния
 
-### Initializing
+Закрытый публичный набор:
 
-Runtime проверяет конфигурацию и подготавливает необходимые ресурсы.
+~~~text
+initializing
+starting_workload
+running
+stopping
+finalizing
+final_wait
+failed
+terminated
+~~~
 
-Наблюдаемые требования:
+| Состояние         | Значение                                                                                                 | Readiness   |
+|-------------------|----------------------------------------------------------------------------------------------------------|-------------|
+| initializing      | Валидация всей configuration и bind обязательных ресурсов до запуска workload.                           | not ready   |
+| starting_workload | Только одна попытка запуска workload.                                                                    | not ready   |
+| running           | Workload активен; ingestion и exposition доступны.                                                       | ready       |
+| stopping          | Идёт external termination; сигнал передан и выполняется bounded cleanup workload.                        | not ready   |
+| finalizing        | Фиксация результата workload, закрытие ingestion, разрешение in-flight ordering и freeze final snapshot. | not ready   |
+| final_wait        | Frozen snapshot обслуживается по policy естественного завершения.                                        | not ready   |
+| failed            | Зафиксирован невосстановимый сбой MetricShell; остаётся bounded cleanup.                                 | not ready   |
+| terminated        | Не осталось endpoints и children под владением MetricShell; процесс завершается только один раз.         | unavailable |
 
-- процесс workload ещё не запущен;
-- `/metrics` может быть недоступна либо публиковать только метрики инициализации среды выполнения;
-- некорректная конфигурация должна приводить к детерминированному завершению.
-
-### StartingWorkload
-
-Runtime пытается запустить настроенную workload.
-
-Наблюдаемые требования:
-
-- ошибку запуска необходимо отличать от сбоя workload;
-- успешного кода завершения workload ещё не существует;
-- время ожидания запуска, если оно настроено, должно быть ограничено.
-
-### Running
-
-Workload активна.
-
-Наблюдаемые требования:
-
-- метрики приложения принимаются через включённые интерфейсы приёма;
-- `/metrics` публикует текущее наблюдаемое состояние метрик;
-- сигналы завершения пересылаются согласно политике среды выполнения;
-- runtime отслеживает завершение workload.
-
-### Stopping
-
-Runtime получила запрос на завершение, пока workload ещё активна.
-
-Наблюдаемые требования:
-
-- workload получает настроенный сигнал завершения;
-- runtime ожидает лишь до настроенного предельного срока завершения;
-- после истечения срока допускается принудительное завершение;
-- ожидание финального scrape-запроса не должно отменять внешний запрос на завершение.
-
-### Finalizing
-
-Workload остановлена, и runtime подготавливает терминальное состояние метрик.
-
-Наблюдаемые требования:
-
-- результат завершения workload зафиксирован;
-- последнее принятое состояние метрик финализировано;
-- поколение финального снимка установлено;
-- ни одна стратегия завершения ещё не выполнена.
-
-### StrategyResolved
-
-Runtime преобразует автоматическую стратегию в одну явную стратегию завершения.
-
-Наблюдаемые требования:
-
-- выбранная стратегия видна в журналах и метриках среды выполнения;
-- одинаковые входные условия должны приводить к детерминированному поведению;
-- автоматический выбор не должен вносить неограниченное ожидание.
-
-### ImmediateExit
-
-Runtime не ожидает после завершения workload.
-
-Наблюдаемые требования:
-
-- runtime завершается сразу после финализации;
-- результат завершения workload сохраняется.
-
-### DelayWait
-
-Конечная точка финальных метрик остаётся доступной в течение настроенного времени.
-
-Наблюдаемые требования:
-
-- задержка ограничена;
-- финальный snapshot остаётся неизменным;
-- дополнительные scrape-запросы не продлевают задержку, если это явно не настроено;
-- внешний запрос на завершение может досрочно прекратить ожидание.
-
-### ScrapeWait
-
-Конечная точка финальных метрик остаётся доступной, пока не произойдёт одно из событий:
-
-- получено требуемое число допустимых scrape-запросов финального снимка;
-- истекло настроенное время ожидания;
-- внешний запрос на завершение прекратил ожидание.
-
-Наблюдаемые требования:
-
-- учитываются только scrape-запросы, обслуживающие поколение финального снимка;
-- повторные запросы могут учитываться отдельно согласно политике;
-- посторонние запросы проверки работоспособности не учитываются;
-- ожидание всегда должно иметь тайм-аут.
-
-### Failed
-
-Runtime не может продолжать работу из-за внутреннего сбоя или ошибки инициализации.
-
-Наблюдаемые требования:
-
-- сбой должен быть записан в журнал;
-- сбой среды выполнения нельзя представлять как успешное завершение workload;
-- поведение при завершении должно быть детерминированным.
-
-### ForcedTermination
-
-Workload не остановилась до предельного срока завершения.
-
-Наблюдаемые требования:
-
-- принудительное завершение фиксируется;
-- итоговый статус завершения среды выполнения должен соответствовать политике принудительного завершения;
-- runtime не должна продолжать ожидать финальные scrape-запросы.
-
-### Terminated
-
-Runtime завершила все действия по остановке.
-
-Наблюдаемые требования:
-
-- последующие запросы метрик не обслуживаются;
-- процесс возвращает итоговый статус завершения;
-- дочерние процессы не остаются работающими.
+Workload exit является событием, а не состоянием. Forced termination — действие и outcome внутри stopping, а не
+публичное состояние. Duration и scrape-count policies используют final_wait; immediate mode обходит его.
 
 ## События
 
-| Событие                     | Значение                                                          |
-|-----------------------------|-------------------------------------------------------------------|
-| `ConfigurationValidated`    | Конфигурация среды выполнения корректна.                          |
-| `InitializationFailed`      | Необходимая инициализация среды выполнения завершилась с ошибкой. |
-| `WorkloadStarted`           | Дочерний процесс workload успешно запущен.                        |
-| `WorkloadStartFailed`       | Дочерний процесс workload запустить не удалось.                   |
-| `WorkloadExited`            | Workload завершилась с некоторым результатом.                     |
-| `TerminationRequested`      | Runtime получила внешний запрос на остановку.                     |
-| `ShutdownDeadlineExceeded`  | Workload не завершилась до предельного срока.                     |
-| `FinalSnapshotCreated`      | Поколение финальных метрик стало неизменяемым.                    |
-| `DelayElapsed`              | Настроенная задержка после завершения истекла.                    |
-| `EligibleScrapeObserved`    | Финальный snapshot отдан допустимому сборщику.                    |
-| `RequiredScrapesObserved`   | Достигнуто настроенное пороговое число scrape-запросов.           |
-| `FinalScrapeTimeoutElapsed` | Истекло время ожидания scrape-запросов.                           |
-| `RuntimeFailure`            | Произошла неустранимая внутренняя ошибка среды выполнения.        |
+Закрытый lifecycle event set:
 
-## Правила переходов
+| Событие                 | Допустимый источник                                              | Результат                                |
+|-------------------------|------------------------------------------------------------------|------------------------------------------|
+| configuration_validated | initializing                                                     | starting_workload                        |
+| initialization_failed   | initializing                                                     | failed                                   |
+| workload_started        | starting_workload                                                | running                                  |
+| workload_start_failed   | starting_workload                                                | failed                                   |
+| workload_exited         | running, stopping                                                | finalizing                               |
+| termination_requested   | initializing, starting_workload, running, finalizing, final_wait | stopping или terminated по правилам ниже |
+| runtime_failed          | любое нетерминальное состояние                                   | failed                                   |
+| finalization_completed  | finalizing                                                       | final_wait или terminated                |
+| final_wait_completed    | final_wait                                                       | terminated                               |
+| cleanup_completed       | failed                                                           | terminated                               |
 
-1. Runtime не должна входить в `Running` до успешного запуска workload.
-2. Runtime не должна входить в состояние ожидания после завершения до остановки workload.
-3. Финальный snapshot должен быть создан до того, как можно учесть финальный scrape-запрос.
-4. Внешнее завершение всегда имеет приоритет над ожиданием финального scrape-запроса.
-5. Ни одно состояние ожидания не может быть неограниченным.
-6. Runtime должна завершиться ровно один раз.
-7. Результат завершения workload должен сохраняться, если политика сбоя среды выполнения или принудительного
-   завершения явно не переопределяет его.
-8. После завершения workload runtime не должна возвращаться в `Running`.
-9. Финальные метрики должны оставаться неизменными в `DelayWait` и `ScrapeWait`.
-10. Запросы проверки работоспособности и готовности нельзя считать финальными scrape-запросами метрик.
+Повторные termination signals не создают новое состояние. Они могут сократить remaining grace или запустить немедленный
+forced cleanup согласно shutdown policy и обязательно логируются.
 
-## Учёт финальных scrape-запросов
+## Нормативные переходы
 
-Scrape-запрос может учитываться при завершении работы, только если выполнены все настроенные условия допустимости.
+~~~mermaid
+stateDiagram-v2
+    [*] --> initializing
+    initializing --> starting_workload: configuration_validated
+    initializing --> failed: initialization_failed
+    initializing --> terminated: termination_requested
+    starting_workload --> running: workload_started
+    starting_workload --> failed: workload_start_failed
+    starting_workload --> stopping: termination_requested after spawn
+    starting_workload --> terminated: termination_requested before spawn
+    running --> finalizing: workload_exited
+    running --> stopping: termination_requested
+    running --> failed: runtime_failed
+    stopping --> finalizing: workload_exited after bounded cleanup
+    stopping --> failed: runtime_failed
+    finalizing --> final_wait: natural completion and mode duration or scrapes
+    finalizing --> terminated: natural completion and mode immediate
+    finalizing --> terminated: external termination already active
+    finalizing --> terminated: termination_requested
+    finalizing --> failed: runtime_failed
+    final_wait --> terminated: duration elapsed, required scrapes, or timeout
+    final_wait --> terminated: termination_requested
+    final_wait --> failed: runtime_failed
+    failed --> terminated: cleanup_completed
+    terminated --> [*]
+~~~
 
-Минимальные условия:
+После workload_exited переход в running запрещён. Недопустимый переход является internal failure.
 
-- запрос направлен к endpoint метрик;
-- ответ содержит поколение финального снимка;
-- ответ успешно передан полностью;
-- запрос поступил после финализации.
+## Правила final wait
 
-Дополнительные условия могут включать:
+Принятые modes: immediate, duration и scrapes. Mode auto отсутствует.
 
-- аутентификацию;
-- список разрешённых источников;
-- обязательный заголовок запроса;
-- уникальный идентификатор сборщика;
-- минимальный интервал между учитываемыми scrape-запросами.
+- immediate переводит finalizing непосредственно в terminated;
+- duration входит в final_wait до истечения configured duration;
+- scrapes входит в final_wait до достижения saturating counter положительного N или finite timeout;
+- eligible является только успешный полный response frozen generation, завершённый после входа в final_wait;
+- health, readiness, debug, cancelled, failed, pre-final и ineligible responses не считаются;
+- после достижения N completion grace drain-ит только уже принятые handlers и не увеличивает N;
+- external termination немедленно завершает final_wait и имеет приоритет над обычными условиями завершения.
 
-Машина состояний не требует конкретной реализации проверки допустимости.
+## Ingestion ordering при workload exit
 
-## Правила определения результата завершения
+Переход в finalizing сначала закрывает admission. Candidate, допущенный ранее, может завершиться в remaining
+finalization budget. При acceptance он становится final generation; иначе фиксируется предыдущий last-valid snapshot.
+Candidates, не допущенные до закрытия, получают frozen.
 
-Терминальный результат определяется согласно следующему порядку приоритета:
+## Probe и endpoint semantics
 
-1. неустранимый сбой среды выполнения;
-2. принудительное завершение workload;
-3. результат завершения workload;
-4. успешное завершение среды выполнения.
+| Состояние         |                             health |   readiness | metrics                      |
+|-------------------|-----------------------------------:|------------:|------------------------------|
+| initializing      | 200 пока возможен bounded progress |         503 | unavailable до bind          |
+| starting_workload |                                200 |         503 | available после bind         |
+| running           |                                200 |         200 | available                    |
+| stopping          |  200 пока возможен bounded cleanup |         503 | available пока server открыт |
+| finalizing        |                                200 |         503 | frozen view после freeze     |
+| final_wait        |                                200 |         503 | frozen view available        |
+| failed            |                                500 |         503 | best effort до начала drain  |
+| terminated        |                        unavailable | unavailable | unavailable                  |
 
-Успешный scrape-запрос никогда не должен превращать результат сбойной workload в успешный.
+Probe requests никогда не считаются final scrapes. Readiness намеренно false вне running.
 
-Само по себе истечение времени ожидания финального scrape-запроса не должно менять результат workload, если это
-явно не настроено.
+## Приоритет termination и process result
 
-## Внешнее завершение во время финального ожидания
+При конкурирующих условиях действует порядок:
 
-При получении внешнего запроса на завершение в `DelayWait` или `ScrapeWait`:
+1. невосстановимый internal failure MetricShell;
+2. external termination и forced-cleanup policy;
+3. сохранённый workload result;
+4. нормальное завершение final wait.
 
-1. runtime прекращает ожидание;
-2. финальный snapshot может оставаться доступным лишь в течение ограниченного периода корректного завершения;
-3. runtime завершается до внешнего предельного срока окружения;
-4. исходный результат завершения workload по возможности сохраняется.
+Final-wait timeout является нормальной bounded completion reason и не заменяет workload result. Forced cleanup
+фиксируется отдельно; он меняет результат только если workload ещё не дал результата. Постоянный registry собственных
+exit codes MetricShell определён в configuration specification.
 
-## Инварианты
+## Observability mapping
 
-Реализация должна поддерживать следующие инварианты:
+Каждый переход выпускает только один state-change log после активации нового состояния. Metric
+metricshell_runtime_state использует только значения из этого документа. Mode и completion reason final_wait используют
+закрытые enums спецификации self-metrics. Structured logs используют те же registries state, mode, outcome и reason.
 
-- не более одной активной группы процессов workload;
-- не более одного поколения финального снимка;
-- один терминальный переход;
-- отсутствие неограниченного ожидания;
-- отсутствие неявной подмены кода завершения;
-- неизменность финального снимка;
-- отсутствие учтённых scrape-запросов до финализации.
+## Conformance
 
-## Ненормативные замечания по реализации
+Table-driven tests покрывают каждый допустимый и недопустимый переход, concurrent races workload
+exit/signal/publication,
+probe responses во всех состояниях, все terminal conditions final_wait, повторные signals, forced cleanup, только один
+переход в terminated и запуск race detector.
 
-Машина состояний может быть реализована с помощью:
+## Ссылки
 
-- явного цикла обработки событий;
-- каналов;
-- обработки сообщений в стиле акторов;
-- синхронизированных переходов между состояниями;
-- другой модели конкурентного выполнения.
-
-Выбранная реализация не должна менять наблюдаемое поведение, определённое в этом документе.
-
-## Открытые вопросы
-
-Следующие вопросы намеренно оставлены нерешёнными:
-
-- будет ли когда-либо поддерживаться многократный перезапуск workload;
-- точные правила допустимости сборщика;
-- будет ли сохранён автоматический выбор стратегии;
-- учитываются ли финальные scrape-запросы глобально или отдельно для каждого сборщика;
-- как назначаются коды завершения при сбое среды выполнения;
-- сохраняет или заменяет код workload принудительное завершение.
-
----
-[Поведенческая модель](behavioral-model-draft.md)
-
----
-[README](README.md) | [README документации](../README.md)
+- [Спецификация configuration](configuration.md)
+- [Спецификация self-metrics](self-metrics.md)
+- [Спецификация structured logging](structured-logging.md)
+- [ADR-002](../06-architecture/adr/ADR-002.md)
+- [ADR-003](../06-architecture/adr/ADR-003.md)
+- [ADR-011](../06-architecture/adr/ADR-011.md)

@@ -20,13 +20,13 @@ MetricShell должен сохранять однозначность резу�
 
 ## Кандидаты
 
-1. Выполнить ровно один workload и вернуть его результат.
+1. Выполнить только один workload и вернуть его результат.
 2. Перезапускать workload внутри MetricShell.
 3. Выполнить workload один раз и передать retry Docker, Compose или Kubernetes.
 
 ## Исходная гипотеза
 
-MetricShell должен выполнять ровно один запуск workload. Restart policy должна оставаться вне MetricShell.
+MetricShell должен выполнять только один запуск workload. Restart policy должна оставаться вне MetricShell.
 
 ## Эксперименты
 
@@ -66,7 +66,7 @@ Signal-to-exit p50/p95/p99: `0.594/1.194/2.010 ms` на macOS и `1.767/2.137/2.
 
 ## Вывод
 
-Гипотеза подтверждена. MetricShell выполняет workload ровно один раз; retry count и backoff не входят в его
+Гипотеза подтверждена. MetricShell выполняет workload только один раз; retry count и backoff не входят в его
 configuration surface. Runtime restart создаёт новый metric-state epoch.
 
 Kubernetes оценён структурно: Pod `restartPolicy: OnFailure` перезапускает контейнер, а Job controller применяет
@@ -74,7 +74,7 @@ Kubernetes оценён структурно: Pod `restartPolicy: OnFailure` п�
 
 ## Допустимые значения lifecycle
 
-- executions workload на процесс MetricShell: ровно `1`;
+- executions workload на процесс MetricShell: только `1`;
 - internal retry count: `0`, production retry option отсутствует;
 - post-exit duration: `0` либо явное конечное значение; `2s` подтверждено функционально, но не является sizing
   recommendation;
@@ -137,4 +137,4 @@ post-exit `0,1,2,5,10,30s` и internal restart storms 10/100/1000 attempts.
 - Extended evidence: `results/20260721T200406Z-extended/`
 - Ubuntu evidence: `results/20260721T201256Z/`, `results/20260721T202227Z-extended/`
 - Подробный анализ: [report_ru.md](report_ru.md)
-- Вход для ADR: ровно один execution workload, внешнее владение restart, один metric-state epoch на execution.
+- Вход для ADR: только один execution workload, внешнее владение restart, один metric-state epoch на execution.
