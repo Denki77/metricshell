@@ -1,6 +1,8 @@
 .idea
 .DS_Store
 
+implementation/bin/
+
 research/INV*/latest-*results.txt
 
 research/INV*/results/*/*

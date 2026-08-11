@@ -10,7 +10,7 @@ MetricShell runs an arbitrary command as a managed child process and exposes app
 
 ## Current status
 
-Architecture and design phase.
+Core architecture is complete. Production implementation is in progress under [`implementation/`](implementation/README.md).
 
 ## Documentation
 
