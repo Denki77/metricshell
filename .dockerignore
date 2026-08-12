@@ -1,0 +1,8 @@
+**
+!VERSION
+!implementation/
+!implementation/go.mod
+!implementation/cmd/
+!implementation/cmd/**
+!implementation/internal/
+!implementation/internal/**
