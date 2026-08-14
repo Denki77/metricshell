@@ -14,7 +14,7 @@ func TestRunVersion(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	identity := buildinfo.Info{Version: "1.2.3", Revision: "0123456"}
-	code := Run([]string{"--version"}, &stdout, &stderr, identity, time.Now)
+	code := Run([]string{"--version"}, nil, &stdout, &stderr, identity, time.Now)
 
 	if code != 0 {
 		t.Fatalf("Run() code = %d, want 0", code)
@@ -31,7 +31,7 @@ func TestRunHelp(t *testing.T) {
 	t.Parallel()
 
 	var stdout, stderr bytes.Buffer
-	code := Run([]string{"--help"}, &stdout, &stderr, buildinfo.Info{}, time.Now)
+	code := Run([]string{"--help"}, nil, &stdout, &stderr, buildinfo.Info{}, time.Now)
 	if code != 0 || stdout.String() != usage || stderr.Len() != 0 {
 		t.Fatalf("Run(--help) = code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
@@ -42,7 +42,7 @@ func TestRunRejectsInvalidStartupConfiguration(t *testing.T) {
 
 	var stdout, stderr bytes.Buffer
 	now := time.Date(2026, 8, 11, 10, 30, 0, 123, time.FixedZone("test", 3*60*60))
-	code := Run(nil, &stdout, &stderr, buildinfo.Info{}, func() time.Time { return now })
+	code := Run(nil, nil, &stdout, &stderr, buildinfo.Info{}, func() time.Time { return now })
 
 	if code != 64 {
 		t.Fatalf("Run() code = %d, want 64", code)

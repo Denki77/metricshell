@@ -5,8 +5,9 @@
 
 ## Текущий объём
 
-ISSUE-001 создаёт production-структуру пакетов, `cmd/metricshell`, build identity, bootstrap ошибки
-конфигурации, тесты, статические Linux-сборки и CI в Docker. Запуск workload и поведение PID 1 начинаются в ISSUE-002.
+ISSUE-002 добавляет контракт entrypoint PID 1, обязательный разделитель workload `--`, точную передачу argv, запуск
+одного direct child, классификацию pre-start failure и немедленную передачу результата workload. Process groups,
+signal forwarding, descendant reaping и post-exit lifecycle остаются в последующих задачах.
 
 ## Требования
 
@@ -27,9 +28,17 @@ make ci
 make build PLATFORM=linux/amd64 IMAGE=metricshell
 ```
 
-Makefile только вызывает Docker targets; Dockerfile напрямую запускает formatting, vet, tests, dependency-boundary
-проверки, version smoke и статические Linux-сборки для amd64/arm64. Dockerfile не зависит от Make;
-host-команды Go и вспомогательные shell orchestration scripts не используются.
+Makefile только вызывает Docker targets; `make ci` запускает build/unit checks и real-container acceptance fixtures.
+Dockerfile не зависит от Make; host-команды Go и вспомогательные shell orchestration scripts не используются.
+
+Запуск workload без shell interpretation:
+
+```sh
+docker run --rm metricshell:local -- /path/to/workload "argument with spaces"
+```
+
+Каждый token после первого standalone `--` передаётся напрямую как workload argv. Для shell behavior надо явно
+запустить shell, например `-- /bin/sh -c 'command'`.
 
 ## Build identity
 
@@ -49,6 +58,8 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/diagnostic`: структурированные startup diagnostics.
+- `internal/workload`: запуск одного direct-child workload и немедленное отображение результата.
+- `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
 - `../VERSION`: общая версия проекта на уровне репозитория.
 

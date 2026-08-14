@@ -38,6 +38,20 @@ RUN version="$(cat /project/VERSION)" && \
       -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
       -o /out/metricshell ./cmd/metricshell
 
+FROM source AS integration-build
+ARG REVISION=unknown
+RUN version="$(cat /project/VERSION)" && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
+      -o /out/metricshell ./cmd/metricshell && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/workload-fixture ./internal/testfixture/workload
+
+FROM scratch AS integration
+COPY --from=integration-build /out/metricshell /metricshell
+COPY --from=integration-build /out/workload-fixture /workload-fixture
+ENTRYPOINT ["/metricshell"]
+
 FROM scratch AS runtime
 COPY --from=build /out/metricshell /metricshell
 ENTRYPOINT ["/metricshell"]
