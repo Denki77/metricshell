@@ -1,16 +1,33 @@
 package config
 
-import "errors"
-
-const (
-	ExitConfigurationInvalid = 64
-	ErrorCodeConfigInvalid   = "CONFIG_INVALID"
-	ReasonConfiguration      = "configuration"
+import (
+	err "github.com/Denki77/metricshell/implementation/internal/error"
 )
 
-var ErrStartupConfiguration = errors.New("a workload command after -- is required; workload execution is introduced by ISSUE-002")
+const (
+	ErrorCodeConfigInvalid = "CONFIG_INVALID"
+	ReasonConfiguration    = "configuration"
+)
 
-// ValidateBootstrap is deliberately limited to the startup surface owned by ISSUE-001.
-func ValidateBootstrap([]string) error {
-	return ErrStartupConfiguration
+type Config struct {
+	Workload []string
+}
+
+func Parse(args []string) (Config, error) {
+	for index, argument := range args {
+		if argument != "--" {
+			continue
+		}
+		if index == 0 && len(args) > 1 {
+			return Config{Workload: args[1:]}, nil
+		}
+		if index == 0 {
+			return Config{}, err.Bootstrap.CommandRequired
+		}
+		return Config{}, err.Bootstrap.UnknownOption
+	}
+	if len(args) == 0 {
+		return Config{}, err.Bootstrap.SeparatorRequired
+	}
+	return Config{}, err.Bootstrap.UnknownOption
 }

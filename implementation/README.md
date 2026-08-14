@@ -5,8 +5,9 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-001 provides the production package layout, `cmd/metricshell`, build identity, configuration-error
-bootstrap, tests, static Linux builds, and Docker-based CI. Workload execution and PID 1 behavior begin in ISSUE-002.
+ISSUE-002 adds the PID 1 entrypoint contract, mandatory `--` workload separator, exact argv forwarding, direct-child
+execution, pre-start failure classification, and immediate workload-result propagation. Process groups, signal
+forwarding, descendant reaping, and post-exit lifecycle behavior remain assigned to subsequent issues.
 
 ## Requirements
 
@@ -27,9 +28,17 @@ Build a minimal runtime image for a selected Linux architecture:
 make build PLATFORM=linux/amd64 IMAGE=metricshell
 ```
 
-The Makefile only invokes Docker targets; the Dockerfile directly runs formatting, vet, tests, dependency-boundary
-checks, version smoke coverage, and static Linux builds for amd64 and arm64. The Dockerfile has no Make
-dependency, and no host Go command or auxiliary shell orchestration script is used.
+The Makefile only invokes Docker targets; `make ci` runs build/unit checks and real-container acceptance fixtures. The
+Dockerfile has no Make dependency, and no host Go command or auxiliary shell orchestration script is used.
+
+Run a workload without shell interpretation:
+
+```sh
+docker run --rm metricshell:local -- /path/to/workload "argument with spaces"
+```
+
+Every token after the first standalone `--` is passed directly as workload argv. Shell behavior requires an explicit
+shell workload such as `-- /bin/sh -c 'command'`.
 
 ## Build identity
 
@@ -49,6 +58,8 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
 - `internal/diagnostic`: structured startup diagnostics.
+- `internal/workload`: one direct-child workload execution and immediate result mapping.
+- `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
 - `../VERSION`: repository-wide project version.
 

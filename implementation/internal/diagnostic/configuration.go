@@ -25,6 +25,20 @@ type configurationRejected struct {
 	ErrorMessage  string `json:"error_message"`
 }
 
+type workloadStartFailed struct {
+	Timestamp     string `json:"timestamp"`
+	Sequence      uint64 `json:"sequence"`
+	SchemaVersion string `json:"schema_version"`
+	Level         string `json:"level"`
+	Event         string `json:"event"`
+	Component     string `json:"component"`
+	RuntimeID     string `json:"runtime_id"`
+	State         string `json:"state"`
+	Message       string `json:"message"`
+	Reason        string `json:"reason"`
+	ErrorCode     string `json:"error_code"`
+}
+
 // WriteConfigurationRejected emits the normative startup failure as one JSON Lines record.
 func WriteConfigurationRejected(dst io.Writer, now time.Time, err error) error {
 	record := configurationRejected{
@@ -40,6 +54,23 @@ func WriteConfigurationRejected(dst io.Writer, now time.Time, err error) error {
 		Reason:        config.ReasonConfiguration,
 		ErrorCode:     config.ErrorCodeConfigInvalid,
 		ErrorMessage:  err.Error(),
+	}
+	return json.NewEncoder(dst).Encode(record)
+}
+
+func WriteWorkloadStartFailed(dst io.Writer, now time.Time) error {
+	record := workloadStartFailed{
+		Timestamp:     now.UTC().Format(time.RFC3339Nano),
+		Sequence:      1,
+		SchemaVersion: "1",
+		Level:         "error",
+		Event:         "workload.start_failed",
+		Component:     "workload",
+		RuntimeID:     runtimeID(),
+		State:         "failed",
+		Message:       "workload could not be started",
+		Reason:        "workload_start",
+		ErrorCode:     "WORKLOAD_START_FAILED",
 	}
 	return json.NewEncoder(dst).Encode(record)
 }

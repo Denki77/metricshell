@@ -1,6 +1,6 @@
 # ISSUE-002. PID 1 entrypoint and workload command parsing
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -25,3 +25,21 @@ run an integration test with MetricShell as container PID 1.
   argv; missing executable; exit 0/non-zero/signal; startup signal race.
 - **Completion:** Complete when argv and outcome fixtures pass in a real container and startup failures use the
   normative log and exit registries.
+
+## Delivery log
+
+- 2026-08-12: moved to `In Progress`; implementation started in the dedicated `ISSUE-002` worktree.
+- 2026-08-12: moved to `Testing`; unit and real-container acceptance coverage is implemented.
+- 2026-08-12: moved to `Done`; Docker CI, PID 1, argv, outcome, startup-failure, startup-race, runtime-image, and README
+  checks passed.
+
+## Verification evidence
+
+- `make ci` passed with Go 1.26 and the Docker daemon.
+- The workload fixture observed `ppid=1`, proving MetricShell was container PID 1 and the workload its direct child.
+- Spaces, an empty argument, Unicode, option-like values, and a second `--` were preserved exactly.
+- Workload exits `0` and `17`, and self-termination by SIGTERM as `143`, were propagated.
+- A missing executable returned `73` with `workload.start_failed` / `WORKLOAD_START_FAILED`; empty argv returned `64`.
+- Early external SIGTERM terminated without hanging and was not misclassified as workload start failure. Exact signal
+  forwarding policy remains ISSUE-004.
+- The production scratch image built for `linux/arm64`; `--version` and `--help` passed.
