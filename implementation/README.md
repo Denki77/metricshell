@@ -5,9 +5,9 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-002 adds the PID 1 entrypoint contract, mandatory `--` workload separator, exact argv forwarding, direct-child
-execution, pre-start failure classification, and immediate workload-result propagation. Process groups, signal
-forwarding, descendant reaping, and post-exit lifecycle behavior remain assigned to subsequent issues.
+ISSUE-003 starts each workload as the leader of a dedicated Linux process group inherited by its descendants. The
+workload PID and PGID are recorded in the structured `workload.started` diagnostic. Forwarding external signals,
+subreaper-based descendant reaping, and post-exit lifecycle behavior remain assigned to subsequent issues.
 
 ## Requirements
 
@@ -58,16 +58,16 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
 - `internal/diagnostic`: structured startup diagnostics.
-- `internal/workload`: one direct-child workload execution and immediate result mapping.
+- `internal/workload`: direct-child execution in an owned process group and immediate result mapping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
 - `../VERSION`: repository-wide project version.
 
 ## Normative context
 
-Implementation follows ISSUE-001, EPIC-001, the accepted Configuration and Configuration Value Grammar specifications,
-ADR-013 static multi-architecture distribution, and the cross-cutting definition of done. The complete-snapshot model
-remains the Core invariant; ISSUE-001 does not introduce transport, aggregation, runtime lifecycle, or workload behavior.
+Implementation follows ISSUE-003, EPIC-001, ADR-001, the Runtime State Machine and Structured Logging specifications,
+ADR-013 static multi-architecture distribution, and the cross-cutting definition of done. The process-group boundary
+does not add the external signal-forwarding policy assigned to ISSUE-004 or descendant reaping assigned to ISSUE-005.
 
 ## Engineering contract for subsequent issues
 
@@ -85,3 +85,6 @@ remains the Core invariant; ISSUE-001 does not introduce transport, aggregation,
   container behavior is verified against the running Docker daemon.
 - English and Russian documentation change together. Each issue moves through `In Progress`, `Testing`, and `Done`,
   records verification evidence, and finishes with a completeness audit of the affected READMEs.
+
+For ISSUE-003, `make ci` additionally verifies a child/grandchild tree in the owned group, isolation of another process
+group, group-signal delivery, rapid workload exits, and absence of zombies after the fixture has waited for its children.

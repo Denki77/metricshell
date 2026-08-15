@@ -40,7 +40,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 
 	configuration, err := config.Parse(args)
 	if err == nil {
-		result := workload.Run(configuration.Workload, stdin, stdout, stderr)
+		result := workload.Run(configuration.Workload, stdin, stdout, stderr, func(pid, processGroupID int) error {
+			return diagnostic.WriteWorkloadStarted(stderr, now(), pid, processGroupID)
+		})
 		if !result.Started {
 			if writeErr := diagnostic.WriteWorkloadStartFailed(stderr, now()); writeErr != nil {
 				return exitCodes.ExitInternalFailure

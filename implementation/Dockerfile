@@ -1,4 +1,4 @@
-ARG GO_IMAGE=golang:1.26-alpine@sha256:0178a641fbb4858c5f1b48e34bdaabe0350a330a1b1149aabd498d0699ff5fb2
+ARG GO_IMAGE=golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 ARG REPO_URI=github.com/Denki77/metricshell
 
 FROM ${GO_IMAGE} AS source
@@ -13,7 +13,7 @@ FROM source AS test
 ARG REVISION=unknown
 RUN test -z "$(gofmt -l .)"
 RUN go vet ./...
-RUN go test -count=1 ./...
+RUN go test -race -count=1 ./...
 RUN go test -count=1 ./internal/dependencyboundary -run '^TestProductionDependencyBoundary$'
 RUN version="$(cat /project/VERSION)" && \
     test -n "${version}" && \
@@ -45,11 +45,14 @@ RUN version="$(cat /project/VERSION)" && \
       -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
       -o /out/metricshell ./cmd/metricshell && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
-      -ldflags="-s -w -buildid=" -o /out/workload-fixture ./internal/testfixture/workload
+      -ldflags="-s -w -buildid=" -o /out/workload-fixture ./internal/testfixture/workload && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/process-group-fixture ./internal/testfixture/processgroup
 
 FROM scratch AS integration
 COPY --from=integration-build /out/metricshell /metricshell
 COPY --from=integration-build /out/workload-fixture /workload-fixture
+COPY --from=integration-build /out/process-group-fixture /process-group-fixture
 ENTRYPOINT ["/metricshell"]
 
 FROM scratch AS runtime
