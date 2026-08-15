@@ -5,9 +5,9 @@
 
 ## Текущий объём
 
-ISSUE-002 добавляет контракт entrypoint PID 1, обязательный разделитель workload `--`, точную передачу argv, запуск
-одного direct child, классификацию pre-start failure и немедленную передачу результата workload. Process groups,
-signal forwarding, descendant reaping и post-exit lifecycle остаются в последующих задачах.
+ISSUE-003 запускает каждый workload как лидера отдельной Linux process group, наследуемой его потомками. PID и PGID
+workload фиксируются в структурированной диагностике `workload.started`. Пересылка внешних сигналов, descendant reaping
+через subreaper и post-exit lifecycle остаются в последующих задачах.
 
 ## Требования
 
@@ -58,16 +58,16 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/diagnostic`: структурированные startup diagnostics.
-- `internal/workload`: запуск одного direct-child workload и немедленное отображение результата.
+- `internal/workload`: запуск direct-child workload в управляемой process group и немедленное отображение результата.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
 - `../VERSION`: общая версия проекта на уровне репозитория.
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-001, EPIC-001, принятым спецификациям Configuration и Configuration Value Grammar, ADR-013 о
-статической multi-architecture поставке и сквозному definition of done. Модель complete snapshot остаётся инвариантом
-Core; ISSUE-001 не добавляет transport, aggregation, runtime lifecycle или поведение workload.
+Реализация следует ISSUE-003, EPIC-001, ADR-001, спецификациям Runtime State Machine и Structured Logging, ADR-013 о
+статической multi-architecture поставке и сквозному definition of done. Граница process group не добавляет policy
+пересылки внешних сигналов из ISSUE-004 или descendant reaping из ISSUE-005.
 
 ## Инженерный контракт для следующих задач
 
@@ -85,3 +85,6 @@ Core; ISSUE-001 не добавляет transport, aggregation, runtime lifecycl
   релевантное container-поведение проверяется с запущенным Docker daemon.
 - Английская и русская документация изменяются синхронно. Каждая задача проходит статусы `В работе`, `Тестирование` и
   `Готово`, фиксирует test evidence и завершается проверкой полноты затронутых README.
+
+Для ISSUE-003 `make ci` дополнительно проверяет дерево child/grandchild в управляемой группе, изоляцию другой process
+group, доставку group signal, быстрые завершения workload и отсутствие zombie после ожидания потомков fixture.

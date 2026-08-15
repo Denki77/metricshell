@@ -12,10 +12,17 @@ type observation struct {
 	Argv []string `json:"argv"`
 	PID  int      `json:"pid"`
 	PPID int      `json:"ppid"`
+	PGID int      `json:"pgid"`
 }
 
 func main() {
-	_ = json.NewEncoder(os.Stdout).Encode(observation{Argv: os.Args[1:], PID: os.Getpid(), PPID: os.Getppid()})
+	processGroupID, err := syscall.Getpgid(0)
+	if err != nil {
+		os.Exit(125)
+	}
+	_ = json.NewEncoder(os.Stdout).Encode(observation{
+		Argv: os.Args[1:], PID: os.Getpid(), PPID: os.Getppid(), PGID: processGroupID,
+	})
 
 	if value := os.Getenv("FIXTURE_SLEEP"); value != "" {
 		duration, err := time.ParseDuration(value)

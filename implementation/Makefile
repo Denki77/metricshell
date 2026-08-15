@@ -26,6 +26,14 @@ integration:
 	@container="$$(docker run -d -e FIXTURE_SLEEP=10s $(IMAGE)-integration:local -- /workload-fixture)"; \
 		docker kill --signal TERM "$$container" >/dev/null; code="$$(docker wait "$$container")"; docker rm "$$container" >/dev/null; \
 		test "$$code" -ne 0; test "$$code" -ne 73
+	@code=0; output="$$(docker run --rm $(IMAGE)-integration:local -- /process-group-fixture 2>&1)" || code=$$?; \
+		test "$$code" -eq 0; \
+		printf '%s\n' "$$output" | grep -F '"event":"workload.started"' >/dev/null; \
+		printf '%s\n' "$$output" | grep -F '"workload_pgid":' >/dev/null
+	@attempt=0; while test "$$attempt" -lt 25; do \
+		docker run --rm $(IMAGE)-integration:local -- /workload-fixture >/dev/null 2>&1 || exit 1; \
+		attempt=$$((attempt + 1)); \
+	done
 
 ci: test integration
 
