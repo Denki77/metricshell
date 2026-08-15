@@ -5,9 +5,12 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-003 starts each workload as the leader of a dedicated Linux process group inherited by its descendants. The
-workload PID and PGID are recorded in the structured `workload.started` diagnostic. Forwarding external signals,
-subreaper-based descendant reaping, and post-exit lifecycle behavior remain assigned to subsequent issues.
+ISSUE-004 forwards `SIGTERM`, `SIGINT`, `SIGHUP`, and `SIGQUIT` to the owned workload process group. Every delivered
+repeat is forwarded while the target exists; signals queued after workload exit and a disappeared group are ignored
+without panic and remain observable. A queued TERM/INT before spawn terminates startup without launching or reporting a
+workload start failure. Internal forwarding failures kill and wait for the direct child, with a bounded direct-process
+fallback when group cleanup does not complete. Forced shutdown budgets, subreaper-based descendant reaping, and
+post-exit lifecycle behavior remain assigned to subsequent issues.
 
 ## Requirements
 
@@ -57,17 +60,17 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/buildinfo`: linker-provided build identity.
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
-- `internal/diagnostic`: structured startup diagnostics.
-- `internal/workload`: direct-child execution in an owned process group and immediate result mapping.
+- `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
+- `internal/workload`: owned process-group execution, signal forwarding, and immediate result mapping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
 - `../VERSION`: repository-wide project version.
 
 ## Normative context
 
-Implementation follows ISSUE-003, EPIC-001, ADR-001, the Runtime State Machine and Structured Logging specifications,
-ADR-013 static multi-architecture distribution, and the cross-cutting definition of done. The process-group boundary
-does not add the external signal-forwarding policy assigned to ISSUE-004 or descendant reaping assigned to ISSUE-005.
+Implementation follows ISSUE-004, EPIC-001, ADR-001, ADR-003, the Runtime State Machine and Structured Logging
+specifications, ADR-013 static multi-architecture distribution, and the cross-cutting definition of done. Signal
+forwarding does not add descendant reaping from ISSUE-005 or grace-budget and forced-kill policy from ISSUE-009.
 
 ## Engineering contract for subsequent issues
 
@@ -86,5 +89,7 @@ does not add the external signal-forwarding policy assigned to ISSUE-004 or desc
 - English and Russian documentation change together. Each issue moves through `In Progress`, `Testing`, and `Done`,
   records verification evidence, and finishes with a completeness audit of the affected READMEs.
 
-For ISSUE-003, `make ci` additionally verifies a child/grandchild tree in the owned group, isolation of another process
-group, group-signal delivery, rapid workload exits, and absence of zombies after the fixture has waited for its children.
+For ISSUE-004, `make ci` additionally verifies TERM/INT delivery from Docker to container PID 1, TERM/INT/HUP/QUIT group
+delivery, repeated TERM, ordered structured signal records, rapid exit during forwarding, disappeared groups, queued
+post-wait signals, unsupported signals, pre-start termination without workload launch, direct-child reaping on both
+forwarding error paths, and race-detector execution.
