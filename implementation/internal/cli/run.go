@@ -26,15 +26,13 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 	if len(args) == 1 {
 		switch args[0] {
 		case "--version":
-			_, err := fmt.Fprintln(stdout, identity.String())
-			if err != nil {
-				fmt.Println(err.Error())
+			if _, err := fmt.Fprintln(stdout, identity.String()); err != nil {
+				return exitCodes.ExitInternalFailure
 			}
 			return exitCodes.Success
 		case "--help", "-h":
-			_, err := fmt.Fprint(stdout, usage)
-			if err != nil {
-				fmt.Println(err.Error())
+			if _, err := fmt.Fprint(stdout, usage); err != nil {
+				return exitCodes.ExitInternalFailure
 			}
 			return exitCodes.Success
 		}
@@ -45,6 +43,14 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		runtimeState := "running"
 		result := workload.Run(configuration.Workload, stdin, stdout, stderr, workload.Observers{
 			Started: logger.WriteWorkloadStarted,
+			PrimaryExited: func(exitCode int) error {
+				runtimeState = "finalizing"
+				return logger.WriteWorkloadExited(exitCode)
+			},
+			ChildReaped: func(kind string) error {
+				return logger.WriteChildReaped(kind, runtimeState)
+			},
+			Failed: logger.WriteRuntimeFailed,
 			Signal: func(event workload.SignalEvent) error {
 				switch event.Outcome {
 				case workload.SignalForwarded:

@@ -30,6 +30,29 @@ func TestTerminationQueuedBeforeStartDoesNotStartWorkload(t *testing.T) {
 	}
 }
 
+func TestSubreaperFailureDoesNotStartWorkload(t *testing.T) {
+	signals := make(chan os.Signal)
+	dependencies := testDependencies(signals)
+	dependencies.enableSubreaper = func() error { return syscall.EPERM }
+	started := false
+	failed := false
+
+	result := run([]string{"/workload-must-not-start"}, nil, io.Discard, io.Discard, Observers{
+		Started: func(_, _ int) error {
+			started = true
+			return nil
+		},
+		Failed: func() error {
+			failed = true
+			return nil
+		},
+	}, dependencies)
+
+	if result.ExitCode != exitCodes.ExitInternalFailure || result.Started || result.StartFailed || started || !failed {
+		t.Fatalf("run() = %#v, observer started = %t, failed = %t; want pre-start internal failure", result, started, failed)
+	}
+}
+
 func TestSignalObserverErrorWaitsForDirectChild(t *testing.T) {
 	t.Setenv(helperProcessEnvironment, "1")
 	signals := make(chan os.Signal, 1)
@@ -78,6 +101,83 @@ func TestForwardingErrorUsesDirectFallbackAndWaits(t *testing.T) {
 	assertReaped(t, pid)
 }
 
+func TestReaperErrorCleansUpAndWaitsForDirectChild(t *testing.T) {
+	t.Setenv(helperProcessEnvironment, "1")
+	signals := make(chan os.Signal)
+	dependencies := testDependencies(signals)
+	firstWait := true
+	dependencies.wait4 = func(pid int, status *syscall.WaitStatus, options int, usage *syscall.Rusage) (int, error) {
+		if firstWait {
+			firstWait = false
+			return -1, syscall.EIO
+		}
+		return syscall.Wait4(pid, status, options, usage)
+	}
+	failed := false
+	var pid int
+
+	result := run(helperCommand(), nil, io.Discard, io.Discard, Observers{
+		Started: func(workloadPID, _ int) error {
+			pid = workloadPID
+			return nil
+		},
+		Failed: func() error {
+			failed = true
+			return nil
+		},
+	}, dependencies)
+
+	if result.ExitCode != exitCodes.ExitInternalFailure || !result.Started || !failed {
+		t.Fatalf("run() = %#v, failed = %t; want reaper failure cleanup", result, failed)
+	}
+	assertReaped(t, pid)
+}
+
+func TestReusedPrimaryPIDDoesNotReplacePrimaryResult(t *testing.T) {
+	const primaryPID = 41
+	events := []reapEvent{
+		{pid: primaryPID, status: syscall.WaitStatus(7 << 8)},
+		{pid: 42, status: syscall.WaitStatus(8 << 8)},
+		{pid: primaryPID, status: syscall.WaitStatus(9 << 8)},
+	}
+	var primaryResult *Result
+	primaryEvents := 0
+	releases := 0
+	kinds := make([]string, 0, len(events))
+	observers := Observers{
+		PrimaryExited: func(exitCode int) error {
+			primaryEvents++
+			if exitCode != 7 {
+				t.Fatalf("primary exit code = %d, want 7", exitCode)
+			}
+			return nil
+		},
+		ChildReaped: func(kind string) error {
+			kinds = append(kinds, kind)
+			return nil
+		},
+	}
+
+	for _, event := range events {
+		if err := processReapEvent(event, primaryPID, &primaryResult, func() { releases++ }, observers); err != nil {
+			t.Fatalf("processReapEvent() error = %v", err)
+		}
+	}
+
+	if primaryResult == nil || primaryResult.ExitCode != 7 {
+		t.Fatalf("primary result = %#v, want preserved exit code 7", primaryResult)
+	}
+	if primaryEvents != 1 || releases != 1 {
+		t.Fatalf("primary events = %d, releases = %d; want one of each", primaryEvents, releases)
+	}
+	wantKinds := []string{"direct", "adopted", "adopted"}
+	for index, want := range wantKinds {
+		if kinds[index] != want {
+			t.Fatalf("child kinds = %v, want %v", kinds, wantKinds)
+		}
+	}
+}
+
 func TestUnsupportedSignalIsIgnored(t *testing.T) {
 	event := forwardSignal(1, syscall.SIGUSR1)
 	if event.Outcome != SignalIgnored || event.Reason != "unsupported_signal" {
@@ -124,11 +224,13 @@ func helperCommand() []string {
 
 func testDependencies(signals <-chan os.Signal) runDependencies {
 	return runDependencies{
-		signals:       signals,
-		stopSignals:   func() {},
-		forward:       forwardSignal,
-		killGroup:     func(processGroupID int) error { return syscall.Kill(-processGroupID, syscall.SIGKILL) },
-		fallbackDelay: 10 * time.Millisecond,
+		signals:         signals,
+		stopSignals:     func() {},
+		enableSubreaper: func() error { return nil },
+		forward:         forwardSignal,
+		killGroup:       func(processGroupID int) error { return syscall.Kill(-processGroupID, syscall.SIGKILL) },
+		wait4:           syscall.Wait4,
+		fallbackDelay:   10 * time.Millisecond,
 	}
 }
 

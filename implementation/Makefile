@@ -60,6 +60,22 @@ integration:
 		printf '%s\n' "$$output" | grep -F '"event":"workload.signal_forwarded"' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F "\"signal\":\"$$requested\"" >/dev/null; \
 	done
+	@code=0; output="$$(docker run --rm -e REAPER_MODE=primary-before-child $(IMAGE)-integration:local -- /reaper-fixture 2>&1)" || code=$$?; \
+		test "$$code" -eq 21; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.exited"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"child.reaped".*"kind":"direct"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"child.reaped".*"kind":"adopted"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -n -m1 '"event":"workload.exited"' | cut -d: -f1)" -lt "$$(printf '%s\n' "$$output" | grep -n -m1 '"event":"child.reaped".*"kind":"adopted"' | cut -d: -f1)"
+	@code=0; output="$$(docker run --init --rm -e REAPER_MODE=child-before-primary $(IMAGE)-integration:local -- /reaper-fixture 2>&1)" || code=$$?; \
+		test "$$code" -eq 22; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.exited"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -n -m1 '"event":"child.reaped".*"kind":"adopted"' | cut -d: -f1)" -lt "$$(printf '%s\n' "$$output" | grep -n -m1 '"event":"workload.exited"' | cut -d: -f1)"
+	@code=0; output="$$(docker run --rm -e REAPER_MODE=burst $(IMAGE)-integration:local -- /reaper-fixture 2>&1)" || code=$$?; \
+		test "$$code" -eq 23; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.audit","zombies":0' >/dev/null; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.exited"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"child.reaped".*"kind":"direct"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"child.reaped".*"kind":"adopted"')" -eq 64
 
 ci: test integration
 

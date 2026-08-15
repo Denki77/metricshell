@@ -5,12 +5,10 @@
 
 ## Текущий объём
 
-ISSUE-004 пересылает `SIGTERM`, `SIGINT`, `SIGHUP` и `SIGQUIT` управляемой process group workload. Каждый доставленный
-повтор пересылается, пока target существует; queued signals после выхода workload и исчезнувшая group игнорируются без
-panic и остаются наблюдаемыми. Queued TERM/INT до spawn завершает startup без запуска workload и без ложного start
-failure. При internal forwarding failure direct child завершается и обязательно ожидается; если group cleanup не
-завершился, применяется bounded direct-process fallback. Forced shutdown budgets, descendant reaping через subreaper и
-post-exit lifecycle остаются в последующих задачах.
+ISSUE-005 включает Linux child-subreaper mode до запуска workload и использует единственного владельца `wait4` для
+primary и всех adopted descendants. PID и process-compatible result primary остаются authoritative и публикуются ровно
+один раз; каждый reaped process классифицируется как `direct` или `adopted` без публикации child PID. MetricShell ждёт,
+пока все adopted children будут reaped. Forced shutdown budgets и post-exit lifecycle остаются в последующих задачах.
 
 ## Требования
 
@@ -61,16 +59,16 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
-- `internal/workload`: запуск в управляемой process group, signal forwarding и немедленное отображение результата.
+- `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
 - `../VERSION`: общая версия проекта на уровне репозитория.
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-004, EPIC-001, ADR-001, ADR-003, спецификациям Runtime State Machine и Structured Logging,
-ADR-013 о статической multi-architecture поставке и сквозному definition of done. Signal forwarding не добавляет
-descendant reaping из ISSUE-005 или grace-budget и forced-kill policy из ISSUE-009.
+Реализация следует ISSUE-005, EPIC-001, ADR-001, ADR-003, спецификациям Runtime State Machine, Self-Metrics и Structured
+Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of done. Child reaping не добавляет
+grace-budget или forced-kill policy из ISSUE-009.
 
 ## Инженерный контракт для следующих задач
 
@@ -89,7 +87,8 @@ descendant reaping из ISSUE-005 или grace-budget и forced-kill policy из
 - Английская и русская документация изменяются синхронно. Каждая задача проходит статусы `В работе`, `Тестирование` и
   `Готово`, фиксирует test evidence и завершается проверкой полноты затронутых README.
 
-Для ISSUE-004 `make ci` дополнительно проверяет доставку TERM/INT из Docker в PID 1 контейнера, group delivery для
-TERM/INT/HUP/QUIT, повторный TERM, упорядоченные structured signal records, быстрый exit во время forwarding,
-исчезнувшие groups, queued post-wait и unsupported signals, pre-start termination без запуска workload, reap direct
-child в обоих forwarding error paths, а также race detector.
+Для ISSUE-005 `make ci` дополнительно проверяет orphan adoption через double spawn, включая внешний Docker init над
+MetricShell, оба порядка завершения primary-before-child и child-before-primary, reuse primary PID, ровно один primary
+result, reaping diagnostics `direct|adopted`, burst из 64 завершающихся children с нулём стабильных zombies, sanitized
+failures subreaper/reaper, гарантированный cleanup direct child и race detector. Существующее signal-forwarding
+acceptance coverage остаётся активным.

@@ -5,12 +5,11 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-004 forwards `SIGTERM`, `SIGINT`, `SIGHUP`, and `SIGQUIT` to the owned workload process group. Every delivered
-repeat is forwarded while the target exists; signals queued after workload exit and a disappeared group are ignored
-without panic and remain observable. A queued TERM/INT before spawn terminates startup without launching or reporting a
-workload start failure. Internal forwarding failures kill and wait for the direct child, with a bounded direct-process
-fallback when group cleanup does not complete. Forced shutdown budgets, subreaper-based descendant reaping, and
-post-exit lifecycle behavior remain assigned to subsequent issues.
+ISSUE-005 enables Linux child-subreaper mode before starting the workload and uses one `wait4` owner for the primary and
+all adopted descendants. The primary PID and process-compatible result remain authoritative and are emitted exactly
+once; every reaped process is classified as `direct` or `adopted` without exposing child PIDs. MetricShell waits until
+all adopted children are reaped. Forced shutdown budgets and post-exit lifecycle behavior remain assigned to later
+issues.
 
 ## Requirements
 
@@ -61,16 +60,16 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
-- `internal/workload`: owned process-group execution, signal forwarding, and immediate result mapping.
+- `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
 - `../VERSION`: repository-wide project version.
 
 ## Normative context
 
-Implementation follows ISSUE-004, EPIC-001, ADR-001, ADR-003, the Runtime State Machine and Structured Logging
-specifications, ADR-013 static multi-architecture distribution, and the cross-cutting definition of done. Signal
-forwarding does not add descendant reaping from ISSUE-005 or grace-budget and forced-kill policy from ISSUE-009.
+Implementation follows ISSUE-005, EPIC-001, ADR-001, ADR-003, the Runtime State Machine, Self-Metrics and Structured
+Logging specifications, ADR-013 static multi-architecture distribution, and the cross-cutting definition of done.
+Child reaping does not add grace-budget or forced-kill policy from ISSUE-009.
 
 ## Engineering contract for subsequent issues
 
@@ -89,7 +88,8 @@ forwarding does not add descendant reaping from ISSUE-005 or grace-budget and fo
 - English and Russian documentation change together. Each issue moves through `In Progress`, `Testing`, and `Done`,
   records verification evidence, and finishes with a completeness audit of the affected READMEs.
 
-For ISSUE-004, `make ci` additionally verifies TERM/INT delivery from Docker to container PID 1, TERM/INT/HUP/QUIT group
-delivery, repeated TERM, ordered structured signal records, rapid exit during forwarding, disappeared groups, queued
-post-wait signals, unsupported signals, pre-start termination without workload launch, direct-child reaping on both
-forwarding error paths, and race-detector execution.
+For ISSUE-005, `make ci` additionally verifies orphan adoption through a double spawn, including an external Docker init
+above MetricShell, both primary-before-child and child-before-primary completion orders, primary-PID reuse, exactly one
+primary result, `direct|adopted` reaping diagnostics, a 64-child exit burst with zero stable zombies, sanitized
+subreaper/reaper failures, guaranteed cleanup of the direct child, and race-detector execution. Existing
+signal-forwarding acceptance coverage remains active.
