@@ -27,6 +27,9 @@ type record struct {
 	Signal        string `json:"signal,omitempty"`
 	WorkloadPID   int    `json:"workload_pid,omitempty"`
 	WorkloadPGID  int    `json:"workload_pgid,omitempty"`
+	ExitCode      *int   `json:"exit_code,omitempty"`
+	Forced        *bool  `json:"forced,omitempty"`
+	Kind          string `json:"kind,omitempty"`
 }
 
 type Logger struct {
@@ -115,6 +118,42 @@ func (logger *Logger) WriteSignalFailed(signal string, processGroupID int) error
 		ErrorCode:    "INTERNAL_FAILURE",
 		Signal:       signal,
 		WorkloadPGID: processGroupID,
+	})
+}
+
+func (logger *Logger) WriteWorkloadExited(exitCode int) error {
+	forced := false
+	return logger.write(record{
+		Level:     "info",
+		Event:     "workload.exited",
+		Component: "workload",
+		State:     "finalizing",
+		Message:   "primary workload exited",
+		ExitCode:  &exitCode,
+		Forced:    &forced,
+	})
+}
+
+func (logger *Logger) WriteChildReaped(kind, state string) error {
+	return logger.write(record{
+		Level:     "debug",
+		Event:     "child.reaped",
+		Component: "workload",
+		State:     state,
+		Message:   "managed child reaped",
+		Kind:      kind,
+	})
+}
+
+func (logger *Logger) WriteRuntimeFailed() error {
+	return logger.write(record{
+		Level:     "error",
+		Event:     "runtime.failed",
+		Component: "runtime",
+		State:     "failed",
+		Message:   "process supervision failed",
+		Reason:    "internal",
+		ErrorCode: "INTERNAL_FAILURE",
 	})
 }
 
