@@ -91,6 +91,7 @@ Consumers обязаны игнорировать неизвестные fields.
 | `workload.started`            | info      | `workload_pid`, `workload_pgid`                                               | После успешного start.              |
 | `workload.start_failed`       | error     | `reason`, `error_code`                                                        | Start failure.                      |
 | `workload.signal_forwarded`   | info      | `signal`, PID/PGID                                                            | Каждый forwarded signal.            |
+| `workload.signal_ignored`     | info      | `signal`, `reason`; PID/PGID, если target ранее был известен                  | Каждый не пересланный signal.       |
 | `workload.exited`             | info      | `exit_code`, `forced`                                                         | Только один раз после resolution.   |
 | `child.reaped`                | debug     | `kind`                                                                        | Reaped managed child.               |
 | `snapshot.accepted`           | debug     | `transport`, `snapshot_generation`, `snapshot_bytes`, `series`, `duration_ms` | После atomic installation.          |
@@ -112,6 +113,16 @@ Consumers обязаны игнорировать неизвестные fields.
 | `logging.suppression_summary` | warn      | `suppressed_event`, `suppressed_count`, `window_ms`; optional `reason`        | Summary rate-limited records.       |
 
 High-frequency success events имеют debug level; rejection и lifecycle boundaries видны на normal levels.
+
+`workload.signal_ignored.reason` является закрытым enum:
+
+| Reason               | Значение                                                                     |
+|----------------------|------------------------------------------------------------------------------|
+| `target_exited`      | Target workload завершился или его process group больше не существует.       |
+| `unsupported_signal` | Запрошенный signal отсутствует в registry поддерживаемых forwarding signals. |
+
+Event не содержит raw operating-system error. Ошибка forwarding, отличная от исчезновения target, использует
+MetricShell-owned path `runtime.failed` / `INTERNAL_FAILURE`.
 
 При `log.selector_values=true` событие `configuration.validated` может содержать normalized array `selectors`. При
 значении false field отсутствует. Другие events не содержат selector values.

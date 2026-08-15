@@ -5,9 +5,12 @@
 
 ## Текущий объём
 
-ISSUE-003 запускает каждый workload как лидера отдельной Linux process group, наследуемой его потомками. PID и PGID
-workload фиксируются в структурированной диагностике `workload.started`. Пересылка внешних сигналов, descendant reaping
-через subreaper и post-exit lifecycle остаются в последующих задачах.
+ISSUE-004 пересылает `SIGTERM`, `SIGINT`, `SIGHUP` и `SIGQUIT` управляемой process group workload. Каждый доставленный
+повтор пересылается, пока target существует; queued signals после выхода workload и исчезнувшая group игнорируются без
+panic и остаются наблюдаемыми. Queued TERM/INT до spawn завершает startup без запуска workload и без ложного start
+failure. При internal forwarding failure direct child завершается и обязательно ожидается; если group cleanup не
+завершился, применяется bounded direct-process fallback. Forced shutdown budgets, descendant reaping через subreaper и
+post-exit lifecycle остаются в последующих задачах.
 
 ## Требования
 
@@ -57,17 +60,17 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/buildinfo`: build identity, передаваемый linker.
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
-- `internal/diagnostic`: структурированные startup diagnostics.
-- `internal/workload`: запуск direct-child workload в управляемой process group и немедленное отображение результата.
+- `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
+- `internal/workload`: запуск в управляемой process group, signal forwarding и немедленное отображение результата.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
 - `../VERSION`: общая версия проекта на уровне репозитория.
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-003, EPIC-001, ADR-001, спецификациям Runtime State Machine и Structured Logging, ADR-013 о
-статической multi-architecture поставке и сквозному definition of done. Граница process group не добавляет policy
-пересылки внешних сигналов из ISSUE-004 или descendant reaping из ISSUE-005.
+Реализация следует ISSUE-004, EPIC-001, ADR-001, ADR-003, спецификациям Runtime State Machine и Structured Logging,
+ADR-013 о статической multi-architecture поставке и сквозному definition of done. Signal forwarding не добавляет
+descendant reaping из ISSUE-005 или grace-budget и forced-kill policy из ISSUE-009.
 
 ## Инженерный контракт для следующих задач
 
@@ -86,5 +89,7 @@ metricshell version=0.1.0-dev revision=0123456
 - Английская и русская документация изменяются синхронно. Каждая задача проходит статусы `В работе`, `Тестирование` и
   `Готово`, фиксирует test evidence и завершается проверкой полноты затронутых README.
 
-Для ISSUE-003 `make ci` дополнительно проверяет дерево child/grandchild в управляемой группе, изоляцию другой process
-group, доставку group signal, быстрые завершения workload и отсутствие zombie после ожидания потомков fixture.
+Для ISSUE-004 `make ci` дополнительно проверяет доставку TERM/INT из Docker в PID 1 контейнера, group delivery для
+TERM/INT/HUP/QUIT, повторный TERM, упорядоченные structured signal records, быстрый exit во время forwarding,
+исчезнувшие groups, queued post-wait и unsupported signals, pre-start termination без запуска workload, reap direct
+child в обоих forwarding error paths, а также race detector.

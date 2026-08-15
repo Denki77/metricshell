@@ -94,6 +94,7 @@ Unknown fields must be ignored by consumers. Existing fields cannot change type 
 | `workload.started`            | info          | `workload_pid`, `workload_pgid`                                               | After successful start.                             |
 | `workload.start_failed`       | error         | `reason`, `error_code`                                                        | Failed start attempt.                               |
 | `workload.signal_forwarded`   | info          | `signal`, `workload_pid` or `workload_pgid`                                   | Every forwarded control/termination signal.         |
+| `workload.signal_ignored`     | info          | `signal`, `reason`; workload PID/PGID when a target was previously known      | Every supported or requested signal not forwarded.  |
 | `workload.exited`             | info          | `exit_code`, `forced`                                                         | Exactly once after outcome resolution.              |
 | `child.reaped`                | debug         | `kind`                                                                        | Managed direct/adopted child reaped.                |
 | `snapshot.accepted`           | debug         | `transport`, `snapshot_generation`, `snapshot_bytes`, `series`, `duration_ms` | After atomic installation.                          |
@@ -116,6 +117,16 @@ Unknown fields must be ignored by consumers. Existing fields cannot change type 
 
 High-frequency success events are debug-level so default info logging does not scale with publication or scrape rate.
 Rejections and lifecycle boundaries remain visible at normal levels.
+
+`workload.signal_ignored.reason` is a closed enum:
+
+| Reason               | Meaning                                                                   |
+|----------------------|---------------------------------------------------------------------------|
+| `target_exited`      | The workload target exited or its process group no longer exists.         |
+| `unsupported_signal` | The requested signal is outside the supported forwarding signal registry. |
+
+The event contains no raw operating-system error. A forwarding failure other than target disappearance is a
+MetricShell-owned `runtime.failed` / `INTERNAL_FAILURE` path.
 
 When `log.selector_values=true`, `configuration.validated` may contain the normalized `selectors` array. When false,
 the field is absent. No other event contains selector values.

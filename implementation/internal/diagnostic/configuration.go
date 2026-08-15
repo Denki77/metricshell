@@ -5,12 +5,13 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"io"
+	"sync"
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/config"
 )
 
-type configurationRejected struct {
+type record struct {
 	Timestamp     string `json:"timestamp"`
 	Sequence      uint64 `json:"sequence"`
 	SchemaVersion string `json:"schema_version"`
@@ -20,93 +21,116 @@ type configurationRejected struct {
 	RuntimeID     string `json:"runtime_id"`
 	State         string `json:"state"`
 	Message       string `json:"message"`
-	Reason        string `json:"reason"`
-	ErrorCode     string `json:"error_code"`
-	ErrorMessage  string `json:"error_message"`
+	Reason        string `json:"reason,omitempty"`
+	ErrorCode     string `json:"error_code,omitempty"`
+	ErrorMessage  string `json:"error_message,omitempty"`
+	Signal        string `json:"signal,omitempty"`
+	WorkloadPID   int    `json:"workload_pid,omitempty"`
+	WorkloadPGID  int    `json:"workload_pgid,omitempty"`
 }
 
-type workloadStartFailed struct {
-	Timestamp     string `json:"timestamp"`
-	Sequence      uint64 `json:"sequence"`
-	SchemaVersion string `json:"schema_version"`
-	Level         string `json:"level"`
-	Event         string `json:"event"`
-	Component     string `json:"component"`
-	RuntimeID     string `json:"runtime_id"`
-	State         string `json:"state"`
-	Message       string `json:"message"`
-	Reason        string `json:"reason"`
-	ErrorCode     string `json:"error_code"`
+type Logger struct {
+	destination io.Writer
+	now         func() time.Time
+	runtimeID   string
+
+	mu       sync.Mutex
+	sequence uint64
 }
 
-type workloadStarted struct {
-	Timestamp     string `json:"timestamp"`
-	Sequence      uint64 `json:"sequence"`
-	SchemaVersion string `json:"schema_version"`
-	Level         string `json:"level"`
-	Event         string `json:"event"`
-	Component     string `json:"component"`
-	RuntimeID     string `json:"runtime_id"`
-	State         string `json:"state"`
-	Message       string `json:"message"`
-	WorkloadPID   int    `json:"workload_pid"`
-	WorkloadPGID  int    `json:"workload_pgid"`
+func New(destination io.Writer, now func() time.Time) *Logger {
+	return &Logger{destination: destination, now: now, runtimeID: newRuntimeID()}
 }
 
-// WriteConfigurationRejected emits the normative startup failure as one JSON Lines record.
-func WriteConfigurationRejected(dst io.Writer, now time.Time, err error) error {
-	record := configurationRejected{
-		Timestamp:     now.UTC().Format(time.RFC3339Nano),
-		Sequence:      1,
-		SchemaVersion: "1",
-		Level:         "error",
-		Event:         "configuration.rejected",
-		Component:     "runtime",
-		RuntimeID:     runtimeID(),
-		State:         "initializing",
-		Message:       "startup configuration rejected",
-		Reason:        config.ReasonConfiguration,
-		ErrorCode:     config.ErrorCodeConfigInvalid,
-		ErrorMessage:  err.Error(),
-	}
-	return json.NewEncoder(dst).Encode(record)
+func (logger *Logger) WriteConfigurationRejected(err error) error {
+	return logger.write(record{
+		Level:        "error",
+		Event:        "configuration.rejected",
+		Component:    "runtime",
+		State:        "initializing",
+		Message:      "startup configuration rejected",
+		Reason:       config.ReasonConfiguration,
+		ErrorCode:    config.ErrorCodeConfigInvalid,
+		ErrorMessage: err.Error(),
+	})
 }
 
-func WriteWorkloadStartFailed(dst io.Writer, now time.Time) error {
-	record := workloadStartFailed{
-		Timestamp:     now.UTC().Format(time.RFC3339Nano),
-		Sequence:      1,
-		SchemaVersion: "1",
-		Level:         "error",
-		Event:         "workload.start_failed",
-		Component:     "workload",
-		RuntimeID:     runtimeID(),
-		State:         "failed",
-		Message:       "workload could not be started",
-		Reason:        "workload_start",
-		ErrorCode:     "WORKLOAD_START_FAILED",
-	}
-	return json.NewEncoder(dst).Encode(record)
+func (logger *Logger) WriteWorkloadStartFailed() error {
+	return logger.write(record{
+		Level:     "error",
+		Event:     "workload.start_failed",
+		Component: "workload",
+		State:     "failed",
+		Message:   "workload could not be started",
+		Reason:    "workload_start",
+		ErrorCode: "WORKLOAD_START_FAILED",
+	})
 }
 
-func WriteWorkloadStarted(dst io.Writer, now time.Time, pid, processGroupID int) error {
-	record := workloadStarted{
-		Timestamp:     now.UTC().Format(time.RFC3339Nano),
-		Sequence:      1,
-		SchemaVersion: "1",
-		Level:         "info",
-		Event:         "workload.started",
-		Component:     "workload",
-		RuntimeID:     runtimeID(),
-		State:         "running",
-		Message:       "workload started",
-		WorkloadPID:   pid,
-		WorkloadPGID:  processGroupID,
-	}
-	return json.NewEncoder(dst).Encode(record)
+func (logger *Logger) WriteWorkloadStarted(pid, processGroupID int) error {
+	return logger.write(record{
+		Level:        "info",
+		Event:        "workload.started",
+		Component:    "workload",
+		State:        "running",
+		Message:      "workload started",
+		WorkloadPID:  pid,
+		WorkloadPGID: processGroupID,
+	})
 }
 
-func runtimeID() string {
+func (logger *Logger) WriteSignalForwarded(signal, state string, processGroupID int) error {
+	return logger.write(record{
+		Level:        "info",
+		Event:        "workload.signal_forwarded",
+		Component:    "workload",
+		State:        state,
+		Message:      "signal forwarded to workload group",
+		Signal:       signal,
+		WorkloadPGID: processGroupID,
+	})
+}
+
+func (logger *Logger) WriteSignalIgnored(signal, reason string, processGroupID int) error {
+	return logger.write(record{
+		Level:        "info",
+		Event:        "workload.signal_ignored",
+		Component:    "workload",
+		State:        "finalizing",
+		Message:      "late signal ignored",
+		Reason:       reason,
+		Signal:       signal,
+		WorkloadPGID: processGroupID,
+	})
+}
+
+func (logger *Logger) WriteSignalFailed(signal string, processGroupID int) error {
+	return logger.write(record{
+		Level:        "error",
+		Event:        "runtime.failed",
+		Component:    "runtime",
+		State:        "failed",
+		Message:      "signal could not be forwarded",
+		Reason:       "internal",
+		ErrorCode:    "INTERNAL_FAILURE",
+		Signal:       signal,
+		WorkloadPGID: processGroupID,
+	})
+}
+
+func (logger *Logger) write(value record) error {
+	logger.mu.Lock()
+	defer logger.mu.Unlock()
+
+	logger.sequence++
+	value.Timestamp = logger.now().UTC().Format(time.RFC3339Nano)
+	value.Sequence = logger.sequence
+	value.SchemaVersion = "1"
+	value.RuntimeID = logger.runtimeID
+	return json.NewEncoder(logger.destination).Encode(value)
+}
+
+func newRuntimeID() string {
 	var value [8]byte
 	if _, err := rand.Read(value[:]); err != nil {
 		return "unavailable"
