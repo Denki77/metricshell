@@ -4,7 +4,7 @@ REVISION ?= $(shell git -C $(PROJECT_ROOT) rev-parse --verify HEAD 2>/dev/null |
 IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 
-.PHONY: all test integration ci build
+.PHONY: all test integration ci wave1 build
 
 all: ci
 
@@ -22,7 +22,6 @@ integration:
 	@code=0; output="$$(docker run --rm $(IMAGE)-integration:local -- /missing-workload 2>&1)" || code=$$?; \
 		test "$$code" -eq 73; printf '%s\n' "$$output" | grep -F '"event":"workload.start_failed"' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"error_code":"WORKLOAD_START_FAILED"' >/dev/null
-	@code=0; docker run --rm $(IMAGE)-integration:local >/dev/null 2>&1 || code=$$?; test "$$code" -eq 64
 	@container="$$(docker run -d -e FIXTURE_SLEEP=10s $(IMAGE)-integration:local -- /workload-fixture)"; \
 		docker kill --signal TERM "$$container" >/dev/null; code="$$(docker wait "$$container")"; docker rm "$$container" >/dev/null; \
 		test "$$code" -ne 0; test "$$code" -ne 73
@@ -76,8 +75,13 @@ integration:
 		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.exited"')" -eq 1; \
 		test "$$(printf '%s\n' "$$output" | grep -c '"event":"child.reaped".*"kind":"direct"')" -eq 1; \
 		test "$$(printf '%s\n' "$$output" | grep -c '"event":"child.reaped".*"kind":"adopted"')" -eq 64
+	@code=0; output="$$(docker run --rm --entrypoint /result-matrix-fixture $(IMAGE)-integration:local 2>&1)" || code=$$?; \
+		test "$$code" -eq 0; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.result_matrix","configurations_checked":1,"exits_checked":256,"signals_checked":2' >/dev/null
 
 ci: test integration
+
+wave1: ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"

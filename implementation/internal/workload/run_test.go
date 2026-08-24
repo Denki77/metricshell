@@ -178,6 +178,29 @@ func TestReusedPrimaryPIDDoesNotReplacePrimaryResult(t *testing.T) {
 	}
 }
 
+func TestResolveWaitStatusMatrix(t *testing.T) {
+	for exitCode := 0; exitCode <= 255; exitCode++ {
+		result := resolveWaitStatus(syscall.WaitStatus(exitCode << 8))
+		if result.ExitCode != exitCode || !result.Started || result.StartFailed {
+			t.Fatalf("exit %d resolved to %#v", exitCode, result)
+		}
+	}
+
+	signals := []struct {
+		value syscall.Signal
+		want  int
+	}{
+		{value: syscall.SIGINT, want: 130},
+		{value: syscall.SIGTERM, want: 143},
+	}
+	for _, signal := range signals {
+		result := resolveWaitStatus(syscall.WaitStatus(signal.value))
+		if result.ExitCode != signal.want || !result.Started || result.StartFailed {
+			t.Fatalf("signal %s resolved to %#v, want exit %d", signal.value, result, signal.want)
+		}
+	}
+}
+
 func TestUnsupportedSignalIsIgnored(t *testing.T) {
 	event := forwardSignal(1, syscall.SIGUSR1)
 	if event.Outcome != SignalIgnored || event.Reason != "unsupported_signal" {
