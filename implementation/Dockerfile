@@ -51,7 +51,9 @@ RUN version="$(cat /project/VERSION)" && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/signal-fixture ./internal/testfixture/signal
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
-      -ldflags="-s -w -buildid=" -o /out/reaper-fixture ./internal/testfixture/reaper
+      -ldflags="-s -w -buildid=" -o /out/reaper-fixture ./internal/testfixture/reaper && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/result-matrix-fixture ./internal/testfixture/resultmatrix
 
 FROM scratch AS integration
 COPY --from=integration-build /out/metricshell /metricshell
@@ -59,6 +61,7 @@ COPY --from=integration-build /out/workload-fixture /workload-fixture
 COPY --from=integration-build /out/process-group-fixture /process-group-fixture
 COPY --from=integration-build /out/signal-fixture /signal-fixture
 COPY --from=integration-build /out/reaper-fixture /reaper-fixture
+COPY --from=integration-build /out/result-matrix-fixture /result-matrix-fixture
 ENTRYPOINT ["/metricshell"]
 
 FROM scratch AS runtime

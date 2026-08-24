@@ -5,11 +5,11 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-005 enables Linux child-subreaper mode before starting the workload and uses one `wait4` owner for the primary and
-all adopted descendants. The primary PID and process-compatible result remain authoritative and are emitted exactly
-once; every reaped process is classified as `direct` or `adopted` without exposing child PIDs. MetricShell waits until
-all adopted children are reaped. Forced shutdown budgets and post-exit lifecycle behavior remain assigned to later
-issues.
+ISSUE-006 completes the Wave 1 supervisor foundation. MetricShell preserves every byte-sized primary workload result,
+including values that collide numerically with its own `64` and `70-73` registry, and maps signal termination to
+`128+signal`. Structured lifecycle records and the workload-started fact identify result origin. The primary result is
+resolved once and retained while adopted descendants are reaped. Final-wait modes, forced shutdown budgets, and the
+full lifecycle state machine remain assigned to later waves.
 
 ## Requirements
 
@@ -23,6 +23,16 @@ Run the same Docker-only gate used by CI. Make only supplies the repository revi
 ```sh
 make ci
 ```
+
+Run the explicit Wave 1 exit gate (currently the same complete Docker gate):
+
+```sh
+make wave1
+```
+
+The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
+`configuration.rejected` record), all workload exits `0-255`, and INT/TERM mappings. Product exit codes are observed
+inside the container so Docker CLI failures cannot be confused with MetricShell results.
 
 Build a minimal runtime image for a selected Linux architecture:
 
@@ -67,9 +77,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-005, EPIC-001, ADR-001, ADR-003, the Runtime State Machine, Self-Metrics and Structured
-Logging specifications, ADR-013 static multi-architecture distribution, and the cross-cutting definition of done.
-Child reaping does not add grace-budget or forced-kill policy from ISSUE-009.
+Implementation follows ISSUE-006, EPIC-001, ADR-001, ADR-002, ADR-003, the Configuration, Runtime State Machine,
+Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
+cross-cutting definition of done. Result preservation does not implement lifecycle states from ISSUE-007, forced-kill
+policy from ISSUE-009, or final-wait modes from ISSUE-026.
 
 ## Engineering contract for subsequent issues
 
@@ -88,8 +99,8 @@ Child reaping does not add grace-budget or forced-kill policy from ISSUE-009.
 - English and Russian documentation change together. Each issue moves through `In Progress`, `Testing`, and `Done`,
   records verification evidence, and finishes with a completeness audit of the affected READMEs.
 
-For ISSUE-005, `make ci` additionally verifies orphan adoption through a double spawn, including an external Docker init
-above MetricShell, both primary-before-child and child-before-primary completion orders, primary-PID reuse, exactly one
-primary result, `direct|adopted` reaping diagnostics, a 64-child exit burst with zero stable zombies, sanitized
-subreaper/reaper failures, guaranteed cleanup of the direct child, and race-detector execution. Existing
-signal-forwarding acceptance coverage remains active.
+For ISSUE-006, `make wave1` retains every earlier PID 1, argv, process-group, signal-forwarding and descendant-reaping
+check. Its Docker-contained result verifier additionally runs 256 independent MetricShell lifecycles for exits `0-255`
+and TERM/INT cases, proves one workload execution and one authoritative result per lifecycle, and rejects registry
+collisions misclassified as MetricShell failures. Pre-result internal failures remain covered before and after workload
+start; post-exit descendant work proves the resolved workload result is retained until completion.

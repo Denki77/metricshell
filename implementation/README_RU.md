@@ -5,10 +5,11 @@
 
 ## Текущий объём
 
-ISSUE-005 включает Linux child-subreaper mode до запуска workload и использует единственного владельца `wait4` для
-primary и всех adopted descendants. PID и process-compatible result primary остаются authoritative и публикуются ровно
-один раз; каждый reaped process классифицируется как `direct` или `adopted` без публикации child PID. MetricShell ждёт,
-пока все adopted children будут reaped. Forced shutdown budgets и post-exit lifecycle остаются в последующих задачах.
+ISSUE-006 завершает supervisor foundation Wave 1. MetricShell сохраняет каждый byte-sized result primary workload,
+включая значения, численно совпадающие с собственным registry `64` и `70-73`, и отображает signal termination как
+`128+signal`. Structured lifecycle records и факт workload-started определяют origin результата. Primary result
+разрешается один раз и сохраняется во время reaping adopted descendants. Final-wait modes, forced shutdown budgets и
+полная lifecycle state machine остаются в последующих waves.
 
 ## Требования
 
@@ -22,6 +23,16 @@ primary и всех adopted descendants. PID и process-compatible result primar
 ```sh
 make ci
 ```
+
+Запуск явного exit gate Wave 1, который сейчас совпадает с полным Docker gate:
+
+```sh
+make wave1
+```
+
+Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
+запись `configuration.rejected`), все workload exits `0-255` и отображения INT/TERM. Product exit codes наблюдаются
+внутри контейнера, поэтому сбой Docker CLI нельзя принять за результат MetricShell.
 
 Сборка минимального runtime image для выбранной Linux-архитектуры:
 
@@ -66,9 +77,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-005, EPIC-001, ADR-001, ADR-003, спецификациям Runtime State Machine, Self-Metrics и Structured
-Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of done. Child reaping не добавляет
-grace-budget или forced-kill policy из ISSUE-009.
+Реализация следует ISSUE-006, EPIC-001, ADR-001, ADR-002, ADR-003, спецификациям Configuration, Runtime State Machine,
+Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of done.
+Result preservation не реализует lifecycle states из ISSUE-007, forced-kill policy из ISSUE-009 или final-wait modes из
+ISSUE-026.
 
 ## Инженерный контракт для следующих задач
 
@@ -87,8 +99,8 @@ grace-budget или forced-kill policy из ISSUE-009.
 - Английская и русская документация изменяются синхронно. Каждая задача проходит статусы `В работе`, `Тестирование` и
   `Готово`, фиксирует test evidence и завершается проверкой полноты затронутых README.
 
-Для ISSUE-005 `make ci` дополнительно проверяет orphan adoption через double spawn, включая внешний Docker init над
-MetricShell, оба порядка завершения primary-before-child и child-before-primary, reuse primary PID, ровно один primary
-result, reaping diagnostics `direct|adopted`, burst из 64 завершающихся children с нулём стабильных zombies, sanitized
-failures subreaper/reaper, гарантированный cleanup direct child и race detector. Существующее signal-forwarding
-acceptance coverage остаётся активным.
+Для ISSUE-006 `make wave1` сохраняет все предыдущие проверки PID 1, argv, process group, signal forwarding и descendant
+reaping. Docker-contained result verifier дополнительно запускает 256 независимых lifecycle MetricShell для exits
+`0-255` и cases TERM/INT, доказывает одно выполнение workload и один authoritative result на lifecycle и отклоняет
+ошибочную классификацию registry collisions как failures MetricShell. Pre-result internal failures остаются покрыты до
+и после workload start; post-exit descendant work доказывает сохранение resolved workload result до завершения.
