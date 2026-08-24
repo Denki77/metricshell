@@ -33,13 +33,12 @@ integration:
 		docker run --rm $(IMAGE)-integration:local -- /workload-fixture >/dev/null 2>&1 || exit 1; \
 		attempt=$$((attempt + 1)); \
 	done
-	@code=0; output="$$(docker run --rm -e FIXTURE_SIGNALS=TERM,INT,HUP,QUIT,TERM $(IMAGE)-integration:local -- /signal-fixture 2>&1)" || code=$$?; \
+	@code=0; output="$$(docker run --rm -e FIXTURE_SIGNALS=HUP,QUIT,HUP,QUIT,HUP $(IMAGE)-integration:local -- /signal-fixture 2>&1)" || code=$$?; \
 		test "$$code" -eq 0; \
 		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.signal_forwarded"')" -eq 5; \
-		test "$$(printf '%s\n' "$$output" | grep '"event":"workload.signal_forwarded"' | sed -n 's/.*"signal":"\([^"]*\)".*/\1/p' | paste -sd, -)" = "TERM,INT,HUP,QUIT,TERM"; \
-		printf '%s\n' "$$output" | grep '"state":"stopping".*"signal":"HUP"' >/dev/null; \
-		printf '%s\n' "$$output" | grep -F '"signal":"TERM","count":5' >/dev/null; \
-		printf '%s\n' "$$output" | grep -F '"signal":"INT"' >/dev/null; \
+		test "$$(printf '%s\n' "$$output" | grep '"event":"workload.signal_forwarded"' | sed -n 's/.*"signal":"\([^"]*\)".*/\1/p' | paste -sd, -)" = "HUP,QUIT,HUP,QUIT,HUP"; \
+		printf '%s\n' "$$output" | grep '"state":"running".*"signal":"HUP"' >/dev/null; \
+		printf '%s\n' "$$output" | grep -F '"signal":"HUP","count":5' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"signal":"HUP"' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"signal":"QUIT"' >/dev/null
 	@attempt=0; while test "$$attempt" -lt 25; do \
@@ -78,6 +77,30 @@ integration:
 	@code=0; output="$$(docker run --rm --entrypoint /result-matrix-fixture $(IMAGE)-integration:local 2>&1)" || code=$$?; \
 		test "$$code" -eq 0; \
 		printf '%s\n' "$$output" | grep -F '"event":"fixture.result_matrix","configurations_checked":1,"exits_checked":256,"signals_checked":2' >/dev/null
+	@for mode in cooperative ignore fork-after-signal; do \
+		container="$$(docker run -d -e TERMINATION_MODE="$$mode" -e METRICSHELL_SHUTDOWN_TOTAL_GRACE=1s -e METRICSHELL_WORKLOAD_SHUTDOWN_TIMEOUT=100ms -e METRICSHELL_SHUTDOWN_RESERVE=250ms $(IMAGE)-integration:local -- /termination-fixture)"; \
+		attempt=0; until docker logs "$$container" 2>&1 | grep -F '"event":"fixture.ready"' >/dev/null; do \
+			attempt=$$((attempt + 1)); \
+			if test "$$attempt" -eq 30; then docker rm -f "$$container" >/dev/null; exit 1; fi; \
+			sleep 0.1; \
+		done; \
+		docker kill --signal TERM "$$container" >/dev/null; \
+		code="$$(docker wait "$$container")"; output="$$(docker logs "$$container" 2>&1)"; docker rm "$$container" >/dev/null; \
+		if test "$$mode" = cooperative; then test "$$code" -eq 0; test "$$(printf '%s\n' "$$output" | grep -c '"event":"shutdown.forced"')" -eq 0; \
+		else test "$$code" -eq 137; test "$$(printf '%s\n' "$$output" | grep -c '"event":"shutdown.forced"')" -eq 1; fi; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"shutdown.started"')" -eq 1; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"shutdown.completed"')" -eq 1; \
+		if test "$$mode" = fork-after-signal; then printf '%s\n' "$$output" | grep '"event":"child.reaped".*"kind":"adopted"' >/dev/null; fi; \
+	done
+	@container="$$(docker run -d -e TERMINATION_MODE=ignore -e METRICSHELL_SHUTDOWN_TOTAL_GRACE=1s -e METRICSHELL_WORKLOAD_SHUTDOWN_TIMEOUT=750ms -e METRICSHELL_SHUTDOWN_RESERVE=250ms $(IMAGE)-integration:local -- /termination-fixture)"; \
+		attempt=0; until docker logs "$$container" 2>&1 | grep -F '"event":"fixture.ready"' >/dev/null; do attempt=$$((attempt + 1)); if test "$$attempt" -eq 30; then docker rm -f "$$container" >/dev/null; exit 1; fi; sleep 0.1; done; \
+		docker kill --signal TERM "$$container" >/dev/null; docker kill --signal TERM "$$container" >/dev/null; \
+		code="$$(docker wait "$$container")"; output="$$(docker logs "$$container" 2>&1)"; docker rm "$$container" >/dev/null; \
+		test "$$code" -eq 137; test "$$(printf '%s\n' "$$output" | grep -c '"event":"shutdown.forced"')" -eq 1
+	@container="$$(docker run -d -e TERMINATION_MODE=ignore -e METRICSHELL_SHUTDOWN_TOTAL_GRACE=1s -e METRICSHELL_WORKLOAD_SHUTDOWN_TIMEOUT=0 -e METRICSHELL_SHUTDOWN_RESERVE=1s $(IMAGE)-integration:local -- /termination-fixture)"; \
+		attempt=0; until docker logs "$$container" 2>&1 | grep -F '"event":"fixture.ready"' >/dev/null; do attempt=$$((attempt + 1)); if test "$$attempt" -eq 30; then docker rm -f "$$container" >/dev/null; exit 1; fi; sleep 0.1; done; \
+		docker kill --signal TERM "$$container" >/dev/null; code="$$(docker wait "$$container")"; output="$$(docker logs "$$container" 2>&1)"; docker rm "$$container" >/dev/null; \
+		test "$$code" -eq 137; printf '%s\n' "$$output" | grep -F '"event":"shutdown.started"' | grep -F '"remaining_ms":1000' >/dev/null
 
 ci: test integration
 

@@ -5,10 +5,10 @@
 
 ## Текущий объём
 
-ISSUE-008 добавляет принятую shutdown budget model к lifecycle machine Wave 2. Shutdown configuration валидируется до
-workload spawn, один monotonic absolute deadline ограничивает все phase contexts, authoritative external deadline никогда
-не продлевается. Гарантии result/reaping Wave 1 и state/log semantics ISSUE-007 сохраняются. Process-group escalation и
-HTTP probe transport остаются следующим задачам Wave 2.
+ISSUE-009 завершает termination escalation поверх принятых lifecycle и shutdown budget Wave 2. TERM/INT пересылается
+owned process group, workload grace ограничивается resolved monotonic deadline, а истечение grace или повторный
+termination signal приводит к idempotent group SIGKILL. MetricShell по-прежнему reap-ит всех managed children перед
+возвратом единственного сохранённого workload result. HTTP probe transport остаётся в ISSUE-010.
 
 ## Требования
 
@@ -69,6 +69,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
+- `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
@@ -76,10 +77,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-006, EPIC-001, ADR-001, ADR-002, ADR-003, спецификациям Configuration, Runtime State Machine,
+Реализация следует ISSUE-009, EPIC-001, ADR-001, ADR-002, ADR-003, спецификациям Configuration, Runtime State Machine,
 Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of done.
-Result preservation не реализует lifecycle states из ISSUE-007, forced-kill policy из ISSUE-009 или final-wait modes из
-ISSUE-026.
+HTTP probe handling остаётся в ISSUE-010, а final-wait modes — в ISSUE-026.
 
 ## Инженерный контракт для следующих задач
 

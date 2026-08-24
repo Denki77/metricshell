@@ -5,10 +5,10 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-008 adds the accepted shutdown budget model to the Wave 2 lifecycle machine. Shutdown configuration is validated
-before workload spawn, one monotonic absolute deadline bounds all phase contexts, and an authoritative external deadline
-is never extended. The Wave 1 result/reaping guarantees and ISSUE-007 state/log semantics remain intact. Process-group
-escalation and HTTP probe transport remain assigned to the following Wave 2 tasks.
+ISSUE-009 completes termination escalation on top of the accepted Wave 2 lifecycle and shutdown budget. TERM/INT is
+forwarded to the owned process group, workload grace is bounded by the resolved monotonic deadline, and grace expiry or
+a repeated termination signal applies idempotent group SIGKILL. MetricShell still reaps every managed child before
+returning the single saved workload result. HTTP probe transport remains assigned to ISSUE-010.
 
 ## Requirements
 
@@ -69,6 +69,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
+- `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
@@ -76,10 +77,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-006, EPIC-001, ADR-001, ADR-002, ADR-003, the Configuration, Runtime State Machine,
+Implementation follows ISSUE-009, EPIC-001, ADR-001, ADR-002, ADR-003, the Configuration, Runtime State Machine,
 Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Result preservation does not implement lifecycle states from ISSUE-007, forced-kill
-policy from ISSUE-009, or final-wait modes from ISSUE-026.
+cross-cutting definition of done. HTTP probe handling remains ISSUE-010 and final-wait modes remain ISSUE-026.
 
 ## Engineering contract for subsequent issues
 

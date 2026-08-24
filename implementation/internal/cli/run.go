@@ -11,6 +11,7 @@ import (
 	exitCodes "github.com/Denki77/metricshell/implementation/internal/constants"
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 	"github.com/Denki77/metricshell/implementation/internal/workload"
 )
 
@@ -54,18 +55,19 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		if err := machine.TransitionEvent(lifecycle.ConfigurationValidated); err != nil {
 			return failLifecycle(machine, logger)
 		}
-		result := workload.Run(configuration.Workload, stdin, stdout, stderr, workload.Observers{
+		var shutdownPlan *shutdown.Plan
+		result := workload.Run(configuration.Workload, stdin, stdout, stderr, configuration.Shutdown, workload.Observers{
 			Started: func(pid, processGroupID int) error {
 				if err := machine.TransitionEvent(lifecycle.WorkloadStarted); err != nil {
 					return err
 				}
 				return logger.WriteWorkloadStarted(pid, processGroupID)
 			},
-			PrimaryExited: func(exitCode int) error {
+			PrimaryExited: func(exitCode int, forced bool) error {
 				if err := machine.TransitionEvent(lifecycle.WorkloadExited); err != nil {
 					return err
 				}
-				return logger.WriteWorkloadExited(exitCode)
+				return logger.WriteWorkloadExited(exitCode, forced)
 			},
 			ChildReaped: func(kind string) error {
 				return logger.WriteChildReaped(kind, string(machine.State()))
@@ -78,12 +80,15 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				}
 				return logger.WriteRuntimeFailed()
 			},
-			Signal: func(event workload.SignalEvent) error {
-				if event.Name == "TERM" || event.Name == "INT" {
-					if err := machine.TransitionEvent(lifecycle.TerminationAfterSpawn); err != nil {
-						return err
-					}
+			Shutdown: func(signal string, plan shutdown.Plan) error {
+				shutdownPlan = &plan
+				if err := machine.TransitionEvent(lifecycle.TerminationAfterSpawn); err != nil {
+					return err
 				}
+				return logger.WriteShutdownStarted(signal, plan.Deadline, plan.Remaining(plan.StartedAt))
+			},
+			Forced: logger.WriteShutdownForced,
+			Signal: func(event workload.SignalEvent) error {
 				switch event.Outcome {
 				case workload.SignalForwarded:
 					return logger.WriteSignalForwarded(event.Name, string(machine.State()), event.ProcessGroupID)
@@ -94,6 +99,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				}
 			},
 		})
+		if shutdownPlan != nil && result.Started && machine.State() == lifecycle.Finalizing {
+			if err := logger.WriteShutdownCompleted(result.ExitCode, now().Sub(shutdownPlan.StartedAt)); err != nil {
+				return failLifecycle(machine, logger)
+			}
+		}
 		if result.StartFailed {
 			if err := machine.TransitionEvent(lifecycle.WorkloadStartFailed); err != nil {
 				return failLifecycle(machine, logger)

@@ -4,11 +4,13 @@ import (
 	"errors"
 	"io"
 	"os"
+	"os/signal"
 	"syscall"
 	"testing"
 	"time"
 
 	exitCodes "github.com/Denki77/metricshell/implementation/internal/constants"
+	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 )
 
 const helperProcessEnvironment = "METRICSHELL_WORKLOAD_TEST_HELPER"
@@ -145,7 +147,7 @@ func TestReusedPrimaryPIDDoesNotReplacePrimaryResult(t *testing.T) {
 	releases := 0
 	kinds := make([]string, 0, len(events))
 	observers := Observers{
-		PrimaryExited: func(exitCode int) error {
+		PrimaryExited: func(exitCode int, _ bool) error {
 			primaryEvents++
 			if exitCode != 7 {
 				t.Fatalf("primary exit code = %d, want 7", exitCode)
@@ -159,7 +161,7 @@ func TestReusedPrimaryPIDDoesNotReplacePrimaryResult(t *testing.T) {
 	}
 
 	for _, event := range events {
-		if err := processReapEvent(event, primaryPID, &primaryResult, func() { releases++ }, observers); err != nil {
+		if err := processReapEvent(event, primaryPID, &primaryResult, false, func() { releases++ }, observers); err != nil {
 			t.Fatalf("processReapEvent() error = %v", err)
 		}
 	}
@@ -232,9 +234,86 @@ func TestQueuedSignalAfterWaitIsIgnored(t *testing.T) {
 	}
 }
 
+func TestRepeatedTerminationForcesIgnoringWorkload(t *testing.T) {
+	t.Setenv(helperProcessEnvironment, "ignore")
+	signals := make(chan os.Signal, 2)
+	dependencies := testDependencies(signals)
+	dependencies.after = func(time.Duration) <-chan time.Time { return make(chan time.Time) }
+	dependencies.forward = func(processGroupID int, received os.Signal) SignalEvent {
+		return SignalEvent{Name: "TERM", ProcessGroupID: processGroupID, Outcome: SignalForwarded}
+	}
+	forced := 0
+
+	result := run(helperCommand(), nil, io.Discard, io.Discard, Observers{
+		Started: func(_, _ int) error {
+			signals <- syscall.SIGTERM
+			signals <- syscall.SIGTERM
+			return nil
+		},
+		Forced: func(signal string, _ int) error {
+			forced++
+			if signal != "TERM" {
+				t.Fatalf("forced signal = %s", signal)
+			}
+			return nil
+		},
+	}, dependencies)
+
+	if result.ExitCode != 137 || !result.Forced || forced != 1 {
+		t.Fatalf("run() = %+v, forced events = %d", result, forced)
+	}
+}
+
+func TestZeroWorkloadBudgetForcesAfterForward(t *testing.T) {
+	t.Setenv(helperProcessEnvironment, "ignore")
+	signals := make(chan os.Signal, 1)
+	dependencies := testDependencies(signals)
+	dependencies.shutdown = shutdown.Config{TotalGrace: time.Second, WorkloadTimeout: 0, Reserve: time.Second}
+	forwarded := false
+	dependencies.forward = func(processGroupID int, received os.Signal) SignalEvent {
+		forwarded = true
+		return SignalEvent{Name: "TERM", ProcessGroupID: processGroupID, Outcome: SignalForwarded}
+	}
+	forced := false
+
+	result := run(helperCommand(), nil, io.Discard, io.Discard, Observers{
+		Started: func(_, _ int) error { signals <- syscall.SIGTERM; return nil },
+		Forced:  func(string, int) error { forced = true; return nil },
+	}, dependencies)
+
+	if result.ExitCode != 137 || !result.Forced || !forwarded || !forced {
+		t.Fatalf("run() = %+v, forwarded=%t forced=%t", result, forwarded, forced)
+	}
+}
+
+func TestForcedTerminationIsIdempotentWhenGroupDisappears(t *testing.T) {
+	dependencies := testDependencies(make(chan os.Signal))
+	dependencies.killGroup = func(int) error { return syscall.ESRCH }
+	forcedEvents := 0
+	value := newEscalation(42, Observers{Forced: func(string, int) error {
+		forcedEvents++
+		return nil
+	}}, dependencies)
+	value.signal = "TERM"
+
+	if err := value.force(); err != nil {
+		t.Fatal(err)
+	}
+	if err := value.force(); err != nil {
+		t.Fatal(err)
+	}
+	if value.forced || forcedEvents != 0 {
+		t.Fatalf("forced=%t events=%d, want disappeared group ignored", value.forced, forcedEvents)
+	}
+}
+
 func TestHelperProcess(t *testing.T) {
-	if os.Getenv(helperProcessEnvironment) != "1" {
+	mode := os.Getenv(helperProcessEnvironment)
+	if mode == "" {
 		return
+	}
+	if mode == "ignore" {
+		signal.Ignore(syscall.SIGTERM, syscall.SIGINT)
 	}
 	for {
 		time.Sleep(time.Hour)
@@ -254,6 +333,9 @@ func testDependencies(signals <-chan os.Signal) runDependencies {
 		killGroup:       func(processGroupID int) error { return syscall.Kill(-processGroupID, syscall.SIGKILL) },
 		wait4:           syscall.Wait4,
 		fallbackDelay:   10 * time.Millisecond,
+		shutdown:        shutdown.Defaults(),
+		now:             time.Now,
+		after:           time.After,
 	}
 }
 

@@ -1,6 +1,6 @@
 # ISSUE-009. Эскалация termination
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -29,3 +29,23 @@
 - **Критерии приёмки и обязательные тесты:** Cooperative, ignoring и fork-after-signal workloads; zero remaining budget;
   repeated signal; disappearing group; отсутствие surviving descendants.
 - **Условие завершения:** Готово, когда каждый termination path завершается внутри budget без оставшихся descendants.
+
+## Журнал выполнения
+
+- 2026-08-24: задача переведена в `В работе`; реализованы budget-aware escalation controller и shutdown diagnostics.
+- 2026-08-24: задача переведена в `Тестирование`; в Docker прошли race-enabled unit tests и real-container сценарии
+  cooperative, ignoring, fork-after-signal, repeated signal, zero budget и disappearing group.
+- 2026-08-24: задача переведена в `Готово`; termination завершается одним authoritative result после reaping всех
+  managed children, а forced cleanup выполняется idempotently и в границах принятого shutdown plan.
+
+## Свидетельства проверки
+
+- Первый TERM/INT фиксирует один absolute shutdown deadline, пересылает graceful signal и запускает только workload
+  grace timer; повторный termination signal может немедленно форсировать owned process group.
+- По истечении grace SIGKILL посылается всей process group и даёт exit `137`; уже исчезнувшая group обрабатывается
+  idempotently без ложного forced-termination event.
+- Container fixtures доказывают cooperative exit, forced exit для ignoring workload и reaping descendant, созданного
+  после graceful signal.
+- `shutdown.started`, `shutdown.forced`, `shutdown.completed` и поле `forced` результата workload соответствуют
+  registry structured events.
+- `implementation/README.md` и `implementation/README_RU.md` проверены на полноту и обновлены синхронно.
