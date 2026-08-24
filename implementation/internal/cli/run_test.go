@@ -99,3 +99,26 @@ func TestRunRejectsInvalidStartupConfiguration(t *testing.T) {
 		t.Error("runtime_id is empty")
 	}
 }
+
+func TestRunRejectsOvercommittedShutdownBeforeWorkloadStart(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+	now := time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
+	code := Run([]string{
+		"--shutdown-total-grace=1s",
+		"--workload-shutdown-timeout=751ms",
+		"--shutdown-reserve=250ms",
+		"--", "/must-not-start",
+	}, nil, &stdout, &stderr, buildinfo.Info{}, func() time.Time { return now })
+
+	if code != 64 {
+		t.Fatalf("Run() code = %d, want 64", code)
+	}
+	if stdout.Len() != 0 || bytes.Contains(stderr.Bytes(), []byte(`"event":"workload.`)) {
+		t.Fatalf("workload was observed: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte(`"event":"configuration.rejected"`)) {
+		t.Fatalf("configuration rejection missing: %s", stderr.String())
+	}
+}

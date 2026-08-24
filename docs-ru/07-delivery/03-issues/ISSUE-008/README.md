@@ -1,6 +1,6 @@
 # ISSUE-008. Модель shutdown budget
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -30,3 +30,22 @@
   already-expired deadline; clock advancement; cancellation каждой phase.
 - **Условие завершения:** Готово, когда ни одна phase не превышает absolute deadline, а все validation/error paths
   наблюдаемы.
+
+## Журнал выполнения
+
+- 2026-08-24: задача переведена в `В работе`; реализованы shutdown configuration и deadline-derived phase model.
+- 2026-08-24: задача переведена в `Тестирование`; grammar, range, equality/overflow, expiry, clock advancement и
+  phase-cancellation tests прошли под race detector в Docker.
+- 2026-08-24: задача переведена в `Готово`; invalid budgets отклоняются до spawn, каждый phase context ограничен deadline.
+
+## Свидетельства проверки
+
+- Defaults равны `30s` total, `28s` workload и `2s` reserve; CLI имеет приоритет над environment, environment — над defaults.
+- Duration parser реализует нормативную integer/unit grammar и отклоняет signs, fractions, compounds, leading zeroes и
+  overflow до range validation.
+- Resolved plan удерживает один absolute deadline, задаёт нулевой workload grace, когда reserve не помещается, и никогда
+  не продлевает external deadline.
+- Signal forwarding, workload grace, finalization, HTTP drain и forced cleanup получают cancellable contexts,
+  ограниченные phase boundary и общим deadline.
+- CLI-level test подтверждает возврат `64`/`configuration.rejected` для overcommitted budget без workload event.
+- `implementation/README.md` и `implementation/README_RU.md` проверены и обновлены вместе.

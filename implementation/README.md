@@ -5,11 +5,10 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-007 starts Wave 2 with the accepted runtime lifecycle state machine. MetricShell now drives supervisor behavior,
-structured state-change logs, probe status derivation, and the one-hot runtime-state vector from one concurrency-safe
-transition table. The Wave 1 guarantees remain: every byte-sized primary result is preserved while adopted descendants
-are reaped. Shutdown budget allocation, escalation, and HTTP probe transport remain assigned to the following Wave 2
-tasks.
+ISSUE-008 adds the accepted shutdown budget model to the Wave 2 lifecycle machine. Shutdown configuration is validated
+before workload spawn, one monotonic absolute deadline bounds all phase contexts, and an authoritative external deadline
+is never extended. The Wave 1 result/reaping guarantees and ISSUE-007 state/log semantics remain intact. Process-group
+escalation and HTTP probe transport remain assigned to the following Wave 2 tasks.
 
 ## Requirements
 

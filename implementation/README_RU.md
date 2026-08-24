@@ -5,10 +5,10 @@
 
 ## Текущий объём
 
-ISSUE-007 начинает Wave 2 принятой runtime lifecycle state machine. MetricShell управляет supervisor behavior,
-structured state-change logs, выводом probe statuses и one-hot runtime-state vector из одной concurrency-safe transition
-table. Гарантии Wave 1 сохраняются: каждый byte-sized primary result удерживается во время reaping adopted descendants.
-Shutdown budget allocation, escalation и HTTP probe transport остаются следующим задачам Wave 2.
+ISSUE-008 добавляет принятую shutdown budget model к lifecycle machine Wave 2. Shutdown configuration валидируется до
+workload spawn, один monotonic absolute deadline ограничивает все phase contexts, authoritative external deadline никогда
+не продлевается. Гарантии result/reaping Wave 1 и state/log semantics ISSUE-007 сохраняются. Process-group escalation и
+HTTP probe transport остаются следующим задачам Wave 2.
 
 ## Требования
 

@@ -1,6 +1,6 @@
 # ISSUE-008. Shutdown budget model
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -24,3 +24,22 @@ Validate configuration before workload startup.
 - **Acceptance criteria and required tests:** Every duration boundary; timeout plus reserve equality and overflow;
   already-expired deadline; clock advancement; cancellation at each phase.
 - **Completion:** Complete when no phase can exceed the absolute deadline and all validation/error paths are observable.
+
+## Delivery log
+
+- 2026-08-24: moved to `In Progress`; shutdown configuration and the deadline-derived phase model were implemented.
+- 2026-08-24: moved to `Testing`; grammar, range, equality/overflow, expiry, clock-advance and phase-cancellation tests
+  passed under the race detector in Docker.
+- 2026-08-24: moved to `Done`; invalid budgets are rejected before spawn and every phase context is deadline-capped.
+
+## Verification evidence
+
+- Defaults are `30s` total, `28s` workload and `2s` reserve; CLI overrides environment, which overrides defaults.
+- Duration parsing implements the normative integer/unit grammar and rejects signs, fractions, compounds, leading zeroes
+  and overflow before range validation.
+- The resolved plan retains one absolute deadline, derives zero workload grace when reserve cannot fit, and never
+  extends an external deadline.
+- Signal forwarding, workload grace, finalization, HTTP drain and forced cleanup receive cancellable contexts capped by
+  the phase boundary and the common deadline.
+- A CLI-level test proves an overcommitted budget returns `64`/`configuration.rejected` without a workload event.
+- `implementation/README.md` and `implementation/README_RU.md` were reviewed and updated together.

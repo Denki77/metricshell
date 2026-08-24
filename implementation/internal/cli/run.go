@@ -49,7 +49,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		return exitCodes.ExitInternalFailure
 	}
 
-	configuration, err := config.Parse(args)
+	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
 		if err := machine.TransitionEvent(lifecycle.ConfigurationValidated); err != nil {
 			return failLifecycle(machine, logger)
