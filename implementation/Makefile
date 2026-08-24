@@ -4,7 +4,7 @@ REVISION ?= $(shell git -C $(PROJECT_ROOT) rev-parse --verify HEAD 2>/dev/null |
 IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 
-.PHONY: all test integration ci wave1 build
+.PHONY: all test integration ci wave1 wave2 build
 
 all: ci
 
@@ -101,10 +101,14 @@ integration:
 		attempt=0; until docker logs "$$container" 2>&1 | grep -F '"event":"fixture.ready"' >/dev/null; do attempt=$$((attempt + 1)); if test "$$attempt" -eq 30; then docker rm -f "$$container" >/dev/null; exit 1; fi; sleep 0.1; done; \
 		docker kill --signal TERM "$$container" >/dev/null; code="$$(docker wait "$$container")"; output="$$(docker logs "$$container" 2>&1)"; docker rm "$$container" >/dev/null; \
 		test "$$code" -eq 137; printf '%s\n' "$$output" | grep -F '"event":"shutdown.started"' | grep -F '"remaining_ms":1000' >/dev/null
+	@output="$$(docker run --rm --entrypoint /probe-fixture $(IMAGE)-integration:local)"; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.probes"' | grep -F '"requests_checked":18' | grep -F '"states_checked":8' >/dev/null
 
 ci: test integration
 
 wave1: ci
+
+wave2: ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"

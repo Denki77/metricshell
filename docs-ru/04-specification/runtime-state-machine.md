@@ -46,21 +46,21 @@ Workload exit является событием, а не состоянием. F
 
 Закрытый lifecycle event set:
 
-| Событие                           | Допустимый источник                         | Результат         |
-|-----------------------------------|----------------------------------------------|-------------------|
-| configuration_validated           | initializing                                 | starting_workload |
-| initialization_failed             | initializing                                 | failed            |
-| workload_started                  | starting_workload                            | running           |
-| workload_start_failed             | starting_workload                            | failed            |
-| workload_exited                   | running, stopping                            | finalizing        |
-| termination_before_spawn          | initializing, starting_workload              | terminated        |
-| termination_after_spawn           | starting_workload, running                    | stopping          |
-| termination_after_spawn           | finalizing, final_wait                       | terminated        |
-| runtime_failed                    | любое нетерминальное состояние                | failed            |
-| finalization_completed_immediate  | finalizing                                   | terminated        |
-| finalization_completed_wait       | finalizing                                   | final_wait        |
-| final_wait_completed              | final_wait                                   | terminated        |
-| cleanup_completed                 | failed                                       | terminated        |
+| Событие                           | Допустимый источник                     | Результат         |
+|-----------------------------------|-----------------------------------------|-------------------|
+| configuration_validated           | initializing                            | starting_workload |
+| initialization_failed             | initializing                            | failed            |
+| workload_started                  | starting_workload                       | running           |
+| workload_start_failed             | starting_workload                       | failed            |
+| workload_exited                   | running, stopping                       | finalizing        |
+| termination_before_spawn          | initializing, starting_workload         | terminated        |
+| termination_after_spawn           | starting_workload, running              | stopping          |
+| termination_after_spawn           | finalizing, final_wait                  | terminated        |
+| runtime_failed                    | любое нетерминальное состояние          | failed            |
+| finalization_completed_immediate  | finalizing                              | terminated        |
+| finalization_completed_wait       | finalizing                              | final_wait        |
+| final_wait_completed              | final_wait                              | terminated        |
+| cleanup_completed                 | failed                                  | terminated        |
 
 Каждая пара `(source state, event)` имеет ровно одну цель. Контекст, меняющий цель, представлен отдельным event;
 вызывающий код не может выбирать target вне lifecycle machine.
@@ -131,6 +131,13 @@ Candidates, не допущенные до закрытия, получают fr
 | terminated        |                        unavailable | unavailable | unavailable                  |
 
 Probe requests никогда не считаются final scrapes. Readiness намеренно false вне running.
+
+Probe adapter версии 1 владеет точными путями `GET /healthz` и `GET /readyz`. Известный probe path с другим method
+возвращает `405` и `Allow: GET`, неизвестный path — `404`. Bounded plain-text responses содержат `Cache-Control:
+no-store`: health возвращает `ok`, `failed` или `unavailable`, readiness — `ready`, `not ready` или `unavailable`.
+Строка terminated означает, что HTTP server больше не принимает новые requests; уже принятый request, увидевший
+`terminated`, возвращает `503 unavailable`. Обработка probe читает одно public state и не должна менять lifecycle,
+snapshot или вызывать final-scrape completion.
 
 ## Приоритет termination и process result
 

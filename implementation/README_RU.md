@@ -5,10 +5,10 @@
 
 ## Текущий объём
 
-ISSUE-009 завершает termination escalation поверх принятых lifecycle и shutdown budget Wave 2. TERM/INT пересылается
-owned process group, workload grace ограничивается resolved monotonic deadline, а истечение grace или повторный
-termination signal приводит к idempotent group SIGKILL. MetricShell по-прежнему reap-ит всех managed children перед
-возвратом единственного сохранённого workload result. HTTP probe transport остаётся в ISSUE-010.
+Wave 2 завершена до ISSUE-010 включительно. Lifecycle machine, monotonic shutdown budget и process-group escalation
+теперь питают bounded HTTP probe adapter с фиксированной семантикой `/healthz` и `/readyz` для всех public states.
+Adapter готов к подключению exposition server в ISSUE-023; эта задача не bind-ит production listener и не реализует
+metrics exposition.
 
 ## Требования
 
@@ -27,6 +27,12 @@ make ci
 
 ```sh
 make wave1
+```
+
+Запуск exit gate Wave 2 для lifecycle, shutdown, escalation и probes:
+
+```sh
+make wave2
 ```
 
 Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
@@ -69,6 +75,8 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
+- `internal/lifecycle`: synchronized public runtime state и transitions.
+- `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
 - `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
@@ -77,9 +85,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-009, EPIC-001, ADR-001, ADR-002, ADR-003, спецификациям Configuration, Runtime State Machine,
-Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of done.
-HTTP probe handling остаётся в ISSUE-010, а final-wait modes — в ISSUE-026.
+Реализация следует ISSUE-010, EPIC-001, ADR-001, ADR-002, ADR-003, ADR-011, спецификациям Configuration, Runtime State
+Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of
+done. Интеграция production listener/exposition остаётся в ISSUE-023, а final-wait modes — в ISSUE-026.
 
 ## Инженерный контракт для следующих задач
 

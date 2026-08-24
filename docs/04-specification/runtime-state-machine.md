@@ -55,7 +55,7 @@ The closed lifecycle event set is:
 | workload_start_failed            | starting_workload                           | failed            |
 | workload_exited                  | running, stopping                           | finalizing        |
 | termination_before_spawn         | initializing, starting_workload             | terminated        |
-| termination_after_spawn          | starting_workload, running                   | stopping          |
+| termination_after_spawn          | starting_workload, running                  | stopping          |
 | termination_after_spawn          | finalizing, final_wait                      | terminated        |
 | runtime_failed                   | any non-terminal state                      | failed            |
 | finalization_completed_immediate | finalizing                                  | terminated        |
@@ -133,6 +133,13 @@ Candidates not admitted before closure receive frozen.
 | terminated        |                            unavailable | unavailable | unavailable                        |
 
 Probe requests never count as final scrapes. Readiness is intentionally false outside running.
+
+The version 1 probe adapter owns exact paths `GET /healthz` and `GET /readyz`. A known probe path with another method
+returns `405` and `Allow: GET`; an unknown path returns `404`. Responses are bounded plain text with `Cache-Control:
+no-store`: health returns `ok`, `failed`, or `unavailable`, while readiness returns `ready`, `not ready`, or
+`unavailable`. The terminated row means the HTTP server accepts no new requests; an already accepted request that
+observes `terminated` returns `503 unavailable`. Serving a probe reads one public state and must not transition the
+lifecycle, mutate a snapshot, or invoke final-scrape completion.
 
 ## Termination precedence and process result
 
