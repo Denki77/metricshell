@@ -5,11 +5,10 @@
 
 ## Текущий объём
 
-ISSUE-006 завершает supervisor foundation Wave 1. MetricShell сохраняет каждый byte-sized result primary workload,
-включая значения, численно совпадающие с собственным registry `64` и `70-73`, и отображает signal termination как
-`128+signal`. Structured lifecycle records и факт workload-started определяют origin результата. Primary result
-разрешается один раз и сохраняется во время reaping adopted descendants. Final-wait modes, forced shutdown budgets и
-полная lifecycle state machine остаются в последующих waves.
+ISSUE-007 начинает Wave 2 принятой runtime lifecycle state machine. MetricShell управляет supervisor behavior,
+structured state-change logs, выводом probe statuses и one-hot runtime-state vector из одной concurrency-safe transition
+table. Гарантии Wave 1 сохраняются: каждый byte-sized primary result удерживается во время reaping adopted descendants.
+Shutdown budget allocation, escalation и HTTP probe transport остаются следующим задачам Wave 2.
 
 ## Требования
 

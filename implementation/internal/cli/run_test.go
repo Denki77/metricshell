@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"bufio"
 	"bytes"
 	"encoding/json"
 	"testing"
@@ -51,9 +52,30 @@ func TestRunRejectsInvalidStartupConfiguration(t *testing.T) {
 		t.Fatalf("stdout = %q, want empty", stdout.String())
 	}
 
+	var records []map[string]any
+	scanner := bufio.NewScanner(&stderr)
+	for scanner.Scan() {
+		var record map[string]any
+		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+			t.Fatalf("stderr is not JSON Lines: %v", err)
+		}
+		records = append(records, record)
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 5 {
+		t.Fatalf("records = %d, want 5: %s", len(records), stderr.String())
+	}
 	var record map[string]any
-	if err := json.Unmarshal(stderr.Bytes(), &record); err != nil {
-		t.Fatalf("stderr is not JSON Lines: %v", err)
+	for _, candidate := range records {
+		if candidate["event"] == "configuration.rejected" {
+			record = candidate
+			break
+		}
+	}
+	if record == nil {
+		t.Fatalf("configuration.rejected missing: %s", stderr.String())
 	}
 	want := map[string]any{
 		"timestamp":      "2026-08-11T07:30:00.000000123Z",
@@ -70,8 +92,8 @@ func TestRunRejectsInvalidStartupConfiguration(t *testing.T) {
 			t.Errorf("field %s = %#v, want %#v", field, got, expected)
 		}
 	}
-	if record["sequence"] != float64(1) {
-		t.Errorf("sequence = %#v, want 1", record["sequence"])
+	if record["sequence"] != float64(3) {
+		t.Errorf("sequence = %#v, want 3", record["sequence"])
 	}
 	if record["runtime_id"] == "" {
 		t.Error("runtime_id is empty")

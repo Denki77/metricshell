@@ -5,11 +5,11 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-006 completes the Wave 1 supervisor foundation. MetricShell preserves every byte-sized primary workload result,
-including values that collide numerically with its own `64` and `70-73` registry, and maps signal termination to
-`128+signal`. Structured lifecycle records and the workload-started fact identify result origin. The primary result is
-resolved once and retained while adopted descendants are reaped. Final-wait modes, forced shutdown budgets, and the
-full lifecycle state machine remain assigned to later waves.
+ISSUE-007 starts Wave 2 with the accepted runtime lifecycle state machine. MetricShell now drives supervisor behavior,
+structured state-change logs, probe status derivation, and the one-hot runtime-state vector from one concurrency-safe
+transition table. The Wave 1 guarantees remain: every byte-sized primary result is preserved while adopted descendants
+are reaped. Shutdown budget allocation, escalation, and HTTP probe transport remain assigned to the following Wave 2
+tasks.
 
 ## Requirements
 

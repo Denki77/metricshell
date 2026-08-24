@@ -97,11 +97,17 @@ func verifyRejectedConfiguration() error {
 	if err := scanner.Err(); err != nil {
 		return fmt.Errorf("configuration: read diagnostics: %w", err)
 	}
-	if len(records) != 1 {
-		return fmt.Errorf("configuration: diagnostics=%d, want 1", len(records))
+	rejected := 0
+	for _, record := range records {
+		if record.Event == "configuration.rejected" {
+			rejected++
+			if record.ErrorCode != config.ErrorCodeConfigInvalid {
+				return fmt.Errorf("configuration: error_code=%q", record.ErrorCode)
+			}
+		}
 	}
-	if records[0].Event != "configuration.rejected" || records[0].ErrorCode != config.ErrorCodeConfigInvalid {
-		return fmt.Errorf("configuration: event=%q error_code=%q", records[0].Event, records[0].ErrorCode)
+	if rejected != 1 {
+		return fmt.Errorf("configuration: rejected diagnostics=%d, want 1", rejected)
 	}
 	return nil
 }

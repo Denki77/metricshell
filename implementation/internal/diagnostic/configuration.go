@@ -24,12 +24,36 @@ type record struct {
 	Reason        string `json:"reason,omitempty"`
 	ErrorCode     string `json:"error_code,omitempty"`
 	ErrorMessage  string `json:"error_message,omitempty"`
+	PreviousState string `json:"previous_state,omitempty"`
+	PID           int    `json:"pid,omitempty"`
 	Signal        string `json:"signal,omitempty"`
 	WorkloadPID   int    `json:"workload_pid,omitempty"`
 	WorkloadPGID  int    `json:"workload_pgid,omitempty"`
 	ExitCode      *int   `json:"exit_code,omitempty"`
 	Forced        *bool  `json:"forced,omitempty"`
 	Kind          string `json:"kind,omitempty"`
+}
+
+func (logger *Logger) WriteRuntimeInitializing(pid int) error {
+	return logger.write(record{
+		Level:     "info",
+		Event:     "runtime.initializing",
+		Component: "runtime",
+		State:     "initializing",
+		Message:   "runtime initializing",
+		PID:       pid,
+	})
+}
+
+func (logger *Logger) WriteStateChanged(previous, current string) error {
+	return logger.write(record{
+		Level:         "info",
+		Event:         "runtime.state_changed",
+		Component:     "runtime",
+		State:         current,
+		Message:       "runtime state changed",
+		PreviousState: previous,
+	})
 }
 
 type Logger struct {

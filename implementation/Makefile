@@ -36,8 +36,8 @@ integration:
 	@code=0; output="$$(docker run --rm -e FIXTURE_SIGNALS=TERM,INT,HUP,QUIT,TERM $(IMAGE)-integration:local -- /signal-fixture 2>&1)" || code=$$?; \
 		test "$$code" -eq 0; \
 		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.signal_forwarded"')" -eq 5; \
-		printf '%s\n' "$$output" | grep '"sequence":6.*"signal":"TERM"' >/dev/null; \
-		printf '%s\n' "$$output" | grep '"sequence":4.*"state":"stopping".*"signal":"HUP"' >/dev/null; \
+		test "$$(printf '%s\n' "$$output" | grep '"event":"workload.signal_forwarded"' | sed -n 's/.*"signal":"\([^"]*\)".*/\1/p' | paste -sd, -)" = "TERM,INT,HUP,QUIT,TERM"; \
+		printf '%s\n' "$$output" | grep '"state":"stopping".*"signal":"HUP"' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"signal":"TERM","count":5' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"signal":"INT"' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"signal":"HUP"' >/dev/null; \

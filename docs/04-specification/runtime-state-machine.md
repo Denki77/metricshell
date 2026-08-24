@@ -47,18 +47,24 @@ public state. The duration and scrape-count policies share final_wait; immediate
 
 The closed lifecycle event set is:
 
-| Event                   | Valid source                                                     | Result                                  |
-|-------------------------|------------------------------------------------------------------|-----------------------------------------|
-| configuration_validated | initializing                                                     | starting_workload                       |
-| initialization_failed   | initializing                                                     | failed                                  |
-| workload_started        | starting_workload                                                | running                                 |
-| workload_start_failed   | starting_workload                                                | failed                                  |
-| workload_exited         | running, stopping                                                | finalizing                              |
-| termination_requested   | initializing, starting_workload, running, finalizing, final_wait | stopping or terminated as defined below |
-| runtime_failed          | any non-terminal state                                           | failed                                  |
-| finalization_completed  | finalizing                                                       | final_wait or terminated                |
-| final_wait_completed    | final_wait                                                       | terminated                              |
-| cleanup_completed       | failed                                                           | terminated                              |
+| Event                            | Valid source                                | Result            |
+|----------------------------------|---------------------------------------------|-------------------|
+| configuration_validated          | initializing                                | starting_workload |
+| initialization_failed            | initializing                                | failed            |
+| workload_started                 | starting_workload                           | running           |
+| workload_start_failed            | starting_workload                           | failed            |
+| workload_exited                  | running, stopping                           | finalizing        |
+| termination_before_spawn         | initializing, starting_workload             | terminated        |
+| termination_after_spawn          | starting_workload, running                   | stopping          |
+| termination_after_spawn          | finalizing, final_wait                      | terminated        |
+| runtime_failed                   | any non-terminal state                      | failed            |
+| finalization_completed_immediate | finalizing                                  | terminated        |
+| finalization_completed_wait      | finalizing                                  | final_wait        |
+| final_wait_completed             | final_wait                                  | terminated        |
+| cleanup_completed                | failed                                      | terminated        |
+
+Every `(source state, event)` pair has exactly one target. Context that changes the target is represented by a distinct
+event; callers cannot select a target outside the lifecycle machine.
 
 Repeated termination signals do not create a new state. They may shorten the remaining grace or trigger immediate forced
 cleanup according to shutdown policy and must be logged.
@@ -70,23 +76,23 @@ stateDiagram-v2
     [*] --> initializing
     initializing --> starting_workload: configuration_validated
     initializing --> failed: initialization_failed
-    initializing --> terminated: termination_requested
+    initializing --> terminated: termination_before_spawn
     starting_workload --> running: workload_started
     starting_workload --> failed: workload_start_failed
-    starting_workload --> stopping: termination_requested after spawn
-    starting_workload --> terminated: termination_requested before spawn
+    starting_workload --> stopping: termination_after_spawn
+    starting_workload --> terminated: termination_before_spawn
     running --> finalizing: workload_exited
-    running --> stopping: termination_requested
+    running --> stopping: termination_after_spawn
     running --> failed: runtime_failed
     stopping --> finalizing: workload_exited after bounded cleanup
     stopping --> failed: runtime_failed
-    finalizing --> final_wait: natural completion and mode duration or scrapes
-    finalizing --> terminated: natural completion and mode immediate
+    finalizing --> final_wait: finalization_completed_wait
+    finalizing --> terminated: finalization_completed_immediate
     finalizing --> terminated: external termination already active
-    finalizing --> terminated: termination_requested
+    finalizing --> terminated: termination_after_spawn
     finalizing --> failed: runtime_failed
     final_wait --> terminated: duration elapsed, required scrapes, or timeout
-    final_wait --> terminated: termination_requested
+    final_wait --> terminated: termination_after_spawn
     final_wait --> failed: runtime_failed
     failed --> terminated: cleanup_completed
     terminated --> [*]

@@ -1,6 +1,6 @@
 # ISSUE-007. State machine runtime lifecycle
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -31,3 +31,25 @@ termination — action, не дополнительными публичными
 - **Критерии приёмки и обязательные тесты:** Все valid/invalid transitions; concurrent exit/signal/publication; one-hot
   metric; health/readiness table; race detector.
 - **Условие завершения:** Готово, когда одна transition table управляет runtime behavior, probes, logs и tests.
+
+## Журнал выполнения
+
+- 2026-08-24: задача переведена в `В работе`; принятая таблица states/events отображена в отдельный lifecycle package.
+- 2026-08-24: задача переведена в `Тестирование`; valid/invalid transitions, one-hot, probe table, concurrent
+  exit/termination и Docker supervisor tests прошли под race detector.
+- 2026-08-24: задача переведена в `Готово`; runtime behavior выпускает каждый effective public transition из общей
+  state machine.
+
+## Свидетельства проверки
+
+- Закрытые registry из восьми states и двенадцати events представлены typed constants и одной нормативной transition
+  table; каждая пара `(state, event)` имеет ровно один target.
+- Invalid transitions не меняют state и возвращают deterministic errors; state-dependent concurrent events разрешаются
+  под lock машины.
+- Spawn timing и final-wait policy используют contextual events, поэтому runtime только передаёт events и не выбирает
+  target вне machine. Tests выполняют каждую нормативную строку через `TransitionEvent()` и отклоняют ambiguous tables.
+- Данные `metricshell_runtime_state` представлены полным one-hot vector ровно с одним active state.
+- Runtime logs содержат `runtime.initializing` и ровно одну запись `runtime.state_changed` после каждого effective
+  transition, включая initial state без `previous_state`.
+- `make ci IMAGE=metricshell-wave2` прошёл полностью через Docker, включая `go test -race` и все fixtures Wave 1.
+- `implementation/README.md` и `implementation/README_RU.md` проверены и обновлены вместе.
