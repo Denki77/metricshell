@@ -5,10 +5,10 @@ and dependency graph.
 
 ## Current scope
 
-Wave 2 is complete through ISSUE-010. The lifecycle machine, monotonic shutdown budget and process-group escalation now
-feed a bounded HTTP probe adapter with fixed `/healthz` and `/readyz` semantics for all public states. The adapter is
-ready for the exposition server in ISSUE-023; this issue does not bind a production listener or implement metrics
-exposition.
+ISSUE-011 starts the Wave 3 metric-state core with immutable candidate, validated and active snapshot representations.
+Typed construction validates application metric identity and values, normalizes empty families, and creates deterministic
+canonical JSON independently of transport. JSON parsing and the active last-valid holder remain in ISSUE-012 and
+ISSUE-013.
 
 ## Requirements
 
@@ -78,6 +78,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
 - `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
+- `internal/snapshot`: immutable application snapshot model, canonicalization, limits and rejection registry.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
@@ -85,10 +86,11 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-010, EPIC-001, ADR-001, ADR-002, ADR-003, ADR-011, the Configuration, Runtime State
+Implementation follows ISSUE-011, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, the Application Snapshot Protocol,
+Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Production listener/exposition integration remains ISSUE-023 and final-wait modes
-remain ISSUE-026.
+cross-cutting definition of done. JSON parsing remains ISSUE-012, active state replacement ISSUE-013, and production
+listener/exposition integration ISSUE-023.
 
 ## Engineering contract for subsequent issues
 

@@ -1,6 +1,6 @@
 # ISSUE-011. Canonical publication model
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -52,3 +52,21 @@ and race-detector tests for concurrent readers.
 Complete when public protocol fixtures create deterministic immutable values, every rejection code is covered,
 downstream
 validator/state-holder tests consume these types, and documentation and conformance corpus are linked.
+
+## Delivery log
+
+- 2026-08-27: moved to `In Progress`; immutable candidate, validated and active snapshot representations were added.
+- 2026-08-27: moved to `Testing`; canonical ordering, ownership, numeric, histogram, identity, namespace and exact-limit
+  tests passed under the race detector in Docker.
+- 2026-08-27: moved to `Done`; transport-independent typed construction now produces a deterministic canonical snapshot
+  or one closed rejection reason.
+
+## Verification evidence
+
+- Candidate construction deep-copies labels, series, buckets and families; validated and active accessors return copies.
+- Counter, gauge and classic-histogram values use normative binary64 parsing and rendering, including special gauges,
+  underflow/overflow rejection, ordered cumulative buckets and the required `+Inf` bucket.
+- Family/component collisions, duplicate identity, `le`, reserved names and configured byte/cardinality limits reject the
+  whole candidate without exposing attacker-controlled text.
+- Empty families normalize to the exact zero-series canonical document and do not appear in validated family bindings.
+- `implementation/README.md` and `implementation/README_RU.md` were reviewed and updated together.

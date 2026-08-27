@@ -5,10 +5,9 @@
 
 ## Текущий объём
 
-Wave 2 завершена до ISSUE-010 включительно. Lifecycle machine, monotonic shutdown budget и process-group escalation
-теперь питают bounded HTTP probe adapter с фиксированной семантикой `/healthz` и `/readyz` для всех public states.
-Adapter готов к подключению exposition server в ISSUE-023; эта задача не bind-ит production listener и не реализует
-metrics exposition.
+ISSUE-011 начинает metric-state core Wave 3 с immutable representations candidate, validated и active snapshots. Typed
+construction валидирует identity и values application metrics, нормализует empty families и создаёт deterministic
+canonical JSON независимо от transport. JSON parsing и active last-valid holder остаются в ISSUE-012 и ISSUE-013.
 
 ## Требования
 
@@ -78,6 +77,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state и transitions.
 - `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
 - `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
+- `internal/snapshot`: immutable application snapshot model, canonicalization, limits и rejection registry.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
@@ -85,9 +85,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-010, EPIC-001, ADR-001, ADR-002, ADR-003, ADR-011, спецификациям Configuration, Runtime State
-Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of
-done. Интеграция production listener/exposition остаётся в ISSUE-023, а final-wait modes — в ISSUE-026.
+Реализация следует ISSUE-011, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
+поставке и сквозному definition of done. JSON parsing остаётся в ISSUE-012, active state replacement — в ISSUE-013,
+production listener/exposition integration — в ISSUE-023.
 
 ## Инженерный контракт для следующих задач
 
