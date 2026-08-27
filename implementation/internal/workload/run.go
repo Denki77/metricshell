@@ -10,6 +10,7 @@ import (
 	"time"
 
 	exitCodes "github.com/Denki77/metricshell/implementation/internal/constants"
+	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 )
 
 const (
@@ -29,6 +30,7 @@ type Result struct {
 	ExitCode    int
 	Started     bool
 	StartFailed bool
+	Forced      bool
 }
 
 type SignalOutcome uint8
@@ -49,7 +51,9 @@ type SignalEvent struct {
 type Observers struct {
 	Started       func(pid, processGroupID int) error
 	Signal        func(event SignalEvent) error
-	PrimaryExited func(exitCode int) error
+	Shutdown      func(signal string, plan shutdown.Plan) error
+	Forced        func(signal string, processGroupID int) error
+	PrimaryExited func(exitCode int, forced bool) error
 	ChildReaped   func(kind string) error
 	Failed        func() error
 }
@@ -64,6 +68,9 @@ type runDependencies struct {
 	killGroup       func(processGroupID int) error
 	wait4           wait4Func
 	fallbackDelay   time.Duration
+	shutdown        shutdown.Config
+	now             func() time.Time
+	after           func(time.Duration) <-chan time.Time
 }
 
 type reapEvent struct {
@@ -74,7 +81,7 @@ type reapEvent struct {
 }
 
 // Run executes and reaps one primary workload and all descendants adopted by MetricShell.
-func Run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Observers) Result {
+func Run(argv []string, stdin io.Reader, stdout, stderr io.Writer, shutdownConfiguration shutdown.Config, observers Observers) Result {
 	signals := make(chan os.Signal, signalQueueCapacity)
 	signal.Notify(signals, supportedSignals...)
 	defer signal.Stop(signals)
@@ -86,6 +93,9 @@ func Run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Obs
 		killGroup:       func(processGroupID int) error { return syscall.Kill(-processGroupID, syscall.SIGKILL) },
 		wait4:           syscall.Wait4,
 		fallbackDelay:   groupKillFallbackDelay,
+		shutdown:        shutdownConfiguration,
+		now:             time.Now,
+		after:           time.After,
 	})
 }
 
@@ -112,6 +122,7 @@ func run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Obs
 	primaryPID := command.Process.Pid
 	processGroupID := primaryPID
 	reaped := startReaper(dependencies.wait4)
+	escalation := newEscalation(processGroupID, observers, dependencies)
 	if observers.Started != nil {
 		if err := observers.Started(primaryPID, processGroupID); err != nil {
 			cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
@@ -120,8 +131,9 @@ func run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Obs
 	}
 
 	for _, received := range pending {
-		if result, done := handleSignal(command, primaryPID, processGroupID, received, reaped, observers.Signal, dependencies); done {
-			return result
+		if err := escalation.handle(received); err != nil {
+			cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
+			return Result{ExitCode: exitCodes.ExitInternalFailure, Started: true}
 		}
 	}
 
@@ -129,8 +141,15 @@ func run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Obs
 	for {
 		select {
 		case received := <-dependencies.signals:
-			if result, done := handleSignal(command, primaryPID, processGroupID, received, reaped, observers.Signal, dependencies); done {
-				return result
+			if err := escalation.handle(received); err != nil {
+				cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
+				return Result{ExitCode: exitCodes.ExitInternalFailure, Started: true}
+			}
+		case <-escalation.timeout():
+			if err := escalation.force(); err != nil {
+				notifyFailure(observers.Failed)
+				cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
+				return Result{ExitCode: exitCodes.ExitInternalFailure, Started: true}
 			}
 		case event := <-reaped:
 			if event.err != nil {
@@ -150,7 +169,7 @@ func run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Obs
 				return *primaryResult
 			}
 
-			if err := processReapEvent(event, primaryPID, &primaryResult, func() {
+			if err := processReapEvent(event, primaryPID, &primaryResult, escalation.forced, func() {
 				_ = command.Process.Release()
 			}, observers); err != nil {
 				cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
@@ -160,15 +179,16 @@ func run(argv []string, stdin io.Reader, stdout, stderr io.Writer, observers Obs
 	}
 }
 
-func processReapEvent(event reapEvent, primaryPID int, primaryResult **Result, releasePrimary func(), observers Observers) error {
+func processReapEvent(event reapEvent, primaryPID int, primaryResult **Result, forced bool, releasePrimary func(), observers Observers) error {
 	kind := "adopted"
 	if event.pid == primaryPID && *primaryResult == nil {
 		kind = "direct"
 		resolved := resolveWaitStatus(event.status)
+		resolved.Forced = forced
 		*primaryResult = &resolved
 		releasePrimary()
 		if observers.PrimaryExited != nil {
-			if err := observers.PrimaryExited(resolved.ExitCode); err != nil {
+			if err := observers.PrimaryExited(resolved.ExitCode, resolved.Forced); err != nil {
 				return err
 			}
 		}
@@ -218,19 +238,78 @@ func drainPreStartSignals(signals <-chan os.Signal) ([]os.Signal, syscall.Signal
 	}
 }
 
-func handleSignal(command *exec.Cmd, primaryPID, processGroupID int, received os.Signal, reaped <-chan reapEvent, observer func(SignalEvent) error, dependencies runDependencies) (Result, bool) {
-	event := dependencies.forward(processGroupID, received)
-	if observer != nil {
-		if err := observer(event); err != nil {
-			cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
-			return Result{ExitCode: exitCodes.ExitInternalFailure, Started: true}, true
+type escalation struct {
+	processGroupID int
+	observers      Observers
+	dependencies   runDependencies
+	plan           *shutdown.Plan
+	timer          <-chan time.Time
+	forced         bool
+	forceAttempted bool
+	signal         string
+}
+
+func newEscalation(processGroupID int, observers Observers, dependencies runDependencies) *escalation {
+	return &escalation{processGroupID: processGroupID, observers: observers, dependencies: dependencies}
+}
+
+func (value *escalation) handle(received os.Signal) error {
+	systemSignal, isSystemSignal := received.(syscall.Signal)
+	name, supported := signalName(systemSignal)
+	termination := isSystemSignal && supported && (systemSignal == syscall.SIGTERM || systemSignal == syscall.SIGINT)
+	repeated := termination && value.plan != nil
+	if termination && !repeated {
+		plan := value.dependencies.shutdown.Resolve(value.dependencies.now())
+		value.plan = &plan
+		value.signal = name
+		if value.observers.Shutdown != nil {
+			if err := value.observers.Shutdown(name, plan); err != nil {
+				return err
+			}
+		}
+	}
+
+	event := value.dependencies.forward(value.processGroupID, received)
+	if value.observers.Signal != nil {
+		if err := value.observers.Signal(event); err != nil {
+			return err
 		}
 	}
 	if event.Outcome == SignalFailed {
-		cleanupAndReap(command, primaryPID, processGroupID, reaped, dependencies)
-		return Result{ExitCode: exitCodes.ExitInternalFailure, Started: true}, true
+		return errors.New("signal forwarding failed")
 	}
-	return Result{}, false
+	if !termination || value.forceAttempted {
+		return nil
+	}
+	if repeated || value.plan.WorkloadBudget == 0 {
+		return value.force()
+	}
+	value.timer = value.dependencies.after(value.plan.WorkloadBudget)
+	return nil
+}
+
+func (value *escalation) timeout() <-chan time.Time {
+	return value.timer
+}
+
+func (value *escalation) force() error {
+	if value.forceAttempted {
+		return nil
+	}
+	value.forceAttempted = true
+	value.timer = nil
+	err := value.dependencies.killGroup(value.processGroupID)
+	if errors.Is(err, syscall.ESRCH) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	value.forced = true
+	if value.observers.Forced != nil {
+		return value.observers.Forced(value.signal, value.processGroupID)
+	}
+	return nil
 }
 
 func cleanupAndReap(command *exec.Cmd, primaryPID, processGroupID int, reaped <-chan reapEvent, dependencies runDependencies) {

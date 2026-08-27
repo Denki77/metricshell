@@ -12,24 +12,51 @@ import (
 )
 
 type record struct {
-	Timestamp     string `json:"timestamp"`
-	Sequence      uint64 `json:"sequence"`
-	SchemaVersion string `json:"schema_version"`
-	Level         string `json:"level"`
-	Event         string `json:"event"`
-	Component     string `json:"component"`
-	RuntimeID     string `json:"runtime_id"`
-	State         string `json:"state"`
-	Message       string `json:"message"`
-	Reason        string `json:"reason,omitempty"`
-	ErrorCode     string `json:"error_code,omitempty"`
-	ErrorMessage  string `json:"error_message,omitempty"`
-	Signal        string `json:"signal,omitempty"`
-	WorkloadPID   int    `json:"workload_pid,omitempty"`
-	WorkloadPGID  int    `json:"workload_pgid,omitempty"`
-	ExitCode      *int   `json:"exit_code,omitempty"`
-	Forced        *bool  `json:"forced,omitempty"`
-	Kind          string `json:"kind,omitempty"`
+	Timestamp     string  `json:"timestamp"`
+	Sequence      uint64  `json:"sequence"`
+	SchemaVersion string  `json:"schema_version"`
+	Level         string  `json:"level"`
+	Event         string  `json:"event"`
+	Component     string  `json:"component"`
+	RuntimeID     string  `json:"runtime_id"`
+	State         string  `json:"state"`
+	Message       string  `json:"message"`
+	Reason        string  `json:"reason,omitempty"`
+	ErrorCode     string  `json:"error_code,omitempty"`
+	ErrorMessage  string  `json:"error_message,omitempty"`
+	PreviousState string  `json:"previous_state,omitempty"`
+	PID           int     `json:"pid,omitempty"`
+	Deadline      string  `json:"deadline,omitempty"`
+	RemainingMS   *int64  `json:"remaining_ms,omitempty"`
+	DurationMS    float64 `json:"duration_ms,omitempty"`
+	Signal        string  `json:"signal,omitempty"`
+	WorkloadPID   int     `json:"workload_pid,omitempty"`
+	WorkloadPGID  int     `json:"workload_pgid,omitempty"`
+	ExitCode      *int    `json:"exit_code,omitempty"`
+	Forced        *bool   `json:"forced,omitempty"`
+	Kind          string  `json:"kind,omitempty"`
+}
+
+func (logger *Logger) WriteRuntimeInitializing(pid int) error {
+	return logger.write(record{
+		Level:     "info",
+		Event:     "runtime.initializing",
+		Component: "runtime",
+		State:     "initializing",
+		Message:   "runtime initializing",
+		PID:       pid,
+	})
+}
+
+func (logger *Logger) WriteStateChanged(previous, current string) error {
+	return logger.write(record{
+		Level:         "info",
+		Event:         "runtime.state_changed",
+		Component:     "runtime",
+		State:         current,
+		Message:       "runtime state changed",
+		PreviousState: previous,
+	})
 }
 
 type Logger struct {
@@ -121,8 +148,7 @@ func (logger *Logger) WriteSignalFailed(signal string, processGroupID int) error
 	})
 }
 
-func (logger *Logger) WriteWorkloadExited(exitCode int) error {
-	forced := false
+func (logger *Logger) WriteWorkloadExited(exitCode int, forced bool) error {
 	return logger.write(record{
 		Level:     "info",
 		Event:     "workload.exited",
@@ -131,6 +157,44 @@ func (logger *Logger) WriteWorkloadExited(exitCode int) error {
 		Message:   "primary workload exited",
 		ExitCode:  &exitCode,
 		Forced:    &forced,
+	})
+}
+
+func (logger *Logger) WriteShutdownStarted(signal string, deadline time.Time, remaining time.Duration) error {
+	remainingMilliseconds := remaining.Milliseconds()
+	return logger.write(record{
+		Level:       "info",
+		Event:       "shutdown.started",
+		Component:   "shutdown",
+		State:       "stopping",
+		Message:     "external termination started",
+		Signal:      signal,
+		Deadline:    deadline.UTC().Format(time.RFC3339Nano),
+		RemainingMS: &remainingMilliseconds,
+	})
+}
+
+func (logger *Logger) WriteShutdownForced(signal string, processGroupID int) error {
+	return logger.write(record{
+		Level:        "warn",
+		Event:        "shutdown.forced",
+		Component:    "shutdown",
+		State:        "stopping",
+		Message:      "workload grace expired",
+		Signal:       signal,
+		WorkloadPGID: processGroupID,
+	})
+}
+
+func (logger *Logger) WriteShutdownCompleted(exitCode int, duration time.Duration) error {
+	return logger.write(record{
+		Level:      "info",
+		Event:      "shutdown.completed",
+		Component:  "shutdown",
+		State:      "finalizing",
+		Message:    "shutdown phases completed",
+		ExitCode:   &exitCode,
+		DurationMS: float64(duration) / float64(time.Millisecond),
 	})
 }
 

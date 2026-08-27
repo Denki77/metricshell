@@ -1,6 +1,6 @@
 # ISSUE-010. Контракт health и readiness
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -27,3 +27,22 @@
 - **Критерии приёмки и обязательные тесты:** Таблица state-by-endpoint status; transition races; requests во время
   shutdown; method/path errors; доказательство, что probes не увеличивают final-scrape count.
 - **Условие завершения:** Готово, когда specification table и HTTP integration fixtures совпадают для каждого state.
+
+## Журнал выполнения
+
+- 2026-08-24: задача переведена в `В работе`; реализован bounded HTTP probe adapter поверх lifecycle state source.
+- 2026-08-24: задача переведена в `Тестирование`; полная матрица state/endpoint, shutdown states, concurrent transitions,
+  method/path errors и исключение final scrapes прошли race detector и проверку real HTTP server в Docker.
+- 2026-08-24: задача переведена в `Готово`; нормативная таблица EN/RU и Docker fixture совпадают для всех восьми public
+  states.
+
+## Свидетельства проверки
+
+- Точные routes `GET /healthz` и `GET /readyz` возвращают state-derived bounded text responses; другие methods дают
+  `405` с `Allow: GET`, другие paths — `404`.
+- Initializing, starting, stopping, finalizing и final-wait healthy, но unready; running healthy и ready; failed даёт
+  `500`/`503`; принятый request, увидевший terminated, получает deterministic `503 unavailable`.
+- Probe handling только читает synchronized lifecycle state. Concurrent transition/request tests проходят race
+  detector, а routing probes не может вызвать final-scrape completion `/metrics`.
+- HTTP integration fixture выполняет 18 requests через real loopback server внутри scratch integration image.
+- `implementation/README.md` и `implementation/README_RU.md` проверены на полноту и обновлены синхронно.

@@ -5,11 +5,10 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-006 completes the Wave 1 supervisor foundation. MetricShell preserves every byte-sized primary workload result,
-including values that collide numerically with its own `64` and `70-73` registry, and maps signal termination to
-`128+signal`. Structured lifecycle records and the workload-started fact identify result origin. The primary result is
-resolved once and retained while adopted descendants are reaped. Final-wait modes, forced shutdown budgets, and the
-full lifecycle state machine remain assigned to later waves.
+Wave 2 is complete through ISSUE-010. The lifecycle machine, monotonic shutdown budget and process-group escalation now
+feed a bounded HTTP probe adapter with fixed `/healthz` and `/readyz` semantics for all public states. The adapter is
+ready for the exposition server in ISSUE-023; this issue does not bind a production listener or implement metrics
+exposition.
 
 ## Requirements
 
@@ -28,6 +27,12 @@ Run the explicit Wave 1 exit gate (currently the same complete Docker gate):
 
 ```sh
 make wave1
+```
+
+Run the Wave 2 lifecycle, shutdown, escalation and probe exit gate:
+
+```sh
+make wave2
 ```
 
 The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
@@ -70,6 +75,9 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
+- `internal/lifecycle`: synchronized public runtime state and transitions.
+- `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
+- `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
@@ -77,10 +85,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-006, EPIC-001, ADR-001, ADR-002, ADR-003, the Configuration, Runtime State Machine,
-Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Result preservation does not implement lifecycle states from ISSUE-007, forced-kill
-policy from ISSUE-009, or final-wait modes from ISSUE-026.
+Implementation follows ISSUE-010, EPIC-001, ADR-001, ADR-002, ADR-003, ADR-011, the Configuration, Runtime State
+Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
+cross-cutting definition of done. Production listener/exposition integration remains ISSUE-023 and final-wait modes
+remain ISSUE-026.
 
 ## Engineering contract for subsequent issues
 

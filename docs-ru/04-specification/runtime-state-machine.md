@@ -46,18 +46,24 @@ Workload exit является событием, а не состоянием. F
 
 Закрытый lifecycle event set:
 
-| Событие                 | Допустимый источник                                              | Результат                                |
-|-------------------------|------------------------------------------------------------------|------------------------------------------|
-| configuration_validated | initializing                                                     | starting_workload                        |
-| initialization_failed   | initializing                                                     | failed                                   |
-| workload_started        | starting_workload                                                | running                                  |
-| workload_start_failed   | starting_workload                                                | failed                                   |
-| workload_exited         | running, stopping                                                | finalizing                               |
-| termination_requested   | initializing, starting_workload, running, finalizing, final_wait | stopping или terminated по правилам ниже |
-| runtime_failed          | любое нетерминальное состояние                                   | failed                                   |
-| finalization_completed  | finalizing                                                       | final_wait или terminated                |
-| final_wait_completed    | final_wait                                                       | terminated                               |
-| cleanup_completed       | failed                                                           | terminated                               |
+| Событие                           | Допустимый источник                     | Результат         |
+|-----------------------------------|-----------------------------------------|-------------------|
+| configuration_validated           | initializing                            | starting_workload |
+| initialization_failed             | initializing                            | failed            |
+| workload_started                  | starting_workload                       | running           |
+| workload_start_failed             | starting_workload                       | failed            |
+| workload_exited                   | running, stopping                       | finalizing        |
+| termination_before_spawn          | initializing, starting_workload         | terminated        |
+| termination_after_spawn           | starting_workload, running              | stopping          |
+| termination_after_spawn           | finalizing, final_wait                  | terminated        |
+| runtime_failed                    | любое нетерминальное состояние          | failed            |
+| finalization_completed_immediate  | finalizing                              | terminated        |
+| finalization_completed_wait       | finalizing                              | final_wait        |
+| final_wait_completed              | final_wait                              | terminated        |
+| cleanup_completed                 | failed                                  | terminated        |
+
+Каждая пара `(source state, event)` имеет ровно одну цель. Контекст, меняющий цель, представлен отдельным event;
+вызывающий код не может выбирать target вне lifecycle machine.
 
 Повторные termination signals не создают новое состояние. Они могут сократить remaining grace или запустить немедленный
 forced cleanup согласно shutdown policy и обязательно логируются.
@@ -69,23 +75,23 @@ stateDiagram-v2
     [*] --> initializing
     initializing --> starting_workload: configuration_validated
     initializing --> failed: initialization_failed
-    initializing --> terminated: termination_requested
+    initializing --> terminated: termination_before_spawn
     starting_workload --> running: workload_started
     starting_workload --> failed: workload_start_failed
-    starting_workload --> stopping: termination_requested after spawn
-    starting_workload --> terminated: termination_requested before spawn
+    starting_workload --> stopping: termination_after_spawn
+    starting_workload --> terminated: termination_before_spawn
     running --> finalizing: workload_exited
-    running --> stopping: termination_requested
+    running --> stopping: termination_after_spawn
     running --> failed: runtime_failed
     stopping --> finalizing: workload_exited after bounded cleanup
     stopping --> failed: runtime_failed
-    finalizing --> final_wait: natural completion and mode duration or scrapes
-    finalizing --> terminated: natural completion and mode immediate
+    finalizing --> final_wait: finalization_completed_wait
+    finalizing --> terminated: finalization_completed_immediate
     finalizing --> terminated: external termination already active
-    finalizing --> terminated: termination_requested
+    finalizing --> terminated: termination_after_spawn
     finalizing --> failed: runtime_failed
     final_wait --> terminated: duration elapsed, required scrapes, or timeout
-    final_wait --> terminated: termination_requested
+    final_wait --> terminated: termination_after_spawn
     final_wait --> failed: runtime_failed
     failed --> terminated: cleanup_completed
     terminated --> [*]
@@ -125,6 +131,13 @@ Candidates, не допущенные до закрытия, получают fr
 | terminated        |                        unavailable | unavailable | unavailable                  |
 
 Probe requests никогда не считаются final scrapes. Readiness намеренно false вне running.
+
+Probe adapter версии 1 владеет точными путями `GET /healthz` и `GET /readyz`. Известный probe path с другим method
+возвращает `405` и `Allow: GET`, неизвестный path — `404`. Bounded plain-text responses содержат `Cache-Control:
+no-store`: health возвращает `ok`, `failed` или `unavailable`, readiness — `ready`, `not ready` или `unavailable`.
+Строка terminated означает, что HTTP server больше не принимает новые requests; уже принятый request, увидевший
+`terminated`, возвращает `503 unavailable`. Обработка probe читает одно public state и не должна менять lifecycle,
+snapshot или вызывать final-scrape completion.
 
 ## Приоритет termination и process result
 
