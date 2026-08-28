@@ -5,9 +5,9 @@
 
 ## Текущий объём
 
-ISSUE-011 начинает metric-state core Wave 3 с immutable representations candidate, validated и active snapshots. Typed
-construction валидирует identity и values application metrics, нормализует empty families и создаёт deterministic
-canonical JSON независимо от transport. JSON parsing и active last-valid holder остаются в ISSUE-012 и ISSUE-013.
+ISSUE-011 и ISSUE-012 реализуют immutable snapshot model Wave 3 и strict whole-candidate parser/validator. JSON version 1
+декодируется без transport assumptions, unknown и duplicate members отклоняются, complete candidate валидируется и
+преобразуется в deterministic canonical bytes. Atomic active last-valid holder остаётся в ISSUE-013.
 
 ## Требования
 
@@ -85,9 +85,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011 и ISSUE-012, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. JSON parsing остаётся в ISSUE-012, active state replacement — в ISSUE-013,
+поставке и сквозному definition of done. Active state replacement остаётся в ISSUE-013,
 production listener/exposition integration — в ISSUE-023.
 
 ## Инженерный контракт для следующих задач
