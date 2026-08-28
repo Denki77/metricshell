@@ -1,6 +1,6 @@
 # ISSUE-013. Atomic holder последнего валидного state
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -24,3 +24,20 @@
 - **Критерии приёмки и обязательные тесты:** Concurrent readers/writers; удаление omitted series; zero-series
   replacement; rejection retention; generation ordering; race detector и allocation ownership.
 - **Условие завершения:** Готово, когда под stress readers видят только полную старую или полную новую generation.
+
+## Журнал выполнения
+
+- 2026-08-28: переведена в `В работе`; реализованы last-valid holder и linear installation boundary.
+- 2026-08-28: переведена в `Тестирование`; replacement, omission, lifetime binding, freeze, overflow, ownership и
+  concurrent reader/writer tests прошли race detector в Docker.
+- 2026-08-28: переведена в `Готово`; readers загружают одну immutable old или new generation, пока writers атомарно
+  устанавливают или отклоняют complete candidate.
+
+## Свидетельства проверки
+
+- Installation и freeze используют единый serialized boundary; active reads выполняют один atomic pointer load.
+- Accepted replacements получают последовательные generations и удаляют omitted families/series без merge и history.
+- Frozen, lifetime type-conflicting и generation-overflow candidates сохраняют content и generation.
+- Empty families не создают lifetime type binding, что соответствует их zero-series normalization semantics.
+- Возвращаемые active/validated representations остаются caller-owned copies; concurrent stress проходит race detector.
+- `implementation/README.md` и `implementation/README_RU.md` проверены и обновлены синхронно.

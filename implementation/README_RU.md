@@ -5,9 +5,9 @@
 
 ## Текущий объём
 
-ISSUE-011 и ISSUE-012 реализуют immutable snapshot model Wave 3 и strict whole-candidate parser/validator. JSON version 1
-декодируется без transport assumptions, unknown и duplicate members отклоняются, complete candidate валидируется и
-преобразуется в deterministic canonical bytes. Atomic active last-valid holder остаётся в ISSUE-013.
+ISSUE-011–ISSUE-013 реализуют immutable snapshot model Wave 3, strict whole-candidate parser/validator и atomic last-valid
+holder. JSON version 1 декодируется без transport assumptions, а complete accepted snapshots заменяют по одной immutable
+generation. Initial generation-zero state остаётся в ISSUE-014.
 
 ## Требования
 
@@ -77,7 +77,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state и transitions.
 - `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
 - `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
-- `internal/snapshot`: immutable application snapshot model, canonicalization, limits и rejection registry.
+- `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits и rejection registry.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
@@ -85,9 +85,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011 и ISSUE-012, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011–ISSUE-013, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Active state replacement остаётся в ISSUE-013,
+поставке и сквозному definition of done. Initial zero-series construction остаётся в ISSUE-014,
 production listener/exposition integration — в ISSUE-023.
 
 ## Инженерный контракт для следующих задач

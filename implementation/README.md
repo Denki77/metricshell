@@ -5,9 +5,9 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-011 and ISSUE-012 provide the Wave 3 immutable snapshot model and strict whole-candidate parser/validator. Version
-1 JSON is decoded without transport assumptions, rejects unknown or duplicate members, validates the complete candidate,
-and returns deterministic canonical bytes. The atomic active last-valid holder remains in ISSUE-013.
+ISSUE-011 through ISSUE-013 provide the Wave 3 immutable snapshot model, strict whole-candidate parser/validator and
+atomic last-valid holder. Version 1 JSON is decoded without transport assumptions and complete accepted snapshots replace
+one immutable generation at a time. Initial generation-zero state remains in ISSUE-014.
 
 ## Requirements
 
@@ -77,7 +77,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
 - `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
-- `internal/snapshot`: immutable application snapshot model, canonicalization, limits and rejection registry.
+- `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits and rejection registry.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
@@ -85,10 +85,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-011 and ISSUE-012, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-013, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Active state replacement remains ISSUE-013, and production
+cross-cutting definition of done. Initial zero-series construction remains ISSUE-014, and production
 listener/exposition integration ISSUE-023.
 
 ## Engineering contract for subsequent issues

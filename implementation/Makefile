@@ -3,10 +3,14 @@ DOCKERFILE := $(CURDIR)/Dockerfile
 REVISION ?= $(shell git -C $(PROJECT_ROOT) rev-parse --verify HEAD 2>/dev/null || printf unknown)
 IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
+GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all test integration ci wave1 wave2 build
+.PHONY: all fmt test integration ci wave1 wave2 build
 
 all: ci
+
+fmt:
+	docker run --rm -v "$(CURDIR):/src" -w /src $(GO_IMAGE) go fmt ./...
 
 test:
 	docker build --target test --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE)-test:local "$(PROJECT_ROOT)"
