@@ -5,9 +5,9 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-011 through ISSUE-013 provide the Wave 3 immutable snapshot model, strict whole-candidate parser/validator and
-atomic last-valid holder. Version 1 JSON is decoded without transport assumptions and complete accepted snapshots replace
-one immutable generation at a time. Initial generation-zero state remains in ISSUE-014.
+ISSUE-011 through ISSUE-014 provide the Wave 3 immutable snapshot model, strict whole-candidate parser/validator, atomic
+last-valid holder and exact generation-zero state. Version 1 JSON is decoded without transport assumptions and complete
+accepted snapshots replace one immutable generation at a time. The separate self-metrics domain remains in ISSUE-015.
 
 ## Requirements
 
@@ -85,10 +85,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-013, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-014, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Initial zero-series construction remains ISSUE-014, and production
+cross-cutting definition of done. The self-metrics registry remains ISSUE-015, and production
 listener/exposition integration ISSUE-023.
 
 ## Engineering contract for subsequent issues

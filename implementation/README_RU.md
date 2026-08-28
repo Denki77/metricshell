@@ -5,9 +5,9 @@
 
 ## Текущий объём
 
-ISSUE-011–ISSUE-013 реализуют immutable snapshot model Wave 3, strict whole-candidate parser/validator и atomic last-valid
-holder. JSON version 1 декодируется без transport assumptions, а complete accepted snapshots заменяют по одной immutable
-generation. Initial generation-zero state остаётся в ISSUE-014.
+ISSUE-011–ISSUE-014 реализуют immutable snapshot model Wave 3, strict whole-candidate parser/validator, atomic last-valid
+holder и exact generation-zero state. JSON version 1 декодируется без transport assumptions, а complete accepted snapshots
+заменяют по одной immutable generation. Separate self-metrics domain остаётся в ISSUE-015.
 
 ## Требования
 
@@ -85,9 +85,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011–ISSUE-013, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011–ISSUE-014, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Initial zero-series construction остаётся в ISSUE-014,
+поставке и сквозному definition of done. Self-metrics registry остаётся в ISSUE-015,
 production listener/exposition integration — в ISSUE-023.
 
 ## Инженерный контракт для следующих задач
