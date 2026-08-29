@@ -1,6 +1,6 @@
 # ISSUE-013. Atomic last-valid state holder
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,20 @@ replacement.
 - **Acceptance criteria and required tests:** Concurrent readers/writers; replacement deletes omitted series;
   zero-series replacement; rejection retention; generation ordering; race detector and allocation ownership.
 - **Completion:** Complete when readers can observe only complete old or complete new generations under stress.
+
+## Delivery log
+
+- 2026-08-28: moved to `In Progress`; the last-valid holder and linear installation boundary were implemented.
+- 2026-08-28: moved to `Testing`; replacement, omission, lifetime binding, freeze, overflow, ownership and concurrent
+  reader/writer tests passed under the race detector in Docker.
+- 2026-08-28: moved to `Done`; readers now load one immutable old or new generation while writers install or reject a
+  complete candidate atomically.
+
+## Verification evidence
+
+- Installation and freeze share one serialized boundary; active reads use one atomic pointer load.
+- Accepted replacements receive consecutive generations and remove omitted families and series without merge or history.
+- Frozen, lifetime type-conflicting and internal generation-overflow candidates preserve both content and generation.
+- Empty families create no lifetime type binding, matching their zero-series normalization semantics.
+- Returned active/validated representations remain caller-owned copies and concurrent stress passes the race detector.
+- `implementation/README.md` and `implementation/README_RU.md` were reviewed and updated together.

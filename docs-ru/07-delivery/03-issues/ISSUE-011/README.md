@@ -1,6 +1,6 @@
 # ISSUE-011. Каноническая модель публикации
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -53,3 +53,23 @@ fuzzing; race-detector tests для concurrent readers.
 Задача завершена, когда fixtures публичного protocol создают детерминированные immutable values, каждый rejection code
 покрыт, downstream tests validator/state holder используют эти types, а документация и conformance corpus связаны
 ссылками.
+
+## Журнал выполнения
+
+- 2026-08-27: задача переведена в `В работе`; добавлены immutable representations candidate, validated и active
+  snapshots.
+- 2026-08-27: задача переведена в `Тестирование`; canonical ordering, ownership, numeric, histogram, identity,
+  namespace и exact-limit tests прошли race detector в Docker.
+- 2026-08-27: задача переведена в `Готово`; transport-independent typed construction создаёт deterministic canonical
+  snapshot либо один closed rejection reason.
+
+## Свидетельства проверки
+
+- Candidate construction глубоко копирует labels, series, buckets и families; accessors validated/active возвращают
+  копии.
+- Counter, gauge и classic histogram используют нормативные binary64 parsing/rendering, включая special gauges,
+  rejection underflow/overflow, ordered cumulative buckets и обязательный bucket `+Inf`.
+- Family/component collisions, duplicate identity, `le`, reserved names и настроенные byte/cardinality limits отклоняют
+  весь candidate без attacker-controlled текста.
+- Empty families нормализуются в точный zero-series canonical document и не входят в validated family bindings.
+- `implementation/README.md` и `implementation/README_RU.md` проверены и обновлены вместе.

@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/config"
+	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 )
 
 type record struct {
@@ -79,7 +80,7 @@ func (logger *Logger) WriteConfigurationRejected(err error) error {
 		Component:    "runtime",
 		State:        "initializing",
 		Message:      "startup configuration rejected",
-		Reason:       config.ReasonConfiguration,
+		Reason:       selfmetric.RuntimeFailureConfiguration,
 		ErrorCode:    config.ErrorCodeConfigInvalid,
 		ErrorMessage: err.Error(),
 	})
@@ -92,7 +93,7 @@ func (logger *Logger) WriteWorkloadStartFailed() error {
 		Component: "workload",
 		State:     "failed",
 		Message:   "workload could not be started",
-		Reason:    "workload_start",
+		Reason:    selfmetric.RuntimeFailureWorkloadStart,
 		ErrorCode: "WORKLOAD_START_FAILED",
 	})
 }
@@ -141,7 +142,7 @@ func (logger *Logger) WriteSignalFailed(signal string, processGroupID int) error
 		Component:    "runtime",
 		State:        "failed",
 		Message:      "signal could not be forwarded",
-		Reason:       "internal",
+		Reason:       selfmetric.RuntimeFailureInternal,
 		ErrorCode:    "INTERNAL_FAILURE",
 		Signal:       signal,
 		WorkloadPGID: processGroupID,
@@ -216,7 +217,7 @@ func (logger *Logger) WriteRuntimeFailed() error {
 		Component: "runtime",
 		State:     "failed",
 		Message:   "process supervision failed",
-		Reason:    "internal",
+		Reason:    selfmetric.RuntimeFailureInternal,
 		ErrorCode: "INTERNAL_FAILURE",
 	})
 }

@@ -1,6 +1,6 @@
 # ISSUE-015. Отдельный домен self-metrics
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -51,3 +51,25 @@ rejection; невосприимчивость к filtering; process restart/rese
 
 Задача завершена, когда реализован весь нормативный registry, проходят golden outputs и enum exhaustiveness tests, а
 structured logging использует те же state/mode/outcome/reason values.
+
+## Журнал выполнения
+
+- 2026-08-29: переведена в `В работе`; реализованы bounded self-metric registry, update domains и immutable scrape views.
+- 2026-08-29: переведена в `Тестирование`; registry exhaustiveness, golden text formats, lifecycle/mode one-hot, label
+  rejection, generation projection, histogram, freeze, restart и concurrent scrape/update tests прошли в Docker.
+- 2026-08-29: переведена в `Готово`; complete transport-independent state core Wave 3 прошёл явный gate `make wave3`.
+
+## Свидетельства проверки
+
+- Все 38 нормативных families и их 187 bounded initial series имеют HELP/TYPE metadata и closed label values;
+  application rejection reasons и lifecycle states берутся из authoritative registries.
+- Registry updates отклоняют unknown metrics/labels/enum values, non-finite/negative values и semantic gauge violations,
+  не создавая series.
+- Runtime state и final-wait mode являются atomic full one-hot vectors; active generation, series и canonical bytes
+  обновляются под одним registry lock.
+- Self-metrics остаются mutable после freeze application holder, а process restart восстанавливает counters/gauges из
+  нормативных defaults.
+- Encoders Prometheus и OpenMetrics сохраняют counter-family naming, экранируют labels, публикуют metadata и создают
+  cumulative shutdown histograms с `+Inf`.
+- Concurrent readers/updates проходят race detector, returned views владеют labels/buckets, cardinality остаётся fixed.
+- `implementation/README.md` и `implementation/README_RU.md` проверены и обновлены синхронно.

@@ -5,10 +5,10 @@ and dependency graph.
 
 ## Current scope
 
-Wave 2 is complete through ISSUE-010. The lifecycle machine, monotonic shutdown budget and process-group escalation now
-feed a bounded HTTP probe adapter with fixed `/healthz` and `/readyz` semantics for all public states. The adapter is
-ready for the exposition server in ISSUE-023; this issue does not bind a production listener or implement metrics
-exposition.
+Wave 3 is complete. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
+parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded self-metrics registry.
+Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
+fixed-cardinality state and do not affect application identity.
 
 ## Requirements
 
@@ -33,6 +33,12 @@ Run the Wave 2 lifecycle, shutdown, escalation and probe exit gate:
 
 ```sh
 make wave2
+```
+
+Run the Wave 3 transport-independent snapshot and self-metrics state-core exit gate:
+
+```sh
+make wave3
 ```
 
 The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
@@ -78,6 +84,8 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
 - `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
+- `internal/selfmetric`: bounded self-metric registry, immutable scrape views and Prometheus/OpenMetrics text encoding.
+- `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits and rejection registry.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
 - `internal/dependencyboundary`: automated production/research isolation test.
@@ -85,10 +93,11 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-010, EPIC-001, ADR-001, ADR-002, ADR-003, ADR-011, the Configuration, Runtime State
+Implementation follows ISSUE-011 through ISSUE-015, EPIC-001, ADR-001–ADR-004, ADR-010, ADR-011, ADR-014, the Application Snapshot Protocol,
+Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Production listener/exposition integration remains ISSUE-023 and final-wait modes
-remain ISSUE-026.
+cross-cutting definition of done. Transport adapters begin in ISSUE-016; production listener/application exposition
+integration remains ISSUE-023.
 
 ## Engineering contract for subsequent issues
 

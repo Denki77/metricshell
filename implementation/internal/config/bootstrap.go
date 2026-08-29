@@ -13,7 +13,6 @@ import (
 
 const (
 	ErrorCodeConfigInvalid = "CONFIG_INVALID"
-	ReasonConfiguration    = "configuration"
 )
 
 type LookupEnv func(string) (string, bool)

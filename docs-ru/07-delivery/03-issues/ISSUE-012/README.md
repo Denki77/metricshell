@@ -1,6 +1,6 @@
 # ISSUE-012. Parser и validator полного candidate
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -28,3 +28,21 @@ Parsing и rejection codes соответствуют принятой спец�
   rounding collisions и special floats; histogram sign rules; base/component-name и `le` collisions; normalization
   empty families; decoded amplification; точные limits; malformed/fuzz input; race-safe concurrent validation.
 - **Условие завершения:** Готово, когда один validator и corpus без изменений используются file, socket и HTTP adapters.
+
+## Журнал выполнения
+
+- 2026-08-28: переведена в `В работе`; strict whole-document JSON parsing соединён с canonical validator.
+- 2026-08-28: переведена в `Тестирование`; golden, closed-rejection, exact-limit, ownership, malformed/fuzz и concurrent
+  race tests прошли в Docker test stage.
+- 2026-08-28: переведена в `Готово`; единый transport-independent parser возвращает только complete validated snapshot
+  или closed rejection reason.
+
+## Свидетельства проверки
+
+- Objects version 1 рекурсивно проверяются по точной форме; missing, unknown и duplicate members не игнорируются.
+- Empty и invalid UTF-8 payloads, malformed documents, неподдерживаемые schema versions и превышение decoded/canonical
+  size детерминированно отображаются в принятый rejection registry.
+- Numeric, identity, metadata, histogram, namespace и cardinality rules после полного decode выполняет единый validator
+  ISSUE-011.
+- Parsed snapshots не удерживают ни входной byte buffer, ни mutable collections decoder.
+- `implementation/README.md` и `implementation/README_RU.md` проверены и обновлены синхронно.

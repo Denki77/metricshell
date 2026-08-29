@@ -5,10 +5,10 @@
 
 ## Текущий объём
 
-Wave 2 завершена до ISSUE-010 включительно. Lifecycle machine, monotonic shutdown budget и process-group escalation
-теперь питают bounded HTTP probe adapter с фиксированной семантикой `/healthz` и `/readyz` для всех public states.
-Adapter готов к подключению exposition server в ISSUE-023; эта задача не bind-ит production listener и не реализует
-metrics exposition.
+Wave 3 завершена. ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
+last-valid holder, exact generation-zero state и отдельный bounded self-metrics registry. Complete accepted application
+snapshots заменяют по одной immutable generation; live self-metrics используют собственный fixed-cardinality state и не
+влияют на application identity.
 
 ## Требования
 
@@ -33,6 +33,12 @@ make wave1
 
 ```sh
 make wave2
+```
+
+Запуск exit gate Wave 3 для transport-independent snapshot и self-metrics state core:
+
+```sh
+make wave3
 ```
 
 Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
@@ -78,6 +84,8 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state и transitions.
 - `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
 - `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
+- `internal/selfmetric`: bounded self-metric registry, immutable scrape views и text encoding Prometheus/OpenMetrics.
+- `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits и rejection registry.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
 - `internal/dependencyboundary`: автоматический тест изоляции production от research.
@@ -85,9 +93,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-010, EPIC-001, ADR-001, ADR-002, ADR-003, ADR-011, спецификациям Configuration, Runtime State
-Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture поставке и сквозному definition of
-done. Интеграция production listener/exposition остаётся в ISSUE-023, а final-wait modes — в ISSUE-026.
+Реализация следует ISSUE-011–ISSUE-015, EPIC-001, ADR-001–ADR-004, ADR-010, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
+поставке и сквозному definition of done. Transport adapters начинаются в ISSUE-016; production listener/application
+exposition integration остаётся в ISSUE-023.
 
 ## Инженерный контракт для следующих задач
 
