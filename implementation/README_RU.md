@@ -6,7 +6,8 @@
 ## Текущий объём
 
 Wave 4 выполняется. ISSUE-016 добавляет общий bounded ingestion core, ISSUE-017 — безопасный atomic-file ingestion,
-ISSUE-018 — bounded acknowledged Unix stream adapter MSP/1. ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
+ISSUE-018 — bounded acknowledged Unix stream adapter MSP/1, ISSUE-019 — его official serialized client writer.
+ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state и отдельный bounded self-metrics registry. Complete accepted application
 snapshots заменяют по одной immutable generation; live self-metrics используют собственный fixed-cardinality state и не
 влияют на application identity.
@@ -77,6 +78,7 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Структура пакетов
 
+- `client`: публичный official connection writer MSP/1 с complete-publication serialization и typed errors.
 - `cmd/metricshell`: entrypoint production-бинарника.
 - `internal/buildinfo`: build identity, передаваемый linker.
 - `internal/cli`: bootstrap command surface.
@@ -97,9 +99,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011–ISSUE-018, EPIC-001, ADR-001–ADR-007, ADR-010, ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011–ISSUE-019, EPIC-001, ADR-001–ADR-007, ADR-010, ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Official writer и HTTP adapter следуют в ISSUE-019 и ISSUE-020; production listener/application
+поставке и сквозному definition of done. HTTP adapter следует в ISSUE-020; production listener/application
 exposition integration остаётся в ISSUE-023.
 
 ## Инженерный контракт для следующих задач

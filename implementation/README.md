@@ -6,7 +6,8 @@ and dependency graph.
 ## Current scope
 
 Wave 4 is in progress. ISSUE-016 adds the common bounded ingestion core, ISSUE-017 adds safe atomic-file ingestion,
-and ISSUE-018 adds the bounded acknowledged MSP/1 Unix stream adapter. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
+ISSUE-018 adds the bounded acknowledged MSP/1 Unix stream adapter, and ISSUE-019 adds its official serialized client
+writer. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
 parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded self-metrics registry.
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity.
@@ -77,6 +78,7 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Package layout
 
+- `client`: public official MSP/1 connection writer with complete-publication serialization and typed errors.
 - `cmd/metricshell`: production executable entrypoint.
 - `internal/buildinfo`: linker-provided build identity.
 - `internal/cli`: bootstrap command surface.
@@ -97,10 +99,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-018, EPIC-001, ADR-001–ADR-007, ADR-010, ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-019, EPIC-001, ADR-001–ADR-007, ADR-010, ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. The official writer and HTTP adapter follow in ISSUE-019 and ISSUE-020; production listener/application exposition
+cross-cutting definition of done. The HTTP adapter follows in ISSUE-020; production listener/application exposition
 integration remains ISSUE-023.
 
 ## Engineering contract for subsequent issues
