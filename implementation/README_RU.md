@@ -5,7 +5,7 @@
 
 ## Текущий объём
 
-Wave 3 завершена. ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
+Wave 4 выполняется. ISSUE-016 добавляет общий bounded ingestion core для всех stable adapters. ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state и отдельный bounded self-metrics registry. Complete accepted application
 snapshots заменяют по одной immutable generation; live self-metrics используют собственный fixed-cardinality state и не
 влияют на application identity.
@@ -81,6 +81,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
+- `internal/ingestion`: transport-independent admission, cancellation, result taxonomy и complete-candidate handoff.
 - `internal/lifecycle`: synchronized public runtime state и transitions.
 - `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
 - `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
@@ -93,9 +94,9 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011–ISSUE-015, EPIC-001, ADR-001–ADR-004, ADR-010, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011–ISSUE-016, EPIC-001, ADR-001–ADR-005, ADR-010, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Transport adapters начинаются в ISSUE-016; production listener/application
+поставке и сквозному definition of done. Transport adapters начинаются в ISSUE-017; production listener/application
 exposition integration остаётся в ISSUE-023.
 
 ## Инженерный контракт для следующих задач
