@@ -1,6 +1,6 @@
 # ISSUE-018. Framed protocol Unix socket
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -26,3 +26,25 @@ rejection; separate connections may validate concurrently; activation remains li
   все limits; expiry/disconnect; concurrent commits.
 - **Условие завершения:** Готово, когда protocol golden transcripts и cross-adapter corpus проходят с точными
   frames/enums.
+
+## Журнал выполнения
+
+- 2026-08-29: переведена в `В работе`; реализованы bounded MSP/1 line framing, multipart transaction storage,
+  ответы FRAME_ACCEPTED/ACK/NACK и Unix listener с mode 0660.
+- 2026-08-29: переведена в `Тестирование`; golden one/multipart transcripts, base64, ordering, duplication,
+  missing-part, size/capacity, expiry, frame drain, default 1MiB и concurrent-commit tests прошли под Docker race tests.
+- 2026-08-29: переведена в `Готово`; socket adapter прошёл `make test`, EN/RU issue и implementation README проверены
+  синхронно.
+
+## Свидетельства проверки
+
+- Каждая line bounded, oversized input дренируется до следующего frame; декодируется только unpadded RFC 4648
+  base64url.
+- Transactions резервируют bounded shared slots, применяют canonical IDs/indexes/sizes, strict part order, exact
+  decoded size и finite expiry; disconnect освобождает все reservations.
+- ACK формируется только из accepted result общего Core после installation и содержит назначенную generation.
+  Candidate reasons, admission outcomes и wire failures остаются в разных registries.
+- Exact conservative capacity formula отклоняет configuration ниже canonical snapshot limit; default 8KiB × 256
+  передаёт полный decoded candidate размером 1MiB.
+- Real AF_UNIX listener test проверяет mode 0660 и end-to-end installation; concurrent commits получают уникальные
+  linear generations.
