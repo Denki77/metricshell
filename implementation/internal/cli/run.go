@@ -11,6 +11,7 @@ import (
 	exitCodes "github.com/Denki77/metricshell/implementation/internal/constants"
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 	"github.com/Denki77/metricshell/implementation/internal/workload"
 )
@@ -43,7 +44,15 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 	if err := logger.WriteRuntimeInitializing(os.Getpid()); err != nil {
 		return exitCodes.ExitInternalFailure
 	}
+	metrics, err := selfmetric.New(identity, selfmetric.FinalWaitImmediate, now)
+	if err != nil {
+		_ = logger.WriteRuntimeFailed()
+		return exitCodes.ExitInternalFailure
+	}
 	machine, err := lifecycle.New(func(change lifecycle.Change) error {
+		if err := metrics.SetRuntimeState(change.Current); err != nil {
+			return err
+		}
 		return logger.WriteStateChanged(string(change.Previous), string(change.Current))
 	})
 	if err != nil {
@@ -61,15 +70,30 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.WorkloadStarted); err != nil {
 					return err
 				}
+				if err := metrics.SetWorkload(pid, true); err != nil {
+					return err
+				}
+				if err := metrics.AddCounter(selfmetric.WorkloadStartsTotal, map[string]string{"outcome": selfmetric.WorkloadOutcomeStarted}, 1); err != nil {
+					return err
+				}
 				return logger.WriteWorkloadStarted(pid, processGroupID)
 			},
 			PrimaryExited: func(exitCode int, forced bool) error {
 				if err := machine.TransitionEvent(lifecycle.WorkloadExited); err != nil {
 					return err
 				}
+				if err := metrics.SetWorkload(0, false); err != nil {
+					return err
+				}
+				if err := metrics.SetWorkloadExitCode(exitCode); err != nil {
+					return err
+				}
 				return logger.WriteWorkloadExited(exitCode, forced)
 			},
 			ChildReaped: func(kind string) error {
+				if err := metrics.AddCounter(selfmetric.ChildrenReapedTotal, map[string]string{"kind": kind}, 1); err != nil {
+					return err
+				}
 				return logger.WriteChildReaped(kind, string(machine.State()))
 			},
 			Failed: func() error {
@@ -78,6 +102,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 						return err
 					}
 				}
+				if err := metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureInternal}, 1); err != nil {
+					return err
+				}
 				return logger.WriteRuntimeFailed()
 			},
 			Shutdown: func(signal string, plan shutdown.Plan) error {
@@ -85,12 +112,26 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.TerminationAfterSpawn); err != nil {
 					return err
 				}
+				if err := metrics.SetGauge(selfmetric.ShutdownActive, nil, 1); err != nil {
+					return err
+				}
+				if err := metrics.SetGauge(selfmetric.ShutdownDeadline, nil, float64(plan.Deadline.UnixNano())/float64(time.Second)); err != nil {
+					return err
+				}
 				return logger.WriteShutdownStarted(signal, plan.Deadline, plan.Remaining(plan.StartedAt))
 			},
-			Forced: logger.WriteShutdownForced,
+			Forced: func(signal string, processGroupID int) error {
+				if err := metrics.AddCounter(selfmetric.WorkloadForcedTotal, nil, 1); err != nil {
+					return err
+				}
+				return logger.WriteShutdownForced(signal, processGroupID)
+			},
 			Signal: func(event workload.SignalEvent) error {
 				switch event.Outcome {
 				case workload.SignalForwarded:
+					if err := metrics.AddCounter(selfmetric.WorkloadSignalsTotal, map[string]string{"signal": event.Name, "target": selfmetric.SignalTargetProcessGroup}, 1); err != nil {
+						return err
+					}
 					return logger.WriteSignalForwarded(event.Name, string(machine.State()), event.ProcessGroupID)
 				case workload.SignalIgnored:
 					return logger.WriteSignalIgnored(event.Name, event.Reason, event.ProcessGroupID)
@@ -100,11 +141,21 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			},
 		})
 		if shutdownPlan != nil && result.Started && machine.State() == lifecycle.Finalizing {
-			if err := logger.WriteShutdownCompleted(result.ExitCode, now().Sub(shutdownPlan.StartedAt)); err != nil {
+			duration := now().Sub(shutdownPlan.StartedAt)
+			if err := metrics.Observe(selfmetric.ShutdownPhaseDuration, map[string]string{"phase": "total"}, duration.Seconds()); err != nil {
+				return failLifecycle(machine, logger)
+			}
+			if err := logger.WriteShutdownCompleted(result.ExitCode, duration); err != nil {
 				return failLifecycle(machine, logger)
 			}
 		}
 		if result.StartFailed {
+			if err := metrics.AddCounter(selfmetric.WorkloadStartsTotal, map[string]string{"outcome": selfmetric.WorkloadOutcomeStartFailed}, 1); err != nil {
+				return failLifecycle(machine, logger)
+			}
+			if err := metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureWorkloadStart}, 1); err != nil {
+				return failLifecycle(machine, logger)
+			}
 			if err := machine.TransitionEvent(lifecycle.WorkloadStartFailed); err != nil {
 				return failLifecycle(machine, logger)
 			}
@@ -126,6 +177,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		return result.ExitCode
 	}
+	_ = metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureConfiguration}, 1)
 	if writeErr := logger.WriteConfigurationRejected(err); writeErr != nil {
 		_, err := fmt.Fprintln(stderr, `{"schema_version":"1","level":"error","event":"runtime.failed","component":"runtime","state":"initializing","message":"diagnostic write failed","reason":"internal","error_code":"INTERNAL_FAILURE"}`)
 		if err != nil {

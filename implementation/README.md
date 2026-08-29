@@ -5,9 +5,10 @@ and dependency graph.
 
 ## Current scope
 
-ISSUE-011 through ISSUE-014 provide the Wave 3 immutable snapshot model, strict whole-candidate parser/validator, atomic
-last-valid holder and exact generation-zero state. Version 1 JSON is decoded without transport assumptions and complete
-accepted snapshots replace one immutable generation at a time. The separate self-metrics domain remains in ISSUE-015.
+Wave 3 is complete. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
+parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded self-metrics registry.
+Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
+fixed-cardinality state and do not affect application identity.
 
 ## Requirements
 
@@ -32,6 +33,12 @@ Run the Wave 2 lifecycle, shutdown, escalation and probe exit gate:
 
 ```sh
 make wave2
+```
+
+Run the Wave 3 transport-independent snapshot and self-metrics state-core exit gate:
+
+```sh
+make wave3
 ```
 
 The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
@@ -77,6 +84,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
 - `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
+- `internal/selfmetric`: bounded self-metric registry, immutable scrape views and Prometheus/OpenMetrics text encoding.
 - `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits and rejection registry.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
@@ -85,11 +93,11 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-014, EPIC-001, ADR-001–ADR-004, ADR-011, ADR-014, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-015, EPIC-001, ADR-001–ADR-004, ADR-010, ADR-011, ADR-014, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. The self-metrics registry remains ISSUE-015, and production
-listener/exposition integration ISSUE-023.
+cross-cutting definition of done. Transport adapters begin in ISSUE-016; production listener/application exposition
+integration remains ISSUE-023.
 
 ## Engineering contract for subsequent issues
 
