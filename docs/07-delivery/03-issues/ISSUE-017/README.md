@@ -1,6 +1,6 @@
 # ISSUE-017. File publication protocol
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,21 @@ reconciliation fallback.
 - **Acceptance criteria and required tests:** Startup present/absent; atomic rename; in-place partial write;
   symlink/non-regular; overflow/invalidation/reinstall; whitespace-amplified file; periodic recovery.
 - **Completion:** Complete when event loss and malformed files cannot cause partial activation or unbounded reads.
+
+## Delivery log
+
+- 2026-08-29: moved to `In Progress`; implemented bounded `O_NOFOLLOW` target reads, raw-content deduplication,
+  directory inotify and mandatory periodic reconciliation.
+- 2026-08-29: moved to `Testing`; startup present/absent, rename, partial write, symlink, non-regular, oversized,
+  unchanged and periodic-recovery tests passed under the Docker race gate.
+- 2026-08-29: moved to `Done`; file ingestion passed `make test`, and EN/RU issue and implementation READMEs were
+  audited together.
+
+## Verification evidence
+
+- Only the configured target is opened; `O_NOFOLLOW` plus `fstat` rejects symlinks and non-regular files before reads.
+- `LimitReader` enforces the decoded-byte bound before parsing, including whitespace amplification.
+- Inotify watches the containing directory for atomic replacements; overflow, invalidation and reinstallation have
+  explicit recovery paths, while the finite periodic reconciliation remains authoritative after silent event loss.
+- Absent, malformed and I/O states retain the last valid holder generation; identical accepted file content is not
+  republished by periodic reconciliation.

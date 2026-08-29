@@ -5,7 +5,8 @@ and dependency graph.
 
 ## Current scope
 
-Wave 4 is in progress. ISSUE-016 adds the common bounded ingestion core used by every stable adapter. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
+Wave 4 is in progress. ISSUE-016 adds the common bounded ingestion core and ISSUE-017 adds safe atomic-file ingestion
+with directory inotify and periodic reconciliation. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
 parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded self-metrics registry.
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity.
@@ -82,6 +83,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/config`: configuration failure registry bootstrap.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
 - `internal/ingestion`: transport-independent admission, cancellation, result taxonomy and complete-candidate handoff.
+- `internal/fileingest`: bounded no-follow file reconciliation and Linux directory-inotify recovery.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
 - `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
@@ -94,10 +96,10 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-016, EPIC-001, ADR-001–ADR-005, ADR-010, ADR-011, ADR-014, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-017, EPIC-001, ADR-001–ADR-006, ADR-010, ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Transport adapters begin in ISSUE-017; production listener/application exposition
+cross-cutting definition of done. Stream and HTTP adapters follow in ISSUE-018 and ISSUE-020; production listener/application exposition
 integration remains ISSUE-023.
 
 ## Engineering contract for subsequent issues
