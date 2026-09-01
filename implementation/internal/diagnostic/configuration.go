@@ -13,29 +13,34 @@ import (
 )
 
 type record struct {
-	Timestamp     string  `json:"timestamp"`
-	Sequence      uint64  `json:"sequence"`
-	SchemaVersion string  `json:"schema_version"`
-	Level         string  `json:"level"`
-	Event         string  `json:"event"`
-	Component     string  `json:"component"`
-	RuntimeID     string  `json:"runtime_id"`
-	State         string  `json:"state"`
-	Message       string  `json:"message"`
-	Reason        string  `json:"reason,omitempty"`
-	ErrorCode     string  `json:"error_code,omitempty"`
-	ErrorMessage  string  `json:"error_message,omitempty"`
-	PreviousState string  `json:"previous_state,omitempty"`
-	PID           int     `json:"pid,omitempty"`
-	Deadline      string  `json:"deadline,omitempty"`
-	RemainingMS   *int64  `json:"remaining_ms,omitempty"`
-	DurationMS    float64 `json:"duration_ms,omitempty"`
-	Signal        string  `json:"signal,omitempty"`
-	WorkloadPID   int     `json:"workload_pid,omitempty"`
-	WorkloadPGID  int     `json:"workload_pgid,omitempty"`
-	ExitCode      *int    `json:"exit_code,omitempty"`
-	Forced        *bool   `json:"forced,omitempty"`
-	Kind          string  `json:"kind,omitempty"`
+	Timestamp     string   `json:"timestamp"`
+	Sequence      uint64   `json:"sequence"`
+	SchemaVersion string   `json:"schema_version"`
+	Level         string   `json:"level"`
+	Event         string   `json:"event"`
+	Component     string   `json:"component"`
+	RuntimeID     string   `json:"runtime_id"`
+	State         string   `json:"state"`
+	Message       string   `json:"message"`
+	Reason        string   `json:"reason,omitempty"`
+	ErrorCode     string   `json:"error_code,omitempty"`
+	ErrorMessage  string   `json:"error_message,omitempty"`
+	PreviousState string   `json:"previous_state,omitempty"`
+	PID           int      `json:"pid,omitempty"`
+	Deadline      string   `json:"deadline,omitempty"`
+	RemainingMS   *int64   `json:"remaining_ms,omitempty"`
+	DurationMS    *float64 `json:"duration_ms,omitempty"`
+	Signal        string   `json:"signal,omitempty"`
+	WorkloadPID   int      `json:"workload_pid,omitempty"`
+	WorkloadPGID  int      `json:"workload_pgid,omitempty"`
+	ExitCode      *int     `json:"exit_code,omitempty"`
+	Forced        *bool    `json:"forced,omitempty"`
+	Kind          string   `json:"kind,omitempty"`
+	Transport     string   `json:"transport,omitempty"`
+	Outcome       string   `json:"outcome,omitempty"`
+	Generation    *uint64  `json:"snapshot_generation,omitempty"`
+	SnapshotBytes *int     `json:"snapshot_bytes,omitempty"`
+	Series        *int     `json:"series,omitempty"`
 }
 
 func (logger *Logger) WriteRuntimeInitializing(pid int) error {
@@ -188,6 +193,7 @@ func (logger *Logger) WriteShutdownForced(signal string, processGroupID int) err
 }
 
 func (logger *Logger) WriteShutdownCompleted(exitCode int, duration time.Duration) error {
+	durationMilliseconds := float64(duration) / float64(time.Millisecond)
 	return logger.write(record{
 		Level:      "info",
 		Event:      "shutdown.completed",
@@ -195,7 +201,7 @@ func (logger *Logger) WriteShutdownCompleted(exitCode int, duration time.Duratio
 		State:      "finalizing",
 		Message:    "shutdown phases completed",
 		ExitCode:   &exitCode,
-		DurationMS: float64(duration) / float64(time.Millisecond),
+		DurationMS: &durationMilliseconds,
 	})
 }
 
@@ -207,6 +213,31 @@ func (logger *Logger) WriteChildReaped(kind, state string) error {
 		State:     state,
 		Message:   "managed child reaped",
 		Kind:      kind,
+	})
+}
+
+func (logger *Logger) WriteSnapshotAccepted(state, transport string, generation uint64, snapshotBytes, series int, duration time.Duration) error {
+	durationMilliseconds := float64(duration) / float64(time.Millisecond)
+	return logger.write(record{
+		Level: "debug", Event: "snapshot.accepted", Component: "ingestion", State: state,
+		Message: "candidate snapshot accepted", Transport: transport, Generation: &generation,
+		SnapshotBytes: &snapshotBytes, Series: &series, DurationMS: &durationMilliseconds,
+	})
+}
+
+func (logger *Logger) WriteSnapshotRejected(state, transport, reason string, duration time.Duration) error {
+	durationMilliseconds := float64(duration) / float64(time.Millisecond)
+	return logger.write(record{
+		Level: "warn", Event: "snapshot.rejected", Component: "ingestion", State: state,
+		Message: "candidate snapshot rejected", Transport: transport, Reason: reason,
+		DurationMS: &durationMilliseconds,
+	})
+}
+
+func (logger *Logger) WriteIngestionOverloaded(state, transport string) error {
+	return logger.write(record{
+		Level: "warn", Event: "ingestion.overloaded", Component: "ingestion", State: state,
+		Message: "ingestion capacity exhausted", Transport: transport, Outcome: "busy",
 	})
 }
 

@@ -5,10 +5,9 @@
 
 ## Текущий объём
 
-Wave 4 выполняется. ISSUE-016 добавляет общий bounded ingestion core, ISSUE-017 — безопасный atomic-file ingestion,
-ISSUE-018 — bounded acknowledged Unix stream adapter MSP/1, ISSUE-019 — его official serialized client writer,
-ISSUE-020 — bounded loopback HTTP push с identity/gzip decoding, ISSUE-021 закрепляет отсутствие mmap/shared-memory ABI
-в Core.
+Wave 4 завершена. ISSUE-016–ISSUE-022 реализуют единый bounded ingestion core, atomic-file reconciliation,
+acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
+exhaustive cross-adapter conformance corpus.
 ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state и отдельный bounded self-metrics registry. Complete accepted application
 snapshots заменяют по одной immutable generation; live self-metrics используют собственный fixed-cardinality state и не
@@ -43,6 +42,12 @@ make wave2
 
 ```sh
 make wave3
+```
+
+Запуск exit gate Wave 4 для common ingestion и cross-adapter conformance:
+
+```sh
+make wave4
 ```
 
 Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
@@ -85,6 +90,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/buildinfo`: build identity, передаваемый linker.
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
+- `internal/conformance`: общий file/Unix/HTTP corpus semantics, state и observability.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
 - `internal/ingestion`: transport-independent admission, cancellation, result taxonomy и complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter с независимыми wire/decoded limits и exact HTTP mapping.
@@ -102,7 +108,7 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011–ISSUE-021, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011–ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
 поставке и сквозному definition of done. Production listener/application
 exposition integration остаётся в ISSUE-023.

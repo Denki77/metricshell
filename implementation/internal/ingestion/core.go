@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
 )
@@ -73,12 +74,34 @@ type Publisher interface {
 type Observer interface {
 	Started(Transport)
 	Completed(Result, snapshot.ActiveSnapshot, time.Duration)
+	Declined(Result, time.Duration)
 }
 
 type noopObserver struct{}
 
 func (noopObserver) Started(Transport)                                        {}
 func (noopObserver) Completed(Result, snapshot.ActiveSnapshot, time.Duration) {}
+func (noopObserver) Declined(Result, time.Duration)                           {}
+
+type MultiObserver []Observer
+
+func (observers MultiObserver) Started(transport Transport) {
+	for _, observer := range observers {
+		observer.Started(transport)
+	}
+}
+
+func (observers MultiObserver) Completed(result Result, active snapshot.ActiveSnapshot, duration time.Duration) {
+	for _, observer := range observers {
+		observer.Completed(result, active, duration)
+	}
+}
+
+func (observers MultiObserver) Declined(result Result, duration time.Duration) {
+	for _, observer := range observers {
+		observer.Declined(result, duration)
+	}
+}
 
 type Parser func([]byte, snapshot.Limits) (snapshot.ValidatedSnapshot, error)
 
@@ -111,12 +134,14 @@ func NewWithParser(holder *snapshot.Holder, limits snapshot.Limits, concurrent, 
 
 func (core *Core) Publish(ctx context.Context, transport Transport, candidate []byte) Result {
 	result := Result{Transport: transport}
+	started := core.now()
 	if !validTransport(transport) {
 		result.Outcome, result.Reason = InternalError, snapshot.ReasonInternal
 		return result
 	}
 	if contextExpired(ctx) {
 		result.Outcome = Timeout
+		core.observer.Declined(result, core.now().Sub(started))
 		return result
 	}
 	select {
@@ -124,6 +149,7 @@ func (core *Core) Publish(ctx context.Context, transport Transport, candidate []
 		defer func() { <-core.admissions }()
 	default:
 		result.Outcome = Busy
+		core.observer.Declined(result, core.now().Sub(started))
 		return result
 	}
 	select {
@@ -131,10 +157,10 @@ func (core *Core) Publish(ctx context.Context, transport Transport, candidate []
 		defer func() { <-core.executing }()
 	case <-ctx.Done():
 		result.Outcome = Timeout
+		core.observer.Declined(result, core.now().Sub(started))
 		return result
 	}
 
-	started := core.now()
 	core.observer.Started(transport)
 	active := core.holder.Active()
 	defer func() { core.observer.Completed(result, active, core.now().Sub(started)) }()
@@ -218,5 +244,41 @@ func (observer *MetricsObserver) Completed(result Result, active snapshot.Active
 	if result.Outcome == Accepted {
 		observer.registry.SetActiveSnapshot(active)
 		_ = observer.registry.SetGauge(selfmetric.IngestionLastSuccess, labels, float64(observer.now().UnixNano())/float64(time.Second))
+	}
+}
+
+func (observer *MetricsObserver) Declined(result Result, _ time.Duration) {
+	observer.mu.Lock()
+	defer observer.mu.Unlock()
+	_ = observer.registry.AddCounter(selfmetric.SnapshotPublicationsTotal, map[string]string{"transport": string(result.Transport), "outcome": string(result.Outcome)}, 1)
+}
+
+type DiagnosticObserver struct {
+	logger *diagnostic.Logger
+	state  func() string
+}
+
+func NewDiagnosticObserver(logger *diagnostic.Logger, state func() string) (*DiagnosticObserver, error) {
+	if logger == nil || state == nil {
+		return nil, errors.New("invalid diagnostic observer")
+	}
+	return &DiagnosticObserver{logger: logger, state: state}, nil
+}
+
+func (observer *DiagnosticObserver) Started(Transport) {}
+
+func (observer *DiagnosticObserver) Completed(result Result, active snapshot.ActiveSnapshot, duration time.Duration) {
+	switch result.Outcome {
+	case Accepted:
+		validated := active.Validated()
+		_ = observer.logger.WriteSnapshotAccepted(observer.state(), string(result.Transport), active.Generation(), validated.CanonicalBytes(), validated.SeriesCount(), duration)
+	case Rejected:
+		_ = observer.logger.WriteSnapshotRejected(observer.state(), string(result.Transport), string(result.Reason), duration)
+	}
+}
+
+func (observer *DiagnosticObserver) Declined(result Result, _ time.Duration) {
+	if result.Outcome == Busy {
+		_ = observer.logger.WriteIngestionOverloaded(observer.state(), string(result.Transport))
 	}
 }

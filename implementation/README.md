@@ -5,11 +5,11 @@ and dependency graph.
 
 ## Current scope
 
-Wave 4 is in progress. ISSUE-016 adds the common bounded ingestion core, ISSUE-017 adds safe atomic-file ingestion,
-ISSUE-018 adds the bounded acknowledged MSP/1 Unix stream adapter, and ISSUE-019 adds its official serialized client
-writer, ISSUE-020 adds bounded loopback HTTP push, and ISSUE-021 enforces the absence of mmap/shared-memory ABI from
-Core. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
-parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded self-metrics registry.
+Wave 4 is complete. ISSUE-016 through ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation,
+acknowledged MSP/1 Unix ingestion and its serialized client, bounded loopback HTTP push, the explicit mmap boundary,
+and an exhaustive cross-adapter conformance corpus. ISSUE-011 through ISSUE-015 provide the immutable snapshot model,
+strict whole-candidate parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded
+self-metrics registry.
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity.
 
@@ -42,6 +42,12 @@ Run the Wave 3 transport-independent snapshot and self-metrics state-core exit g
 
 ```sh
 make wave3
+```
+
+Run the Wave 4 common-ingestion and cross-adapter conformance exit gate:
+
+```sh
+make wave4
 ```
 
 The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
@@ -84,6 +90,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/buildinfo`: linker-provided build identity.
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: configuration failure registry bootstrap.
+- `internal/conformance`: shared file/Unix/HTTP semantic, state and observability corpus.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
 - `internal/ingestion`: transport-independent admission, cancellation, result taxonomy and complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter with independent wire/decoded limits and exact HTTP mapping.
@@ -101,7 +108,7 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-021, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
 cross-cutting definition of done. Production listener/application exposition

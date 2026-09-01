@@ -5,7 +5,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration ci wave1 wave2 wave3 build
+.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 build
 
 all: ci
 
@@ -46,7 +46,11 @@ integration:
 		printf '%s\n' "$$output" | grep -F '"signal":"HUP"' >/dev/null; \
 		printf '%s\n' "$$output" | grep -F '"signal":"QUIT"' >/dev/null
 	@attempt=0; while test "$$attempt" -lt 25; do \
-		docker run --rm -e FIXTURE_SIGNALS=TERM -e FIXTURE_EXIT_DURING_FORWARD=1 $(IMAGE)-integration:local -- /signal-fixture >/dev/null 2>&1 || exit 1; \
+		code=0; output="$$(docker run --rm -e FIXTURE_SIGNALS=TERM -e FIXTURE_EXIT_DURING_FORWARD=1 $(IMAGE)-integration:local -- /signal-fixture 2>&1)" || code=$$?; \
+		test "$$code" -eq 0; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.signal_ignored"')" -eq 1; \
+		printf '%s\n' "$$output" | grep '"event":"workload.signal_ignored".*"reason":"target_exited"' >/dev/null; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.signal_forwarded"')" -eq 0; \
 		attempt=$$((attempt + 1)); \
 	done
 	@for requested in TERM INT; do \
@@ -115,6 +119,8 @@ wave1: ci
 wave2: ci
 
 wave3: ci
+
+wave4: ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"
