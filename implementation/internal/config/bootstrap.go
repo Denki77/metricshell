@@ -29,7 +29,24 @@ var shutdownOptions = map[string]string{
 	"--shutdown-deadline":         "deadline",
 }
 
+var unsupportedSharedMemoryEnvironment = [...]string{
+	"METRICSHELL_MMAP_ENABLED",
+	"METRICSHELL_MMAP_PATH",
+	"METRICSHELL_SHARED_MEMORY_PATH",
+	"METRICSHELL_SHM_PATH",
+}
+
 func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
+	if lookupEnv != nil {
+		for _, name := range unsupportedSharedMemoryEnvironment {
+			if _, exists := lookupEnv(name); exists {
+				return Config{}, err.Bootstrap.UnknownOption
+			}
+		}
+		if transport, exists := lookupEnv("METRICSHELL_INGESTION_TRANSPORT"); exists && (transport == "mmap" || transport == "shared_memory" || transport == "shm") {
+			return Config{}, err.Bootstrap.UnknownOption
+		}
+	}
 	separator := -1
 	for index, argument := range args {
 		if argument == "--" {

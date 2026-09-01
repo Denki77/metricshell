@@ -7,7 +7,8 @@ and dependency graph.
 
 Wave 4 is in progress. ISSUE-016 adds the common bounded ingestion core, ISSUE-017 adds safe atomic-file ingestion,
 ISSUE-018 adds the bounded acknowledged MSP/1 Unix stream adapter, and ISSUE-019 adds its official serialized client
-writer, and ISSUE-020 adds bounded loopback HTTP push with identity/gzip decoding. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
+writer, ISSUE-020 adds bounded loopback HTTP push, and ISSUE-021 enforces the absence of mmap/shared-memory ABI from
+Core. ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate
 parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded self-metrics registry.
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity.
@@ -95,12 +96,12 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits and rejection registry.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance tests.
-- `internal/dependencyboundary`: automated production/research isolation test.
+- `internal/dependencyboundary`: production/research, public-API, primitive, module and license boundary checks.
 - `../VERSION`: repository-wide project version.
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-020, EPIC-001, ADR-001–ADR-008, ADR-010, ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
+Implementation follows ISSUE-011 through ISSUE-021, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
 cross-cutting definition of done. Production listener/application exposition
