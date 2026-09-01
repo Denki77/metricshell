@@ -5,7 +5,10 @@
 
 ## Текущий объём
 
-Wave 3 завершена. ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
+Wave 4 завершена. ISSUE-016–ISSUE-022 реализуют единый bounded ingestion core, atomic-file reconciliation,
+acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
+exhaustive cross-adapter conformance corpus.
+ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state и отдельный bounded self-metrics registry. Complete accepted application
 snapshots заменяют по одной immutable generation; live self-metrics используют собственный fixed-cardinality state и не
 влияют на application identity.
@@ -39,6 +42,12 @@ make wave2
 
 ```sh
 make wave3
+```
+
+Запуск exit gate Wave 4 для common ingestion и cross-adapter conformance:
+
+```sh
+make wave4
 ```
 
 Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
@@ -76,11 +85,17 @@ metricshell version=0.1.0-dev revision=0123456
 
 ## Структура пакетов
 
+- `client`: публичный official connection writer MSP/1 с complete-publication serialization и typed errors.
 - `cmd/metricshell`: entrypoint production-бинарника.
 - `internal/buildinfo`: build identity, передаваемый linker.
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: bootstrap registry ошибок конфигурации.
+- `internal/conformance`: общий file/Unix/HTTP corpus semantics, state и observability.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
+- `internal/ingestion`: transport-independent admission, cancellation, result taxonomy и complete-candidate handoff.
+- `internal/httpingest`: loopback-only POST adapter с независимыми wire/decoded limits и exact HTTP mapping.
+- `internal/fileingest`: bounded no-follow file reconciliation и Linux directory-inotify recovery.
+- `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing и Unix listener с mode 0660.
 - `internal/lifecycle`: synchronized public runtime state и transitions.
 - `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
 - `internal/shutdown`: валидированные shutdown budgets, deadlines, phase contexts и completion reasons.
@@ -88,14 +103,14 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits и rejection registry.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance tests.
-- `internal/dependencyboundary`: автоматический тест изоляции production от research.
+- `internal/dependencyboundary`: проверки production/research, public API, primitives, modules и licenses boundaries.
 - `../VERSION`: общая версия проекта на уровне репозитория.
 
 ## Нормативный контекст
 
-Реализация следует ISSUE-011–ISSUE-015, EPIC-001, ADR-001–ADR-004, ADR-010, ADR-011, ADR-014, спецификациям Application Snapshot Protocol,
+Реализация следует ISSUE-011–ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Transport adapters начинаются в ISSUE-016; production listener/application
+поставке и сквозному definition of done. Production listener/application
 exposition integration остаётся в ISSUE-023.
 
 ## Инженерный контракт для следующих задач

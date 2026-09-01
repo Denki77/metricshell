@@ -1,6 +1,6 @@
 # ISSUE-017. Protocol file publication
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -25,3 +25,21 @@ reconciliation fallback; delete/replace races покрыты.
   symlink/non-regular; overflow/invalidation/reinstall; whitespace-amplified file; periodic recovery.
 - **Условие завершения:** Готово, когда потеря events и malformed files не приводят к partial activation или unbounded
   reads.
+
+## Журнал выполнения
+
+- 2026-08-29: переведена в `В работе`; реализованы bounded target reads с `O_NOFOLLOW`, raw-content deduplication,
+  directory inotify и обязательный periodic reconciliation.
+- 2026-08-29: переведена в `Тестирование`; startup present/absent, rename, partial write, symlink, non-regular,
+  oversized, unchanged и periodic-recovery tests прошли под Docker race gate.
+- 2026-08-29: переведена в `Готово`; file ingestion прошёл `make test`, EN/RU issue и implementation README проверены
+  синхронно.
+
+## Свидетельства проверки
+
+- Открывается только configured target; `O_NOFOLLOW` вместе с `fstat` отклоняет symlinks и non-regular files до чтения.
+- `LimitReader` применяет decoded-byte bound до parsing, включая whitespace amplification.
+- Inotify наблюдает containing directory для atomic replacements; overflow, invalidation и reinstallation имеют явные
+  recovery paths, а finite periodic reconciliation остаётся authoritative после silent event loss.
+- Absent, malformed и I/O states сохраняют last-valid holder generation; identical accepted file content не
+  публикуется повторно при periodic reconciliation.

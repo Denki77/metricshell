@@ -1,6 +1,6 @@
 # ISSUE-018. Unix socket framed protocol
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -23,3 +23,25 @@ activation.
   part; declared-size mismatch; exact capacity formula and default 1MiB transfer; capacity below snapshot limit rejected;
   all limits; expiry/disconnect; concurrent commits.
 - **Completion:** Complete when protocol golden transcripts and cross-adapter corpus pass with exact frames and enums.
+
+## Delivery log
+
+- 2026-08-29: moved to `In Progress`; implemented bounded MSP/1 line framing, multipart transaction storage,
+  FRAME_ACCEPTED/ACK/NACK responses and a mode-0660 Unix listener.
+- 2026-08-29: moved to `Testing`; golden one/multipart transcripts, base64, ordering, duplication, missing-part,
+  size/capacity, expiry, frame drain, default 1MiB and concurrent-commit tests passed under Docker race testing.
+- 2026-08-29: moved to `Done`; the socket adapter passed `make test`, and EN/RU issue and implementation READMEs were
+  audited together.
+
+## Verification evidence
+
+- Every line is bounded and oversized input is drained before the next frame; only unpadded RFC 4648 base64url is
+  decoded.
+- Transactions reserve bounded shared slots, enforce canonical IDs/indexes/sizes, strict part order, exact decoded size
+  and finite expiry; disconnect releases every reservation.
+- ACK is emitted only from the common Core's accepted result after installation and includes the assigned generation.
+  Candidate reasons, admission outcomes and wire failures retain their separate registries.
+- The exact conservative capacity formula rejects configurations below the canonical snapshot limit; the default
+  8KiB × 256 setup transfers a complete 1MiB decoded candidate.
+- Real AF_UNIX listener coverage verifies mode 0660 and end-to-end installation; concurrent commits receive unique
+  linear generations.

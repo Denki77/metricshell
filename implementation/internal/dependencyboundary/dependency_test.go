@@ -2,9 +2,14 @@ package dependencyboundary
 
 import (
 	"bufio"
+	"encoding/json"
+	"errors"
+	"go/ast"
 	"go/parser"
 	"go/token"
+	"io"
 	"io/fs"
+	"os"
 	"os/exec"
 	"path/filepath"
 	"runtime"
@@ -18,7 +23,10 @@ func TestProductionDependencyBoundary(t *testing.T) {
 
 	root := moduleRoot(t)
 	checkSourceImports(t, root)
+	checkPublicSurfaceAndCalls(t, root)
 	checkResolvedDependencies(t, root)
+	checkModuleLicenses(t, root)
+	checkResearchUnavailable(t, root)
 }
 
 func moduleRoot(t *testing.T) string {
@@ -59,6 +67,43 @@ func checkSourceImports(t *testing.T, root string) {
 	}
 }
 
+func checkPublicSurfaceAndCalls(t *testing.T, root string) {
+	t.Helper()
+	err := filepath.WalkDir(root, func(path string, entry fs.DirEntry, walkErr error) error {
+		if walkErr != nil {
+			return walkErr
+		}
+		if entry.IsDir() || filepath.Ext(path) != ".go" || strings.HasSuffix(path, "_test.go") {
+			return nil
+		}
+		parsed, err := parser.ParseFile(token.NewFileSet(), path, nil, 0)
+		if err != nil {
+			return err
+		}
+		ast.Inspect(parsed, func(node ast.Node) bool {
+			switch value := node.(type) {
+			case *ast.TypeSpec:
+				if ast.IsExported(value.Name.Name) && prohibitedSharedMemoryName(value.Name.Name) {
+					t.Errorf("public type %s in %s exposes shared-memory ABI", value.Name.Name, path)
+				}
+			case *ast.FuncDecl:
+				if ast.IsExported(value.Name.Name) && prohibitedSharedMemoryName(value.Name.Name) {
+					t.Errorf("public function %s in %s exposes shared-memory API", value.Name.Name, path)
+				}
+			case *ast.SelectorExpr:
+				if value.Sel.Name == "Mmap" || value.Sel.Name == "Munmap" || value.Sel.Name == "ShmOpen" {
+					t.Errorf("production source %s calls shared-memory primitive %s", path, value.Sel.Name)
+				}
+			}
+			return true
+		})
+		return nil
+	})
+	if err != nil {
+		t.Fatalf("scan production API: %v", err)
+	}
+}
+
 func checkResolvedDependencies(t *testing.T, root string) {
 	t.Helper()
 	command := exec.Command("go", "list", "-deps", "-test", "-f", `{{if .Module}}{{.ImportPath}}{{"\t"}}{{.Dir}}{{"\t"}}{{.Module.Dir}}{{end}}`, "./...")
@@ -83,8 +128,64 @@ func checkResolvedDependencies(t *testing.T, root string) {
 	}
 }
 
+type module struct {
+	Path string
+	Dir  string
+	Main bool
+}
+
+func checkModuleLicenses(t *testing.T, root string) {
+	t.Helper()
+	command := exec.Command("go", "list", "-m", "-json", "all")
+	command.Dir = root
+	output, err := command.Output()
+	if err != nil {
+		t.Fatalf("resolve module licenses: %v", err)
+	}
+	decoder := json.NewDecoder(strings.NewReader(string(output)))
+	for {
+		var dependency module
+		if err := decoder.Decode(&dependency); errors.Is(err, io.EOF) {
+			break
+		} else if err != nil {
+			t.Fatalf("decode module: %v", err)
+		}
+		if dependency.Main {
+			continue
+		}
+		if prohibitedSharedMemoryName(dependency.Path) {
+			t.Errorf("production module %q introduces shared-memory dependency", dependency.Path)
+		}
+		if dependency.Dir == "" || !hasLicense(dependency.Dir) {
+			t.Errorf("production module %q has no discoverable license file", dependency.Path)
+		}
+	}
+}
+
+func hasLicense(directory string) bool {
+	for _, pattern := range []string{"LICENSE*", "COPYING*", "NOTICE*"} {
+		matches, _ := filepath.Glob(filepath.Join(directory, pattern))
+		if len(matches) > 0 {
+			return true
+		}
+	}
+	return false
+}
+
+func checkResearchUnavailable(t *testing.T, root string) {
+	t.Helper()
+	if _, err := os.Stat(filepath.Join(root, "..", "research")); !errors.Is(err, os.ErrNotExist) {
+		t.Fatalf("Docker production test context unexpectedly contains research tree")
+	}
+}
+
 func isResearch(importPath string) bool {
 	return strings.Contains(importPath, "/research/") || strings.HasSuffix(importPath, "/research")
+}
+
+func prohibitedSharedMemoryName(value string) bool {
+	normalized := strings.ToLower(strings.NewReplacer("_", "", "-", "", "/", "").Replace(value))
+	return strings.Contains(normalized, "mmap") || strings.Contains(normalized, "sharedmemory") || strings.Contains(normalized, "shm")
 }
 
 func isWithin(parent, candidate string) bool {

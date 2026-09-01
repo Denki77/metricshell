@@ -5,6 +5,7 @@ FROM ${GO_IMAGE} AS source
 ARG REPO_URI
 WORKDIR /src
 COPY ["implementation/go.mod", "./"]
+COPY ["implementation/client", "./client"]
 COPY ["implementation/cmd", "./cmd"]
 COPY ["implementation/internal", "./internal"]
 COPY ["VERSION", "/project/VERSION"]

@@ -56,6 +56,30 @@ func TestParseRejectsInvalidCommandLine(t *testing.T) {
 	}
 }
 
+func TestParseRejectsSharedMemoryConfigurationSurface(t *testing.T) {
+	t.Parallel()
+
+	for _, option := range []string{"--mmap", "--mmap-path=/run/metrics", "--shared-memory", "--shm-path=/dev/shm/metrics", "--ingestion-transport=mmap"} {
+		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("Parse(%q) accepted unsupported shared-memory option", option)
+		}
+	}
+	for _, name := range append(unsupportedSharedMemoryEnvironment[:], "METRICSHELL_INGESTION_TRANSPORT") {
+		lookup := func(candidate string) (string, bool) {
+			if candidate != name {
+				return "", false
+			}
+			if name == "METRICSHELL_INGESTION_TRANSPORT" {
+				return "mmap", true
+			}
+			return "configured", true
+		}
+		if _, err := Parse([]string{"--", "program"}, testNow, lookup); err == nil {
+			t.Errorf("Parse accepted unsupported environment %s", name)
+		}
+	}
+}
+
 func TestDurationGrammarAndBudgetValidation(t *testing.T) {
 	t.Parallel()
 

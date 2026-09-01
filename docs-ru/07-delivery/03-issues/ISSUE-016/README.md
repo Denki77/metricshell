@@ -1,6 +1,6 @@
 # ISSUE-016. Общий transport-independent ingestion interface
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,22 @@
 - **Критерии приёмки и обязательные тесты:** Contract tests с fake adapters для
   accepted/rejected/busy/timeout/frozen/internal; cancellation; queue boundaries; enum-parity compile/test check.
 - **Условие завершения:** Готово, когда каждый adapter реализует interface без ad hoc translation semantic rejection.
+
+## Журнал выполнения
+
+- 2026-08-29: переведена в `В работе`; реализованы общие registries transport/result/failure, bounded admission,
+  отменяемая очередь и handoff complete candidate в atomic holder.
+- 2026-08-29: переведена в `Тестирование`; acceptance, rejection, busy, timeout, frozen, internal, cancellation,
+  queue-boundary, linearization и enum-parity tests прошли под race detector в Docker.
+- 2026-08-29: переведена в `Готово`; production module прошёл Docker gate `make test`, оба implementation README
+  проверены на полноту.
+
+## Свидетельства проверки
+
+- File, Unix и HTTP используют единый контракт `Publisher` и возвращают typed `Result`; candidate reasons остаются в
+  snapshot registry, wire failures находятся в отдельном typed registry.
+- Admission независимо ограничивает executing и pending work. Cancellation проверяется до parsing и повторно перед
+  atomic installation, поэтому timed-out работа не изменяет active state.
+- Общий metrics observer обновляет inflight, publication, rejection, last-success и active-snapshot metrics без
+  attacker-controlled labels.
+- Concurrent accepted candidates получают уникальные монотонные generations из одного holder.
