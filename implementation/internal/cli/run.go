@@ -1,6 +1,8 @@
 package cli
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -10,9 +12,12 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/config"
 	exitCodes "github.com/Denki77/metricshell/implementation/internal/constants"
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
+	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
+	"github.com/Denki77/metricshell/implementation/internal/snapshot"
 	"github.com/Denki77/metricshell/implementation/internal/workload"
 )
 
@@ -61,6 +66,45 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
+		holder := snapshot.NewHolder(snapshot.Zero())
+		debugView := func() []byte {
+			include, exclude := len(configuration.Exposition.Include), len(configuration.Exposition.Exclude)
+			content, marshalErr := json.Marshal(map[string]any{
+				"exposition_listen":      configuration.Exposition.Listen,
+				"max_response_bytes":     configuration.Exposition.ResponseBytes,
+				"max_concurrent_scrapes": configuration.Exposition.Concurrent,
+				"metrics_include_count":  include,
+				"metrics_exclude_count":  exclude,
+			})
+			if marshalErr != nil {
+				return []byte("{}\n")
+			}
+			return append(content, '\n')
+		}
+		handler, handlerErr := exposition.NewHandler(configuration.Exposition, holder, metrics, probe.New(machine), debugView,
+			func(outcome exposition.Outcome, status int) {
+				_ = logger.WriteExpositionFailed(string(machine.State()), string(outcome), status)
+			})
+		if handlerErr != nil {
+			return rejectConfiguration(machine, metrics, logger, handlerErr)
+		}
+		server, bindErr := exposition.Bind(configuration.Exposition, handler)
+		if bindErr != nil {
+			_ = metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureBind}, 1)
+			_ = logger.WriteEndpointBindFailed("exposition", string(machine.State()))
+			_ = machine.TransitionEvent(lifecycle.RuntimeFailed)
+			_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
+			return exitCodes.ExitEndpointBindFailed
+		}
+		server.Start()
+		defer func() {
+			ctx, cancel := context.WithTimeout(context.Background(), configuration.Exposition.WriteTimeout)
+			defer cancel()
+			_ = server.Shutdown(ctx)
+		}()
+		if err := logger.WriteEndpointBound("exposition", string(machine.State())); err != nil {
+			return failLifecycle(machine, logger)
+		}
 		if err := machine.TransitionEvent(lifecycle.ConfigurationValidated); err != nil {
 			return failLifecycle(machine, logger)
 		}
@@ -186,6 +230,16 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		return exitCodes.ExitConfigurationRejected
 	}
 	if transitionErr := machine.TransitionEvent(lifecycle.InitializationFailed); transitionErr == nil {
+		_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
+	}
+	return exitCodes.ExitConfigurationInvalid
+}
+
+func rejectConfiguration(machine *lifecycle.Machine, metrics *selfmetric.Registry, logger *diagnostic.Logger, err error) int {
+	_ = metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureConfiguration}, 1)
+	_ = logger.WriteConfigurationRejected(err)
+	if machine.State() == lifecycle.Initializing {
+		_ = machine.TransitionEvent(lifecycle.InitializationFailed)
 		_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
 	}
 	return exitCodes.ExitConfigurationInvalid

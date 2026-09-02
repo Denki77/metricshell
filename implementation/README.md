@@ -5,7 +5,8 @@ and dependency graph.
 
 ## Current scope
 
-Wave 5 is in progress. ISSUE-024 provides bounded response pre-encoding and write classification. Wave 4
+Wave 5 is in progress. ISSUE-023 and ISSUE-024 provide the bounded Prometheus/OpenMetrics listener, filtering,
+lifecycle probes, response pre-encoding and write classification. Wave 4
 ISSUE-016 through ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation,
 acknowledged MSP/1 Unix ingestion and its serialized client, bounded loopback HTTP push, the explicit mmap boundary,
 and an exhaustive cross-adapter conformance corpus. ISSUE-011 through ISSUE-015 provide the immutable snapshot model,
@@ -90,7 +91,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `cmd/metricshell`: production executable entrypoint.
 - `internal/buildinfo`: linker-provided build identity.
 - `internal/cli`: bootstrap command surface.
-- `internal/config`: configuration failure registry bootstrap.
+- `internal/config`: validated workload, shutdown and exposition bootstrap configuration.
 - `internal/conformance`: shared file/Unix/HTTP semantic, state and observability corpus.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
 - `internal/exposition`: immutable application/self-metric encoding, response bounds, compression and write outcomes.
@@ -113,8 +114,7 @@ metricshell version=0.1.0-dev revision=0123456
 Implementation follows ISSUE-011 through ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Production listener/application exposition
-integration remains ISSUE-023.
+cross-cutting definition of done. Finalization ingestion closure and final-wait behavior remain ISSUE-025–ISSUE-028.
 
 ## Engineering contract for subsequent issues
 

@@ -5,7 +5,8 @@
 
 ## Текущий объём
 
-Wave 5 выполняется. ISSUE-024 реализует bounded response pre-encoding и write classification. Wave 4
+Wave 5 выполняется. ISSUE-023 и ISSUE-024 реализуют bounded Prometheus/OpenMetrics listener, filtering, lifecycle
+probes, response pre-encoding и write classification. Wave 4
 ISSUE-016–ISSUE-022 реализует единый bounded ingestion core, atomic-file reconciliation,
 acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
 exhaustive cross-adapter conformance corpus.
@@ -90,7 +91,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `cmd/metricshell`: entrypoint production-бинарника.
 - `internal/buildinfo`: build identity, передаваемый linker.
 - `internal/cli`: bootstrap command surface.
-- `internal/config`: bootstrap registry ошибок конфигурации.
+- `internal/config`: валидированная workload, shutdown и exposition bootstrap configuration.
 - `internal/conformance`: общий file/Unix/HTTP corpus semantics, state и observability.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
 - `internal/exposition`: immutable application/self-metric encoding, response bounds, compression и write outcomes.
@@ -112,8 +113,8 @@ metricshell version=0.1.0-dev revision=0123456
 
 Реализация следует ISSUE-011–ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Production listener/application
-exposition integration остаётся в ISSUE-023.
+поставке и сквозному definition of done. Finalization ingestion closure и final-wait behavior остаются в
+ISSUE-025–ISSUE-028.
 
 ## Инженерный контракт для следующих задач
 

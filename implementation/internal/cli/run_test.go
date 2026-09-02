@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"bytes"
 	"encoding/json"
+	"net"
 	"testing"
 	"time"
 
@@ -25,6 +26,26 @@ func TestRunVersion(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunFailsBeforeWorkloadWhenExpositionBindFails(t *testing.T) {
+	listener, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer listener.Close()
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"--exposition-listen=" + listener.Addr().String(), "--", "/must-not-start"}, nil, &stdout, &stderr, buildinfo.Info{}, time.Now)
+	if code != 72 {
+		t.Fatalf("Run() code = %d, want 72", code)
+	}
+	if stdout.Len() != 0 || bytes.Contains(stderr.Bytes(), []byte(`"event":"workload.`)) {
+		t.Fatalf("workload was observed: stdout=%q stderr=%q", stdout.String(), stderr.String())
+	}
+	if !bytes.Contains(stderr.Bytes(), []byte(`"event":"endpoint.bind_failed"`)) {
+		t.Fatalf("endpoint.bind_failed missing: %s", stderr.String())
 	}
 }
 

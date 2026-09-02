@@ -106,3 +106,47 @@ func TestDurationGrammarAndBudgetValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestParseExpositionDefaultsPrecedenceAndSelectors(t *testing.T) {
+	t.Parallel()
+
+	environment := map[string]string{
+		"METRICSHELL_EXPOSITION_LISTEN":        "127.0.0.1:19090",
+		"METRICSHELL_MAX_RESPONSE_BYTES":       "1MiB",
+		"METRICSHELL_MAX_CONCURRENT_SCRAPES":   "4",
+		"METRICSHELL_EXPOSITION_WRITE_TIMEOUT": "5s",
+		"METRICSHELL_METRICS_INCLUDE":          "prefix:environment_,name:ignored",
+		"METRICSHELL_METRICS_EXCLUDE":          "prefix:debug_",
+	}
+	lookup := func(name string) (string, bool) { value, ok := environment[name]; return value, ok }
+	configuration, err := Parse([]string{
+		"--exposition-listen=127.0.0.1:0", "--max-response-bytes", "2MiB", "--max-concurrent-scrapes=8",
+		"--exposition-write-timeout=10s", "--metrics-include=name:application_jobs", "--metrics-include=prefix:worker_",
+		"--", "program",
+	}, testNow, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := configuration.Exposition
+	if got.Listen != "127.0.0.1:0" || got.ResponseBytes != 2<<20 || got.Concurrent != 8 || got.WriteTimeout != 10*time.Second {
+		t.Fatalf("exposition = %+v", got)
+	}
+	wantInclude := []string{"name:application_jobs", "prefix:worker_"}
+	if !reflect.DeepEqual(got.Include, wantInclude) || !reflect.DeepEqual(got.Exclude, []string{"prefix:debug_"}) {
+		t.Fatalf("selectors = %v/%v", got.Include, got.Exclude)
+	}
+}
+
+func TestParseRejectsInvalidExpositionConfiguration(t *testing.T) {
+	t.Parallel()
+
+	for _, option := range []string{
+		"--exposition-listen=:9090", "--max-response-bytes=63KiB", "--max-response-bytes=65MiB",
+		"--max-concurrent-scrapes=0", "--max-concurrent-scrapes=129", "--exposition-write-timeout=999ms",
+		"--metrics-include=regex:jobs", "--metrics-exclude=prefix:*",
+	} {
+		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("Parse accepted %s", option)
+		}
+	}
+}

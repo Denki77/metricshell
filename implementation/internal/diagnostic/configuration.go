@@ -41,6 +41,29 @@ type record struct {
 	Generation    *uint64  `json:"snapshot_generation,omitempty"`
 	SnapshotBytes *int     `json:"snapshot_bytes,omitempty"`
 	Series        *int     `json:"series,omitempty"`
+	HTTPStatus    *int     `json:"http_status,omitempty"`
+}
+
+func (logger *Logger) WriteEndpointBound(component, state string) error {
+	return logger.write(record{
+		Level: "info", Event: "endpoint.bound", Component: component, State: state,
+		Message: "required endpoint bound",
+	})
+}
+
+func (logger *Logger) WriteEndpointBindFailed(component, state string) error {
+	return logger.write(record{
+		Level: "error", Event: "endpoint.bind_failed", Component: component, State: state,
+		Message: "required endpoint could not be bound", Reason: selfmetric.RuntimeFailureBind,
+		ErrorCode: "BIND_FAILED",
+	})
+}
+
+func (logger *Logger) WriteExpositionFailed(state, outcome string, status int) error {
+	return logger.write(record{
+		Level: "warn", Event: "exposition.failed", Component: "exposition", State: state,
+		Message: "metric exposition failed", Outcome: outcome, HTTPStatus: &status,
+	})
 }
 
 func (logger *Logger) WriteRuntimeInitializing(pid int) error {

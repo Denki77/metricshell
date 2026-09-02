@@ -8,6 +8,7 @@ import (
 	"time"
 
 	err "github.com/Denki77/metricshell/implementation/internal/error"
+	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 )
 
@@ -18,8 +19,9 @@ const (
 type LookupEnv func(string) (string, bool)
 
 type Config struct {
-	Workload []string
-	Shutdown shutdown.Config
+	Workload   []string
+	Shutdown   shutdown.Config
+	Exposition exposition.Config
 }
 
 var shutdownOptions = map[string]string{
@@ -27,6 +29,12 @@ var shutdownOptions = map[string]string{
 	"--workload-shutdown-timeout": "workload_timeout",
 	"--shutdown-reserve":          "reserve",
 	"--shutdown-deadline":         "deadline",
+	"--exposition-listen":         "exposition_listen",
+	"--max-response-bytes":        "response_bytes",
+	"--max-concurrent-scrapes":    "concurrent_scrapes",
+	"--exposition-write-timeout":  "exposition_write_timeout",
+	"--metrics-include":           "metrics_include",
+	"--metrics-exclude":           "metrics_exclude",
 }
 
 var unsupportedSharedMemoryEnvironment = [...]string{
@@ -68,7 +76,122 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if parseErr != nil {
 		return Config{}, parseErr
 	}
-	return Config{Workload: args[separator+1:], Shutdown: shutdownConfiguration}, nil
+	expositionConfiguration, parseErr := parseExposition(args[:separator], lookupEnv)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
+	return Config{Workload: args[separator+1:], Shutdown: shutdownConfiguration, Exposition: expositionConfiguration}, nil
+}
+
+func parseExposition(args []string, lookupEnv LookupEnv) (exposition.Config, error) {
+	configuration := exposition.DefaultConfig()
+	values := map[string]string{}
+	if lookupEnv != nil {
+		for environment, property := range map[string]string{
+			"METRICSHELL_EXPOSITION_LISTEN":        "exposition_listen",
+			"METRICSHELL_MAX_RESPONSE_BYTES":       "response_bytes",
+			"METRICSHELL_MAX_CONCURRENT_SCRAPES":   "concurrent_scrapes",
+			"METRICSHELL_EXPOSITION_WRITE_TIMEOUT": "exposition_write_timeout",
+		} {
+			if value, exists := lookupEnv(environment); exists {
+				values[property] = value
+			}
+		}
+		if value, exists := lookupEnv("METRICSHELL_METRICS_INCLUDE"); exists {
+			configuration.Include = splitList(value)
+		}
+		if value, exists := lookupEnv("METRICSHELL_METRICS_EXCLUDE"); exists {
+			configuration.Exclude = splitList(value)
+		}
+	}
+	includeCLI, excludeCLI := false, false
+	for index := 0; index < len(args); index++ {
+		name, value, hasValue := strings.Cut(args[index], "=")
+		property, known := shutdownOptions[name]
+		if !known {
+			return exposition.Config{}, err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return exposition.Config{}, fmt.Errorf("%s requires a value", name)
+			}
+			value = args[index]
+		}
+		switch property {
+		case "metrics_include":
+			if !includeCLI {
+				configuration.Include, includeCLI = nil, true
+			}
+			configuration.Include = append(configuration.Include, value)
+		case "metrics_exclude":
+			if !excludeCLI {
+				configuration.Exclude, excludeCLI = nil, true
+			}
+			configuration.Exclude = append(configuration.Exclude, value)
+		case "exposition_listen", "response_bytes", "concurrent_scrapes", "exposition_write_timeout":
+			values[property] = value
+		}
+	}
+	var parseErr error
+	if value, exists := values["exposition_listen"]; exists {
+		configuration.Listen = value
+	}
+	if value, exists := values["response_bytes"]; exists {
+		configuration.ResponseBytes, parseErr = parseBytes(value)
+	}
+	if parseErr == nil {
+		if value, exists := values["concurrent_scrapes"]; exists {
+			configuration.Concurrent, parseErr = parseCount(value)
+		}
+	}
+	if parseErr == nil {
+		if value, exists := values["exposition_write_timeout"]; exists {
+			configuration.WriteTimeout, parseErr = parseDuration(value)
+		}
+	}
+	if parseErr != nil || configuration.ResponseBytes < 64<<10 || configuration.ResponseBytes > 64<<20 || configuration.Concurrent < 1 || configuration.Concurrent > 128 || configuration.WriteTimeout < time.Second || configuration.WriteTimeout > 2*time.Minute {
+		return exposition.Config{}, fmt.Errorf("invalid exposition configuration")
+	}
+	if validateErr := configuration.Validate(); validateErr != nil {
+		return exposition.Config{}, validateErr
+	}
+	return configuration, nil
+}
+
+func splitList(value string) []string {
+	parts := strings.Split(value, ",")
+	for index := range parts {
+		parts[index] = strings.TrimSpace(parts[index])
+	}
+	return parts
+}
+
+func parseBytes(value string) (int, error) {
+	units := []struct {
+		suffix string
+		value  uint64
+	}{{"MiB", 1 << 20}, {"KiB", 1 << 10}, {"B", 1}}
+	for _, unit := range units {
+		if !strings.HasSuffix(value, unit.suffix) {
+			continue
+		}
+		digits := strings.TrimSuffix(value, unit.suffix)
+		parsed, parseErr := strconv.ParseUint(digits, 10, 64)
+		if parseErr != nil || digits == "" || digits[0] == '0' || parsed > uint64(math.MaxInt)/unit.value {
+			return 0, fmt.Errorf("invalid byte size %q", value)
+		}
+		return int(parsed * unit.value), nil
+	}
+	return 0, fmt.Errorf("invalid byte size %q", value)
+}
+
+func parseCount(value string) (int, error) {
+	parsed, err := strconv.ParseUint(value, 10, 31)
+	if err != nil || value == "" || value[0] == '0' {
+		return 0, fmt.Errorf("invalid count %q", value)
+	}
+	return int(parsed), nil
 }
 
 func parseShutdown(args []string, now time.Time, lookupEnv LookupEnv) (shutdown.Config, error) {
