@@ -9,6 +9,7 @@ import (
 
 	err "github.com/Denki77/metricshell/implementation/internal/error"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
 )
@@ -23,6 +24,7 @@ type Config struct {
 	Workload            []string
 	Shutdown            shutdown.Config
 	Exposition          exposition.Config
+	FinalWait           finalwait.Config
 	IngestionTransport  string
 	Limits              snapshot.Limits
 	ConcurrentIngestion int
@@ -101,6 +103,11 @@ var options = map[string]string{
 	"--max-help-bytes":                "help_bytes",
 	"--max-concurrent-ingestions":     "concurrent_ingestions",
 	"--max-pending-ingestions":        "pending_ingestions",
+	"--final-wait-mode":               "final_wait_mode",
+	"--final-wait-duration":           "final_wait_duration",
+	"--final-wait-timeout":            "final_wait_timeout",
+	"--final-wait-required-scrapes":   "final_wait_required_scrapes",
+	"--final-wait-completion-grace":   "final_wait_completion_grace",
 }
 
 var unsupportedSharedMemoryEnvironment = [...]string{
@@ -146,6 +153,10 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if parseErr != nil {
 		return Config{}, parseErr
 	}
+	finalWaitConfiguration, parseErr := parseFinalWait(args[:separator], lookupEnv)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
 	ingestionConfiguration, parseErr := parseIngestion(args[:separator], lookupEnv)
 	if parseErr != nil {
 		return Config{}, parseErr
@@ -153,6 +164,7 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	ingestionConfiguration.Workload = args[separator+1:]
 	ingestionConfiguration.Shutdown = shutdownConfiguration
 	ingestionConfiguration.Exposition = expositionConfiguration
+	ingestionConfiguration.FinalWait = finalWaitConfiguration
 	return ingestionConfiguration, nil
 }
 
@@ -370,6 +382,65 @@ func effectiveSocketDecodedCapacity(frameBytes, parts int) int {
 		}
 	}
 	return total
+}
+
+func parseFinalWait(args []string, lookupEnv LookupEnv) (finalwait.Config, error) {
+	configuration := finalwait.Defaults()
+	values := map[string]string{}
+	if lookupEnv != nil {
+		for environment, property := range map[string]string{
+			"METRICSHELL_FINAL_WAIT_MODE":             "final_wait_mode",
+			"METRICSHELL_FINAL_WAIT_DURATION":         "final_wait_duration",
+			"METRICSHELL_FINAL_WAIT_TIMEOUT":          "final_wait_timeout",
+			"METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES": "final_wait_required_scrapes",
+			"METRICSHELL_FINAL_WAIT_COMPLETION_GRACE": "final_wait_completion_grace",
+		} {
+			if value, exists := lookupEnv(environment); exists {
+				values[property] = value
+			}
+		}
+	}
+	for index := 0; index < len(args); index++ {
+		name, value, hasValue := strings.Cut(args[index], "=")
+		property, known := options[name]
+		if !known {
+			return finalwait.Config{}, err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return finalwait.Config{}, fmt.Errorf("%s requires a value", name)
+			}
+			value = args[index]
+		}
+		values[property] = value
+	}
+	var parseErr error
+	if value, exists := values["final_wait_mode"]; exists {
+		configuration.Mode = finalwait.Mode(value)
+	}
+	if value, exists := values["final_wait_duration"]; exists {
+		configuration.Duration, parseErr = parseDuration(value)
+	}
+	if parseErr == nil {
+		if value, exists := values["final_wait_timeout"]; exists {
+			configuration.Timeout, parseErr = parseDuration(value)
+		}
+	}
+	if parseErr == nil {
+		if value, exists := values["final_wait_required_scrapes"]; exists {
+			configuration.RequiredScrapes, parseErr = parseCount(value)
+		}
+	}
+	if parseErr == nil {
+		if value, exists := values["final_wait_completion_grace"]; exists {
+			configuration.CompletionGrace, parseErr = parseDuration(value)
+		}
+	}
+	if parseErr != nil || configuration.Validate() != nil {
+		return finalwait.Config{}, fmt.Errorf("invalid final-wait configuration")
+	}
+	return configuration, nil
 }
 
 func parseExposition(args []string, lookupEnv LookupEnv) (exposition.Config, error) {

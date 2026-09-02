@@ -8,7 +8,9 @@ import (
 	"net"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
+	"syscall"
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
@@ -17,6 +19,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/fileingest"
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/httpingest"
 	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
@@ -73,6 +76,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
+		if err := metrics.SetFinalWaitMode(selfmetric.FinalWaitMode(configuration.FinalWait.Mode)); err != nil {
+			return failLifecycle(machine, logger)
+		}
 		holder := snapshot.NewHolder(snapshot.Zero())
 		metricsObserver, observerErr := ingestion.NewMetricsObserver(metrics, now)
 		if observerErr != nil {
@@ -95,6 +101,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				"max_concurrent_scrapes": configuration.Exposition.Concurrent,
 				"metrics_include_count":  include,
 				"metrics_exclude_count":  exclude,
+				"final_wait_mode":        configuration.FinalWait.Mode,
+				"final_wait_duration":    configuration.FinalWait.Duration.String(),
+				"final_wait_timeout":     configuration.FinalWait.Timeout.String(),
+				"final_wait_required":    configuration.FinalWait.RequiredScrapes,
+				"final_wait_grace":       configuration.FinalWait.CompletionGrace.String(),
 				"ingestion_transport":    configuration.IngestionTransport,
 				"unix_socket_path":       configuration.UnixSocketPath,
 				"http_ingestion_listen":  configuration.HTTPIngestionListen,
@@ -154,6 +165,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		if err := machine.TransitionEvent(lifecycle.ConfigurationValidated); err != nil {
 			return failLifecycle(machine, logger)
 		}
+		terminationContext, stopTermination := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+		defer stopTermination()
 		var shutdownPlan *shutdown.Plan
 		result := workload.Run(configuration.Workload, stdin, stdout, stderr, configuration.Shutdown, workload.Observers{
 			Started: func(pid, processGroupID int) error {
@@ -258,8 +271,33 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			final := core.CloseAndFreeze(freezeContext)
 			cancelFreeze()
 			metrics.SetActiveSnapshot(final)
-			if err := machine.TransitionEvent(lifecycle.FinalizationImmediate); err != nil {
-				return failLifecycle(machine, logger)
+			if shutdownPlan != nil {
+				if err := machine.TransitionEvent(lifecycle.FinalizationImmediate); err != nil {
+					return failLifecycle(machine, logger)
+				}
+			} else {
+				waiter, waitErr := finalwait.New(configuration.FinalWait, final.Generation())
+				if waitErr != nil {
+					return failLifecycle(machine, logger)
+				}
+				if configuration.FinalWait.Mode == finalwait.Immediate {
+					if _, waitErr = waiter.Wait(terminationContext); waitErr != nil {
+						return failLifecycle(machine, logger)
+					}
+					if err := machine.TransitionEvent(lifecycle.FinalizationImmediate); err != nil {
+						return failLifecycle(machine, logger)
+					}
+				} else {
+					if err := machine.TransitionEvent(lifecycle.FinalizationWait); err != nil {
+						return failLifecycle(machine, logger)
+					}
+					if _, waitErr = waiter.Wait(terminationContext); waitErr != nil {
+						return failLifecycle(machine, logger)
+					}
+					if err := machine.TransitionEvent(lifecycle.FinalWaitCompleted); err != nil {
+						return failLifecycle(machine, logger)
+					}
+				}
 			}
 		} else if !result.Started && !result.StartFailed && machine.State() == lifecycle.StartingWorkload {
 			if err := machine.TransitionEvent(lifecycle.TerminationBeforeSpawn); err != nil {
@@ -386,5 +424,5 @@ func finalizationContext(configuration config.Config, plan *shutdown.Plan, at ti
 			return ctx, cancel
 		}
 	}
-	return context.WithTimeout(context.Background(), configuration.Exposition.WriteTimeout)
+	return context.WithTimeout(context.Background(), configuration.FinalWait.Timeout)
 }

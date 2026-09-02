@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"encoding/json"
 	"net"
+	"sync"
 	"testing"
 	"time"
 
@@ -48,6 +49,44 @@ func TestRunFailsBeforeWorkloadWhenExpositionBindFails(t *testing.T) {
 		t.Fatalf("endpoint.bind_failed missing: %s", stderr.String())
 	}
 }
+
+func TestRunTraversesConfiguredFinalWait(t *testing.T) {
+	var stdout bytes.Buffer
+	var stderr synchronizedBuffer
+	code := Run([]string{
+		"--exposition-listen=127.0.0.1:0", "--final-wait-mode=duration", "--final-wait-duration=0",
+		"--", "/bin/true",
+	}, nil, &stdout, &stderr, buildinfo.Info{}, time.Now)
+	if code != 0 {
+		t.Fatalf("Run() code = %d, stderr=%s", code, stderr.String())
+	}
+	content := stderr.Bytes()
+	finalizing := bytes.Index(content, []byte(`"state":"finalizing"`))
+	finalWait := bytes.Index(content, []byte(`"state":"final_wait"`))
+	terminated := bytes.LastIndex(content, []byte(`"state":"terminated"`))
+	if finalizing < 0 || finalWait <= finalizing || terminated <= finalWait {
+		t.Fatalf("final-wait state flow missing or unordered: %s", stderr.String())
+	}
+}
+
+type synchronizedBuffer struct {
+	mu     sync.Mutex
+	buffer bytes.Buffer
+}
+
+func (buffer *synchronizedBuffer) Write(content []byte) (int, error) {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return buffer.buffer.Write(content)
+}
+
+func (buffer *synchronizedBuffer) Bytes() []byte {
+	buffer.mu.Lock()
+	defer buffer.mu.Unlock()
+	return bytes.Clone(buffer.buffer.Bytes())
+}
+
+func (buffer *synchronizedBuffer) String() string { return string(buffer.Bytes()) }
 
 func TestRunHelp(t *testing.T) {
 	t.Parallel()

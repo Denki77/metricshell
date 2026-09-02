@@ -5,8 +5,8 @@
 
 ## Текущий объём
 
-Wave 5 выполняется. ISSUE-023–ISSUE-025 реализуют bounded Prometheus/OpenMetrics listener, filtering, lifecycle probes,
-response pre-encoding, write classification и finalization ingestion barrier. Wave 4
+Wave 5 выполняется. ISSUE-023–ISSUE-026 реализуют bounded exposition, response preparation, finalization ingestion
+barrier и final-wait state machine режимов immediate/duration/scrape-count. Wave 4
 ISSUE-016–ISSUE-022 реализует единый bounded ingestion core, atomic-file reconciliation,
 acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
 exhaustive cross-adapter conformance corpus.
@@ -98,6 +98,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/conformance`: общий file/Unix/HTTP corpus semantics, state и observability.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
 - `internal/exposition`: immutable application/self-metric encoding, response bounds, compression и write outcomes.
+- `internal/finalwait`: validated natural-completion policies, frozen-generation threshold и terminal decisions.
 - `internal/ingestion`: transport-independent admission, cancellation, finalization barrier, result taxonomy и
   complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter с независимыми wire/decoded limits и exact HTTP mapping.
@@ -117,7 +118,8 @@ metricshell version=0.1.0-dev revision=0123456
 
 Реализация следует ISSUE-011–ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Final-wait behavior и observability остаются в ISSUE-026–ISSUE-028.
+поставке и сквозному definition of done. Complete-response drain и final-wait observability остаются в
+ISSUE-027–ISSUE-028.
 
 ## Инженерный контракт для следующих задач
 

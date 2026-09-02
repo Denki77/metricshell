@@ -61,6 +61,7 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/probe-fixture ./internal/testfixture/probe
 
 FROM scratch AS integration
+ENV METRICSHELL_FINAL_WAIT_MODE=immediate
 COPY --from=integration-build /out/metricshell /metricshell
 COPY --from=integration-build /out/workload-fixture /workload-fixture
 COPY --from=integration-build /out/process-group-fixture /process-group-fixture

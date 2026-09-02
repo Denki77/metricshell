@@ -4,6 +4,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 )
 
 var testNow = time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
@@ -21,6 +23,9 @@ func TestParseWorkloadAndShutdownDefaults(t *testing.T) {
 	}
 	if configuration.Shutdown.TotalGrace != 30*time.Second || configuration.Shutdown.WorkloadTimeout != 28*time.Second || configuration.Shutdown.Reserve != 2*time.Second {
 		t.Fatalf("shutdown defaults = %+v", configuration.Shutdown)
+	}
+	if configuration.FinalWait != finalwait.Defaults() {
+		t.Fatalf("final-wait defaults = %+v", configuration.FinalWait)
 	}
 	if configuration.IngestionTransport != "unix" || configuration.UnixSocketPath != "/run/metricshell/ingest.sock" {
 		t.Fatalf("ingestion defaults = %+v", configuration)
@@ -147,6 +152,39 @@ func TestParseRejectsInvalidExpositionConfiguration(t *testing.T) {
 		"--exposition-listen=:9090", "--max-response-bytes=63KiB", "--max-response-bytes=65MiB",
 		"--max-concurrent-scrapes=0", "--max-concurrent-scrapes=129", "--exposition-write-timeout=999ms",
 		"--metrics-include=regex:jobs", "--metrics-exclude=prefix:*",
+	} {
+		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("Parse accepted %s", option)
+		}
+	}
+}
+
+func TestParseFinalWaitPrecedenceAndValidation(t *testing.T) {
+	t.Parallel()
+
+	environment := map[string]string{
+		"METRICSHELL_FINAL_WAIT_MODE":             "duration",
+		"METRICSHELL_FINAL_WAIT_DURATION":         "45s",
+		"METRICSHELL_FINAL_WAIT_TIMEOUT":          "50s",
+		"METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES": "2",
+		"METRICSHELL_FINAL_WAIT_COMPLETION_GRACE": "1s",
+	}
+	lookup := func(name string) (string, bool) { value, ok := environment[name]; return value, ok }
+	configuration, err := Parse([]string{
+		"--final-wait-mode=scrapes", "--final-wait-timeout=10s", "--final-wait-required-scrapes", "3",
+		"--final-wait-completion-grace=250ms", "--", "program",
+	}, testNow, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := finalwait.Config{Mode: finalwait.Scrapes, Duration: 45 * time.Second, Timeout: 10 * time.Second, RequiredScrapes: 3, CompletionGrace: 250 * time.Millisecond}
+	if configuration.FinalWait != want {
+		t.Fatalf("final wait = %+v, want %+v", configuration.FinalWait, want)
+	}
+
+	for _, option := range []string{
+		"--final-wait-mode=auto", "--final-wait-duration=1h1s", "--final-wait-timeout=0",
+		"--final-wait-required-scrapes=0", "--final-wait-required-scrapes=17", "--final-wait-completion-grace=5001ms",
 	} {
 		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
 			t.Errorf("Parse accepted %s", option)
