@@ -5,7 +5,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 build
+.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 wave5 build
 
 all: ci
 
@@ -121,6 +121,8 @@ wave2: ci
 wave3: ci
 
 wave4: ci
+
+wave5: ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"

@@ -5,8 +5,8 @@ and dependency graph.
 
 ## Current scope
 
-Wave 5 is in progress. ISSUE-023 and ISSUE-024 provide the bounded Prometheus/OpenMetrics listener, filtering,
-lifecycle probes, response pre-encoding and write classification. Wave 4
+Wave 5 is in progress. ISSUE-023 through ISSUE-025 provide the bounded Prometheus/OpenMetrics listener, filtering,
+lifecycle probes, response pre-encoding, write classification and the finalization ingestion barrier. Wave 4
 ISSUE-016 through ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation,
 acknowledged MSP/1 Unix ingestion and its serialized client, bounded loopback HTTP push, the explicit mmap boundary,
 and an exhaustive cross-adapter conformance corpus. ISSUE-011 through ISSUE-015 provide the immutable snapshot model,
@@ -14,6 +14,9 @@ strict whole-candidate parser/validator, atomic last-valid holder, exact generat
 self-metrics registry.
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity.
+Production runtime creates one shared `ingestion.Core`, routes the selected `file`, `unix` or `http` ingestion
+transport through it, and finalizes via `Core.CloseAndFreeze(ctx)` before terminal exposition observes the frozen
+snapshot.
 
 ## Requirements
 
@@ -95,7 +98,8 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/conformance`: shared file/Unix/HTTP semantic, state and observability corpus.
 - `internal/diagnostic`: ordered structured lifecycle diagnostics for one runtime identity.
 - `internal/exposition`: immutable application/self-metric encoding, response bounds, compression and write outcomes.
-- `internal/ingestion`: transport-independent admission, cancellation, result taxonomy and complete-candidate handoff.
+- `internal/ingestion`: transport-independent admission, cancellation, finalization barrier, result taxonomy and
+  complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter with independent wire/decoded limits and exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation and Linux directory-inotify recovery.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
@@ -114,7 +118,7 @@ metricshell version=0.1.0-dev revision=0123456
 Implementation follows ISSUE-011 through ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Finalization ingestion closure and final-wait behavior remain ISSUE-025–ISSUE-028.
+cross-cutting definition of done. Final-wait behavior and observability remain ISSUE-026–ISSUE-028.
 
 ## Engineering contract for subsequent issues
 

@@ -22,6 +22,9 @@ func TestParseWorkloadAndShutdownDefaults(t *testing.T) {
 	if configuration.Shutdown.TotalGrace != 30*time.Second || configuration.Shutdown.WorkloadTimeout != 28*time.Second || configuration.Shutdown.Reserve != 2*time.Second {
 		t.Fatalf("shutdown defaults = %+v", configuration.Shutdown)
 	}
+	if configuration.IngestionTransport != "unix" || configuration.UnixSocketPath != "/run/metricshell/ingest.sock" {
+		t.Fatalf("ingestion defaults = %+v", configuration)
+	}
 }
 
 func TestParseShutdownPrecedence(t *testing.T) {
@@ -144,6 +147,71 @@ func TestParseRejectsInvalidExpositionConfiguration(t *testing.T) {
 		"--exposition-listen=:9090", "--max-response-bytes=63KiB", "--max-response-bytes=65MiB",
 		"--max-concurrent-scrapes=0", "--max-concurrent-scrapes=129", "--exposition-write-timeout=999ms",
 		"--metrics-include=regex:jobs", "--metrics-exclude=prefix:*",
+	} {
+		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("Parse accepted %s", option)
+		}
+	}
+}
+
+func TestParseIngestionDefaultsPrecedenceAndValidation(t *testing.T) {
+	t.Parallel()
+
+	environment := map[string]string{
+		"METRICSHELL_INGESTION_TRANSPORT":           "unix",
+		"METRICSHELL_HTTP_INGESTION_LISTEN":         "127.0.0.1:19091",
+		"METRICSHELL_UNIX_SOCKET_PATH":              "/tmp/env.sock",
+		"METRICSHELL_SNAPSHOT_FILE_PATH":            "/tmp/env.json",
+		"METRICSHELL_MAX_PENDING_INGESTIONS":        "0",
+		"METRICSHELL_MAX_LABELS_PER_SERIES":         "0",
+		"METRICSHELL_MAX_HELP_BYTES":                "0",
+		"METRICSHELL_HTTP_INGESTION_MAX_WIRE_BYTES": "1MiB",
+	}
+	lookup := func(name string) (string, bool) { value, ok := environment[name]; return value, ok }
+	configuration, err := Parse([]string{
+		"--ingestion-transport=http",
+		"--http-ingestion-listen=127.0.0.1:0",
+		"--unix-socket-path=/tmp/cli.sock",
+		"--snapshot-file-path=/tmp/cli.json",
+		"--file-reconcile-interval=100ms",
+		"--max-concurrent-ingestions=2",
+		"--max-snapshot-bytes=64KiB",
+		"--max-decoded-input-bytes=128KiB",
+		"--max-series=1",
+		"--socket-max-frame-bytes=1KiB",
+		"--socket-max-parts=1024",
+		"--socket-max-transactions=1",
+		"--socket-max-connections=1",
+		"--socket-transaction-timeout=100ms",
+		"--socket-read-timeout=100ms",
+		"--socket-write-timeout=100ms",
+		"--http-read-header-timeout=100ms",
+		"--http-read-timeout=100ms",
+		"--http-write-timeout=100ms",
+		"--http-idle-timeout=1s",
+		"--http-max-header-bytes=1KiB",
+		"--", "program",
+	}, testNow, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.IngestionTransport != "http" || configuration.HTTPIngestionListen != "127.0.0.1:0" ||
+		configuration.UnixSocketPath != "/tmp/cli.sock" || configuration.File.Path != "/tmp/cli.json" {
+		t.Fatalf("transport endpoints = %+v", configuration)
+	}
+	if configuration.PendingIngestion != 0 || configuration.Limits.LabelsPerSeries != 0 || configuration.Limits.HelpBytes != 0 {
+		t.Fatalf("zero-valued bounds = %+v", configuration)
+	}
+	if configuration.Limits.SnapshotBytes != 64<<10 || configuration.Limits.DecodedBytes != 128<<10 ||
+		configuration.HTTPIngestion.DecodedBytes != 128<<10 || configuration.Socket.SnapshotBytes != 64<<10 {
+		t.Fatalf("limits propagation = %+v", configuration)
+	}
+
+	for _, option := range []string{
+		"--ingestion-transport=shm", "--file-reconcile-interval=99ms", "--max-snapshot-bytes=63KiB",
+		"--max-decoded-input-bytes=63KiB", "--max-concurrent-ingestions=0", "--max-pending-ingestions=65",
+		"--socket-max-frame-bytes=512B", "--socket-max-connections=65", "--http-ingestion-max-wire-bytes=63KiB",
+		"--http-idle-timeout=999ms",
 	} {
 		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
 			t.Errorf("Parse accepted %s", option)

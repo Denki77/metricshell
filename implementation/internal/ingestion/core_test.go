@@ -102,6 +102,84 @@ func TestCoreChecksCancellationBeforeCandidateHandoff(t *testing.T) {
 	}
 }
 
+func TestCoreCloseAndFreezeIncludesAdmittedWorkAndRejectsLaterPublications(t *testing.T) {
+	entered := make(chan struct{}, 2)
+	release := make(chan struct{}, 2)
+	parser := func(content []byte, limits snapshot.Limits) (snapshot.ValidatedSnapshot, error) {
+		entered <- struct{}{}
+		<-release
+		return snapshot.Parse(content, limits)
+	}
+	holder := snapshot.NewHolder(snapshot.Zero())
+	core, err := NewWithParser(holder, snapshot.DefaultLimits(), 1, 1, nil, parser, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	results := make(chan Result, 2)
+	go func() { results <- core.Publish(context.Background(), File, []byte(valid)) }()
+	<-entered
+	go func() { results <- core.Publish(context.Background(), HTTP, []byte(valid)) }()
+	for len(core.admissions) != 2 {
+		time.Sleep(time.Millisecond)
+	}
+
+	finals := make(chan snapshot.ActiveSnapshot, 1)
+	go func() { finals <- core.CloseAndFreeze(context.Background()) }()
+	select {
+	case final := <-finals:
+		t.Fatalf("barrier returned before admitted work completed: generation=%d", final.Generation())
+	case <-time.After(10 * time.Millisecond):
+	}
+	release <- struct{}{}
+	<-entered
+	release <- struct{}{}
+	for range 2 {
+		if result := <-results; result.Outcome != Accepted {
+			t.Fatalf("admitted result = %#v", result)
+		}
+	}
+	if final := <-finals; final.Generation() != 2 {
+		t.Fatalf("final generation = %d, want 2", final.Generation())
+	}
+	for _, transport := range Transports {
+		result := core.Publish(context.Background(), transport, []byte(valid))
+		if result.Outcome != Rejected || result.Reason != snapshot.ReasonFrozen || result.Generation != 0 {
+			t.Fatalf("post-barrier %s result = %#v", transport, result)
+		}
+	}
+}
+
+func TestCoreCloseAndFreezeExpiresBoundedWork(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	holder := snapshot.NewHolder(snapshot.Zero())
+	core, err := NewWithParser(holder, snapshot.DefaultLimits(), 1, 0, nil,
+		func(content []byte, limits snapshot.Limits) (snapshot.ValidatedSnapshot, error) {
+			close(entered)
+			<-release
+			return snapshot.Parse(content, limits)
+		}, time.Now)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan Result, 1)
+	go func() { result <- core.Publish(context.Background(), Unix, []byte(valid)) }()
+	<-entered
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+	if final := core.CloseAndFreeze(ctx); final.Generation() != 0 {
+		t.Fatalf("final generation = %d, want 0", final.Generation())
+	}
+	close(release)
+	got := <-result
+	if got.Outcome != Rejected || got.Reason != snapshot.ReasonFrozen || holder.Active().Generation() != 0 {
+		t.Fatalf("expired admitted result = %#v active=%d", got, holder.Active().Generation())
+	}
+	if again := core.CloseAndFreeze(context.Background()); again.Generation() != 0 {
+		t.Fatalf("repeated barrier generation = %d", again.Generation())
+	}
+}
+
 func TestMetricsObserverUsesSharedEnumAndStateCore(t *testing.T) {
 	now := time.Unix(123, 0)
 	registry, err := selfmetric.New(buildinfo.Info{Version: "test", Revision: "test"}, selfmetric.FinalWaitImmediate, func() time.Time { return now })
@@ -119,12 +197,17 @@ func TestMetricsObserverUsesSharedEnumAndStateCore(t *testing.T) {
 	if result := core.Publish(context.Background(), HTTP, nil); result.Reason != snapshot.ReasonEmptyPayload {
 		t.Fatal(result)
 	}
+	core.CloseAndFreeze(context.Background())
+	if result := core.Publish(context.Background(), HTTP, []byte(valid)); result.Reason != snapshot.ReasonFrozen {
+		t.Fatal(result)
+	}
 	view := registry.View()
 	assertGauge(t, view, selfmetric.SnapshotGeneration, nil, 1)
 	assertGauge(t, view, selfmetric.IngestionInflight, map[string]string{"transport": "http"}, 0)
 	assertGauge(t, view, selfmetric.IngestionLastSuccess, map[string]string{"transport": "http"}, 123)
 	assertCounter(t, view, selfmetric.SnapshotPublicationsTotal, map[string]string{"transport": "http", "outcome": "accepted"}, 1)
 	assertCounter(t, view, selfmetric.SnapshotRejectionsTotal, map[string]string{"transport": "http", "reason": "empty_payload"}, 1)
+	assertCounter(t, view, selfmetric.SnapshotRejectionsTotal, map[string]string{"transport": "http", "reason": "frozen"}, 1)
 }
 
 func TestEnumParityWithNormativeRegistries(t *testing.T) {

@@ -5,7 +5,10 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
+	"net/http"
 	"os"
+	"path/filepath"
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
@@ -13,11 +16,15 @@ import (
 	exitCodes "github.com/Denki77/metricshell/implementation/internal/constants"
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
+	"github.com/Denki77/metricshell/implementation/internal/fileingest"
+	"github.com/Denki77/metricshell/implementation/internal/httpingest"
+	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
+	"github.com/Denki77/metricshell/implementation/internal/socketingest"
 	"github.com/Denki77/metricshell/implementation/internal/workload"
 )
 
@@ -67,6 +74,19 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
 		holder := snapshot.NewHolder(snapshot.Zero())
+		metricsObserver, observerErr := ingestion.NewMetricsObserver(metrics, now)
+		if observerErr != nil {
+			return failLifecycle(machine, logger)
+		}
+		diagnosticObserver, observerErr := ingestion.NewDiagnosticObserver(logger, func() string { return string(machine.State()) })
+		if observerErr != nil {
+			return failLifecycle(machine, logger)
+		}
+		core, coreErr := ingestion.New(holder, configuration.Limits, configuration.ConcurrentIngestion, configuration.PendingIngestion,
+			ingestion.MultiObserver{metricsObserver, diagnosticObserver})
+		if coreErr != nil {
+			return rejectConfiguration(machine, metrics, logger, coreErr)
+		}
 		debugView := func() []byte {
 			include, exclude := len(configuration.Exposition.Include), len(configuration.Exposition.Exclude)
 			content, marshalErr := json.Marshal(map[string]any{
@@ -75,6 +95,14 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				"max_concurrent_scrapes": configuration.Exposition.Concurrent,
 				"metrics_include_count":  include,
 				"metrics_exclude_count":  exclude,
+				"ingestion_transport":    configuration.IngestionTransport,
+				"unix_socket_path":       configuration.UnixSocketPath,
+				"http_ingestion_listen":  configuration.HTTPIngestionListen,
+				"snapshot_file_path":     configuration.File.Path,
+				"snapshot_bytes":         configuration.Limits.SnapshotBytes,
+				"decoded_input_bytes":    configuration.Limits.DecodedBytes,
+				"concurrent_ingestions":  configuration.ConcurrentIngestion,
+				"pending_ingestions":     configuration.PendingIngestion,
 			})
 			if marshalErr != nil {
 				return []byte("{}\n")
@@ -97,12 +125,30 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			return exitCodes.ExitEndpointBindFailed
 		}
 		server.Start()
+		ingestionContext, stopIngestion := context.WithCancel(context.Background())
+		stopSelectedIngestion, ingestionErr := startIngestion(ingestionContext, configuration, core)
+		if ingestionErr != nil {
+			stopIngestion()
+			_ = server.Close()
+			_ = metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureBind}, 1)
+			_ = logger.WriteEndpointBindFailed("ingestion", string(machine.State()))
+			_ = machine.TransitionEvent(lifecycle.RuntimeFailed)
+			_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
+			return exitCodes.ExitEndpointBindFailed
+		}
+		defer func() {
+			stopIngestion()
+			_ = stopSelectedIngestion()
+		}()
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), configuration.Exposition.WriteTimeout)
 			defer cancel()
 			_ = server.Shutdown(ctx)
 		}()
 		if err := logger.WriteEndpointBound("exposition", string(machine.State())); err != nil {
+			return failLifecycle(machine, logger)
+		}
+		if err := logger.WriteEndpointBound("ingestion", string(machine.State())); err != nil {
 			return failLifecycle(machine, logger)
 		}
 		if err := machine.TransitionEvent(lifecycle.ConfigurationValidated); err != nil {
@@ -208,6 +254,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			}
 		}
 		if result.Started && machine.State() == lifecycle.Finalizing {
+			freezeContext, cancelFreeze := finalizationContext(configuration, shutdownPlan, now())
+			final := core.CloseAndFreeze(freezeContext)
+			cancelFreeze()
+			metrics.SetActiveSnapshot(final)
 			if err := machine.TransitionEvent(lifecycle.FinalizationImmediate); err != nil {
 				return failLifecycle(machine, logger)
 			}
@@ -252,4 +302,89 @@ func failLifecycle(machine *lifecycle.Machine, logger *diagnostic.Logger) int {
 	_ = logger.WriteRuntimeFailed()
 	_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
 	return exitCodes.ExitInternalFailure
+}
+
+func startIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core) (func() error, error) {
+	switch ingestion.Transport(configuration.IngestionTransport) {
+	case ingestion.File:
+		fileConfiguration := fileingest.Config{
+			Path: configuration.File.Path, ReconcileInterval: configuration.File.ReconcileInterval,
+			DecodedBytes: configuration.File.DecodedBytes,
+		}
+		if err := ensurePrivateParent(configuration.File.Path); err != nil {
+			return nil, err
+		}
+		reconciler, err := fileingest.New(fileConfiguration, core, nil)
+		if err != nil {
+			return nil, err
+		}
+		go func() { _ = reconciler.Run(ctx) }()
+		return func() error { return nil }, nil
+	case ingestion.Unix:
+		socketConfiguration := socketingest.Config{
+			FrameBytes: configuration.Socket.FrameBytes, Parts: configuration.Socket.Parts,
+			Connections: configuration.Socket.Connections, Transactions: configuration.Socket.Transactions,
+			TransactionTimeout: configuration.Socket.TransactionTimeout, ReadTimeout: configuration.Socket.ReadTimeout,
+			WriteTimeout: configuration.Socket.WriteTimeout, DecodedBytes: configuration.Socket.DecodedBytes,
+			SnapshotBytes: configuration.Socket.SnapshotBytes,
+		}
+		if err := ensurePrivateParent(configuration.UnixSocketPath); err != nil {
+			return nil, err
+		}
+		server, err := socketingest.Listen(configuration.UnixSocketPath, socketConfiguration, core, nil)
+		if err != nil {
+			return nil, err
+		}
+		go func() { _ = server.Serve(ctx) }()
+		return server.Close, nil
+	case ingestion.HTTP:
+		httpConfiguration := httpingest.Config{
+			WireBytes: configuration.HTTPIngestion.WireBytes, DecodedBytes: configuration.HTTPIngestion.DecodedBytes,
+			ReadHeaderTimeout: configuration.HTTPIngestion.ReadHeaderTimeout, ReadTimeout: configuration.HTTPIngestion.ReadTimeout,
+			WriteTimeout: configuration.HTTPIngestion.WriteTimeout, IdleTimeout: configuration.HTTPIngestion.IdleTimeout,
+			MaxHeaderBytes: configuration.HTTPIngestion.MaxHeaderBytes,
+		}
+		handler, err := httpingest.NewHandler(httpConfiguration, core)
+		if err != nil {
+			return nil, err
+		}
+		server, err := httpingest.NewServer(configuration.HTTPIngestionListen, handler, httpConfiguration)
+		if err != nil {
+			return nil, err
+		}
+		listener, err := net.Listen("tcp", configuration.HTTPIngestionListen)
+		if err != nil {
+			return nil, err
+		}
+		go func() {
+			err := server.Serve(listener)
+			if err != nil && err != http.ErrServerClosed {
+				_ = server.Close()
+			}
+		}()
+		return func() error {
+			shutdownContext, cancel := context.WithTimeout(context.Background(), configuration.HTTPIngestion.WriteTimeout)
+			defer cancel()
+			return server.Shutdown(shutdownContext)
+		}, nil
+	default:
+		return nil, fmt.Errorf("unknown ingestion transport %q", configuration.IngestionTransport)
+	}
+}
+
+func ensurePrivateParent(path string) error {
+	if !filepath.IsAbs(path) {
+		return fmt.Errorf("path must be absolute")
+	}
+	return os.MkdirAll(filepath.Dir(path), 0o700)
+}
+
+func finalizationContext(configuration config.Config, plan *shutdown.Plan, at time.Time) (context.Context, context.CancelFunc) {
+	if plan != nil {
+		ctx, cancel, err := plan.PhaseContext(context.Background(), shutdown.Finalization, plan.Reserve, at)
+		if err == nil {
+			return ctx, cancel
+		}
+	}
+	return context.WithTimeout(context.Background(), configuration.Exposition.WriteTimeout)
 }
