@@ -1,6 +1,6 @@
 # ISSUE-024. Pre-encoding response и limits
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,17 @@ Oversized response отклоняется до отправки success headers;
   concurrent limit; gzip negotiation; short/slow/cancelled writes.
 - **Условие завершения:** Готово, когда ни один failure path не экспонирует successful partial metric family и не
   превышает configured bounds.
+
+## Журнал выполнения
+
+- 2026-09-02: переведена в `В работе`; реализованы immutable application/self-metric pre-encoding для Prometheus и
+  OpenMetrics, exact uncompressed response bounds, gzip preparation, write classification и non-blocking limiter.
+- 2026-09-02: переведена в `Тестирование`; exact-limit, limit-minus-one, оба формата, self-metrics-only, gzip identity,
+  saturation, short-write и cancellation cases прошли Docker race gate.
+- 2026-09-02: переведена в `Готово`; пройдены Docker vet/race/dependency/multi-architecture checks и EN/RU README audit.
+
+## Свидетельства проверки
+
+- Response полностью находится в памяти и укладывается в uncompressed limit до commit status `200`.
+- Gzip меняет только transport bytes; selected generation, format body и uncompressed byte accounting стабильны.
+- Short writes, cancellation и invalid encoding не дают success outcome; concurrency exhaustion bounded и не ожидает.

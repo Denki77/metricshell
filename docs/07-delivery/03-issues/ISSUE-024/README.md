@@ -1,6 +1,6 @@
 # ISSUE-024. Response pre-encoding and bounds
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,18 @@ Fail oversized responses before committing success headers; compression does not
   concurrent limit; gzip negotiation; short/slow/cancelled writes.
 - **Completion:** Complete when no failure path can expose a successful partial metric family or exceed configured
   bounds.
+
+## Delivery log
+
+- 2026-09-02: moved to `In Progress`; implemented immutable application/self-metric pre-encoding for Prometheus and
+  OpenMetrics, exact uncompressed response bounds, gzip preparation, write classification and a non-blocking limiter.
+- 2026-09-02: moved to `Testing`; exact-limit, limit-minus-one, both formats, self-metrics-only, gzip identity,
+  saturation, short-write and cancellation cases passed in the Docker race gate.
+- 2026-09-02: moved to `Done`; Docker vet/race/dependency/multi-architecture checks and EN/RU README audit passed.
+
+## Verification evidence
+
+- A response is complete in memory and within the uncompressed limit before status `200` can be committed.
+- Gzip changes only transport bytes; selected generation, format body and uncompressed byte accounting remain stable.
+- Short writes, cancellation and invalid encoding never return the success outcome; concurrency exhaustion is
+  non-blocking and bounded.

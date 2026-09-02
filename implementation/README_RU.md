@@ -5,7 +5,8 @@
 
 ## Текущий объём
 
-Wave 4 завершена. ISSUE-016–ISSUE-022 реализуют единый bounded ingestion core, atomic-file reconciliation,
+Wave 5 выполняется. ISSUE-024 реализует bounded response pre-encoding и write classification. Wave 4
+ISSUE-016–ISSUE-022 реализует единый bounded ingestion core, atomic-file reconciliation,
 acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
 exhaustive cross-adapter conformance corpus.
 ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
@@ -92,6 +93,7 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/config`: bootstrap registry ошибок конфигурации.
 - `internal/conformance`: общий file/Unix/HTTP corpus semantics, state и observability.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
+- `internal/exposition`: immutable application/self-metric encoding, response bounds, compression и write outcomes.
 - `internal/ingestion`: transport-independent admission, cancellation, result taxonomy и complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter с независимыми wire/decoded limits и exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation и Linux directory-inotify recovery.
