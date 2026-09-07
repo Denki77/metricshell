@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	applicationsnapshot "github.com/Denki77/metricshell/implementation/internal/snapshot"
 )
@@ -73,6 +74,20 @@ func TestRuntimeStateAndFinalWaitModeAreExactOneHotVectors(t *testing.T) {
 	}
 	if err := registry.SetFinalWaitMode("attacker"); !errors.Is(err, ErrValue) {
 		t.Fatalf("invalid mode error = %v", err)
+	}
+}
+
+func TestFinalWaitReasonRegistryMatchesStateMachine(t *testing.T) {
+	want := []string{
+		string(finalwait.ReasonImmediate),
+		string(finalwait.ReasonDurationElapsed),
+		string(finalwait.ReasonRequiredScrapes),
+		string(finalwait.ReasonTimeout),
+		string(finalwait.ReasonExternalTermination),
+		string(finalwait.ReasonRuntimeFailure),
+	}
+	if !reflect.DeepEqual(FinalWaitReasons[:], want) {
+		t.Fatalf("final-wait reasons = %#v, want %#v", FinalWaitReasons, want)
 	}
 }
 

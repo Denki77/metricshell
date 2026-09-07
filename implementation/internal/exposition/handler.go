@@ -70,6 +70,7 @@ const (
 )
 
 type FinalResponse struct {
+	RequestID  uint64
 	Generation uint64
 	Outcome    FinalOutcome
 	Completed  int
@@ -94,6 +95,7 @@ type Handler struct {
 	drainedOnce    sync.Once
 	waiter         *finalwait.Waiter
 	finalObservers []FinalResponseObserver
+	finalSequence  uint64
 }
 
 func NewHandler(configuration Config, snapshots SnapshotSource, metrics MetricsSource, probes http.Handler, debug DebugView, failures ...FailureObserver) (*Handler, error) {
@@ -270,6 +272,8 @@ func (handler *Handler) completeFinal(generation uint64, outcome Outcome) {
 			final.Outcome = FinalWriteError
 		}
 	}
+	handler.finalSequence++
+	final.RequestID = handler.finalSequence
 	observers := append([]FinalResponseObserver(nil), handler.finalObservers...)
 	handler.mu.Unlock()
 	for _, observer := range observers {

@@ -5,8 +5,9 @@
 
 ## Текущий объём
 
-Wave 5 выполняется. ISSUE-023–ISSUE-027 реализуют bounded exposition, response preparation, finalization ingestion
-barrier, final-wait state machine режимов immediate/duration/scrape-count и complete-response drain. Wave 4
+Wave 5 завершена. ISSUE-023–ISSUE-028 реализуют bounded exposition, response preparation, finalization ingestion
+barrier, final-wait state machine режимов immediate/duration/scrape-count, complete-response drain и final-wait
+observability. Wave 4
 ISSUE-016–ISSUE-022 реализует единый bounded ingestion core, atomic-file reconciliation,
 acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
 exhaustive cross-adapter conformance corpus.
@@ -53,6 +54,12 @@ make wave3
 
 ```sh
 make wave4
+```
+
+Запуск exit gate Wave 5 для exposition и final wait:
+
+```sh
+make wave5
 ```
 
 Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
@@ -119,7 +126,7 @@ metricshell version=0.1.0-dev revision=0123456
 
 Реализация следует ISSUE-011–ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Final-wait observability остаётся в ISSUE-028.
+поставке и сквозному definition of done до ISSUE-028 включительно.
 
 ## Инженерный контракт для следующих задач
 

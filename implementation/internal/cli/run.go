@@ -79,6 +79,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		if err := metrics.SetFinalWaitMode(selfmetric.FinalWaitMode(configuration.FinalWait.Mode)); err != nil {
 			return failLifecycle(machine, logger)
 		}
+		if err := metrics.SetGauge(selfmetric.FinalWaitRequiredScrapes, nil, float64(configuration.FinalWait.RequiredScrapes)); err != nil {
+			return failLifecycle(machine, logger)
+		}
 		holder := snapshot.NewHolder(snapshot.Zero())
 		metricsObserver, observerErr := ingestion.NewMetricsObserver(metrics, now)
 		if observerErr != nil {
@@ -280,20 +283,39 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if waitErr != nil {
 					return failLifecycle(machine, logger)
 				}
+				waitStartedAt := now()
 				if configuration.FinalWait.Mode == finalwait.Immediate {
-					if _, waitErr = waiter.Wait(terminationContext); waitErr != nil {
+					if err := startFinalWaitObservability(metrics, logger, configuration.FinalWait, lifecycle.Finalizing, waitStartedAt); err != nil {
+						return failLifecycle(machine, logger)
+					}
+					var waitResult finalwait.Result
+					if waitResult, waitErr = waiter.Wait(terminationContext); waitErr != nil {
+						_ = completeFinalWaitObservability(metrics, logger, finalwait.Result{Reason: finalwait.ReasonRuntimeFailure, Generation: final.Generation()}, lifecycle.Finalizing, now().Sub(waitStartedAt))
+						return failLifecycle(machine, logger)
+					}
+					if err := completeFinalWaitObservability(metrics, logger, waitResult, lifecycle.Finalizing, now().Sub(waitStartedAt)); err != nil {
 						return failLifecycle(machine, logger)
 					}
 					if err := machine.TransitionEvent(lifecycle.FinalizationImmediate); err != nil {
 						return failLifecycle(machine, logger)
 					}
 				} else {
-					handler.SetFinalWait(waiter)
+					handler.SetFinalWait(waiter, func(response exposition.FinalResponse) {
+						observeFinalResponse(metrics, logger, response)
+					})
 					var waitResult finalwait.Result
 					waitResult, waitErr = waiter.WaitTransition(terminationContext, func() error {
-						return machine.TransitionEvent(lifecycle.FinalizationWait)
+						if err := machine.TransitionEvent(lifecycle.FinalizationWait); err != nil {
+							return err
+						}
+						waitStartedAt = now()
+						return startFinalWaitObservability(metrics, logger, configuration.FinalWait, lifecycle.FinalWait, waitStartedAt)
 					})
 					if waitErr != nil {
+						_ = completeFinalWaitObservability(metrics, logger, finalwait.Result{Reason: finalwait.ReasonRuntimeFailure, Generation: final.Generation()}, machine.State(), now().Sub(waitStartedAt))
+						return failLifecycle(machine, logger)
+					}
+					if err := completeFinalWaitObservability(metrics, logger, waitResult, lifecycle.FinalWait, now().Sub(waitStartedAt)); err != nil {
 						return failLifecycle(machine, logger)
 					}
 					if waitResult.Reason == finalwait.ReasonRequiredScrapes {
@@ -352,6 +374,61 @@ func failLifecycle(machine *lifecycle.Machine, logger *diagnostic.Logger) int {
 	_ = logger.WriteRuntimeFailed()
 	_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
 	return exitCodes.ExitInternalFailure
+}
+
+func startFinalWaitObservability(metrics *selfmetric.Registry, logger *diagnostic.Logger, configuration finalwait.Config, state lifecycle.State, startedAt time.Time) error {
+	if configuration.Mode != finalwait.Immediate {
+		if err := metrics.SetGauge(selfmetric.FinalWaitActive, nil, 1); err != nil {
+			return err
+		}
+	}
+	if err := metrics.SetGauge(selfmetric.FinalWaitCompletedScrapes, nil, 0); err != nil {
+		return err
+	}
+	deadline := finalWaitDeadline(configuration, startedAt)
+	if !deadline.IsZero() {
+		if err := metrics.SetGauge(selfmetric.FinalWaitDeadline, nil, float64(deadline.UnixNano())/float64(time.Second)); err != nil {
+			return err
+		}
+	}
+	return logger.WriteFinalWaitStarted(string(configuration.Mode), string(state), deadline)
+}
+
+func observeFinalResponse(metrics *selfmetric.Registry, logger *diagnostic.Logger, response exposition.FinalResponse) {
+	_ = metrics.AddCounter(selfmetric.FinalScrapeAttemptsTotal, map[string]string{"outcome": string(response.Outcome)}, 1)
+	if response.Counted {
+		_ = metrics.SetGauge(selfmetric.FinalWaitCompletedScrapes, nil, float64(response.Completed))
+		_ = logger.WriteFinalScrapeCounted(response.RequestID, response.Generation)
+		return
+	}
+	_ = logger.WriteFinalScrapeNotCounted(response.RequestID, string(response.Outcome))
+}
+
+func completeFinalWaitObservability(metrics *selfmetric.Registry, logger *diagnostic.Logger, result finalwait.Result, state lifecycle.State, duration time.Duration) error {
+	if err := metrics.SetGauge(selfmetric.FinalWaitActive, nil, 0); err != nil {
+		return err
+	}
+	if err := metrics.SetGauge(selfmetric.FinalWaitDeadline, nil, 0); err != nil {
+		return err
+	}
+	if err := metrics.SetGauge(selfmetric.FinalWaitCompletedScrapes, nil, float64(result.Completed)); err != nil {
+		return err
+	}
+	if err := metrics.AddCounter(selfmetric.FinalWaitCompletionsTotal, map[string]string{"reason": string(result.Reason)}, 1); err != nil {
+		return err
+	}
+	return logger.WriteFinalWaitCompleted(string(result.Reason), string(state), duration)
+}
+
+func finalWaitDeadline(configuration finalwait.Config, startedAt time.Time) time.Time {
+	switch configuration.Mode {
+	case finalwait.Duration:
+		return startedAt.Add(configuration.Duration)
+	case finalwait.Scrapes:
+		return startedAt.Add(configuration.Timeout)
+	default:
+		return time.Time{}
+	}
 }
 
 func startIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core) (func() error, error) {

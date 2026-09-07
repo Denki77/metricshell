@@ -1,6 +1,6 @@
 # ISSUE-028. Final-wait observability
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -57,3 +57,21 @@ cardinality assertions; and race detector.
 
 Complete when every final-wait transition has matching metrics and schema-valid events, enum parity tests with
 self-metrics pass, terminal events are exactly once, and no unbounded or sensitive field is observable.
+
+## Delivery log
+
+- 2026-09-07: moved to `In Progress`; added final-wait lifecycle diagnostics, final scrape counted/not-counted
+  diagnostics, bounded request IDs, and self-metric updates for mode, active state, deadlines, required/completed
+  scrapes, attempts and terminal reasons.
+- 2026-09-07: moved to `Testing`; covered duration, scrape-response outcomes, terminal gauges, reason enum parity,
+  cardinality boundaries and real-container N=2 final scrape observability.
+- 2026-09-07: moved to `Done`; Docker unit/race/multi-architecture and integration gates passed, and implementation
+  EN/RU README scope now marks Wave 5 complete.
+
+## Verification evidence
+
+- `make test IMAGE=metricshell-wave5-028-observability`
+- `make integration IMAGE=metricshell-wave5-028-observability`
+- `make wave5 IMAGE=metricshell-wave5-028-observability`
+- README audit: implementation EN/RU command list includes `make wave5`; package scope and normative context include
+  ISSUE-028 final-wait observability with no remaining Wave 5 implementation scope.

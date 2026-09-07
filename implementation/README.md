@@ -5,8 +5,9 @@ and dependency graph.
 
 ## Current scope
 
-Wave 5 is in progress. ISSUE-023 through ISSUE-027 provide bounded exposition, response preparation, the finalization
-ingestion barrier, the immediate/duration/scrape-count final-wait state machine and complete-response drain. Wave 4
+Wave 5 is complete. ISSUE-023 through ISSUE-028 provide bounded exposition, response preparation, the finalization
+ingestion barrier, the immediate/duration/scrape-count final-wait state machine, complete-response drain and final-wait
+observability. Wave 4
 ISSUE-016 through ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation,
 acknowledged MSP/1 Unix ingestion and its serialized client, bounded loopback HTTP push, the explicit mmap boundary,
 and an exhaustive cross-adapter conformance corpus. ISSUE-011 through ISSUE-015 provide the immutable snapshot model,
@@ -53,6 +54,12 @@ Run the Wave 4 common-ingestion and cross-adapter conformance exit gate:
 
 ```sh
 make wave4
+```
+
+Run the Wave 5 exposition and final-wait exit gate:
+
+```sh
+make wave5
 ```
 
 The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
@@ -120,7 +127,7 @@ metricshell version=0.1.0-dev revision=0123456
 Implementation follows ISSUE-011 through ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
 Configuration, Runtime State
 Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done. Final-wait observability remains ISSUE-028.
+cross-cutting definition of done through ISSUE-028.
 
 ## Engineering contract for subsequent issues
 

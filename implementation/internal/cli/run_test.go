@@ -10,6 +10,11 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
+	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
+	"github.com/Denki77/metricshell/implementation/internal/exposition"
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
+	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 )
 
 func TestRunVersion(t *testing.T) {
@@ -67,6 +72,84 @@ func TestRunTraversesConfiguredFinalWait(t *testing.T) {
 	if finalizing < 0 || finalWait <= finalizing || terminated <= finalWait {
 		t.Fatalf("final-wait state flow missing or unordered: %s", stderr.String())
 	}
+	records := parseDiagnosticRecords(t, content)
+	started := findRecord(records, "final_wait.started")
+	completed := findRecord(records, "final_wait.completed")
+	if started == nil || started["mode"] != "duration" || started["deadline"] == "" {
+		t.Fatalf("final_wait.started missing or incomplete: %s", stderr.String())
+	}
+	if completed == nil || completed["reason"] != "duration_elapsed" {
+		t.Fatalf("final_wait.completed missing or incomplete: %s", stderr.String())
+	}
+}
+
+func TestFinalResponseObservabilityUpdatesMetricsAndLogs(t *testing.T) {
+	clock := func() time.Time { return time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC) }
+	metrics, err := selfmetric.New(buildinfo.Info{Version: "test", Revision: "test"}, selfmetric.FinalWaitScrapes, clock)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	logger := diagnostic.New(&output, clock)
+
+	observeFinalResponse(metrics, logger, exposition.FinalResponse{
+		RequestID: 7, Generation: 42, Outcome: exposition.FinalCompleted, Completed: 1, Counted: true,
+	})
+	observeFinalResponse(metrics, logger, exposition.FinalResponse{
+		RequestID: 8, Generation: 42, Outcome: exposition.FinalCancelled, Completed: 1, Counted: false,
+	})
+
+	view := metrics.View()
+	if got := cliCounterValue(view, selfmetric.FinalScrapeAttemptsTotal, map[string]string{"outcome": "completed"}); got != 1 {
+		t.Fatalf("completed attempts = %d, want 1", got)
+	}
+	if got := cliCounterValue(view, selfmetric.FinalScrapeAttemptsTotal, map[string]string{"outcome": "cancelled"}); got != 1 {
+		t.Fatalf("cancelled attempts = %d, want 1", got)
+	}
+	if got := cliGaugeValue(view, selfmetric.FinalWaitCompletedScrapes, nil); got != 1 {
+		t.Fatalf("completed gauge = %v, want 1", got)
+	}
+
+	records := parseDiagnosticRecords(t, output.Bytes())
+	counted := findRecord(records, "final_scrape.counted")
+	notCounted := findRecord(records, "final_scrape.not_counted")
+	if counted == nil || counted["request_id"] != float64(7) || counted["snapshot_generation"] != float64(42) {
+		t.Fatalf("counted event = %#v", counted)
+	}
+	if notCounted == nil || notCounted["request_id"] != float64(8) || notCounted["outcome"] != "cancelled" {
+		t.Fatalf("not-counted event = %#v", notCounted)
+	}
+}
+
+func TestFinalWaitObservabilityLifecycleMetrics(t *testing.T) {
+	startedAt := time.Date(2026, 9, 7, 12, 0, 0, 0, time.UTC)
+	metrics, err := selfmetric.New(buildinfo.Info{}, selfmetric.FinalWaitScrapes, func() time.Time { return startedAt })
+	if err != nil {
+		t.Fatal(err)
+	}
+	var output bytes.Buffer
+	logger := diagnostic.New(&output, func() time.Time { return startedAt })
+	configuration := finalwait.Defaults()
+	configuration.Timeout = 5 * time.Second
+
+	if err := startFinalWaitObservability(metrics, logger, configuration, lifecycle.FinalWait, startedAt); err != nil {
+		t.Fatal(err)
+	}
+	result := finalwait.Result{Reason: finalwait.ReasonRequiredScrapes, Generation: 3, Completed: 1}
+	if err := completeFinalWaitObservability(metrics, logger, result, lifecycle.FinalWait, 25*time.Millisecond); err != nil {
+		t.Fatal(err)
+	}
+	view := metrics.View()
+	if cliGaugeValue(view, selfmetric.FinalWaitActive, nil) != 0 || cliGaugeValue(view, selfmetric.FinalWaitDeadline, nil) != 0 {
+		t.Fatal("final wait terminal gauges were not reset")
+	}
+	if cliCounterValue(view, selfmetric.FinalWaitCompletionsTotal, map[string]string{"reason": "required_scrapes"}) != 1 {
+		t.Fatal("required_scrapes completion counter missing")
+	}
+	records := parseDiagnosticRecords(t, output.Bytes())
+	if findRecord(records, "final_wait.started") == nil || findRecord(records, "final_wait.completed") == nil {
+		t.Fatalf("final-wait events missing: %s", output.String())
+	}
 }
 
 type synchronizedBuffer struct {
@@ -87,6 +170,68 @@ func (buffer *synchronizedBuffer) Bytes() []byte {
 }
 
 func (buffer *synchronizedBuffer) String() string { return string(buffer.Bytes()) }
+
+func parseDiagnosticRecords(t *testing.T, content []byte) []map[string]any {
+	t.Helper()
+	var records []map[string]any
+	scanner := bufio.NewScanner(bytes.NewReader(content))
+	for scanner.Scan() {
+		var record map[string]any
+		if err := json.Unmarshal(scanner.Bytes(), &record); err != nil {
+			t.Fatalf("stderr is not JSON Lines: %v", err)
+		}
+		records = append(records, record)
+	}
+	if err := scanner.Err(); err != nil {
+		t.Fatal(err)
+	}
+	return records
+}
+
+func findRecord(records []map[string]any, event string) map[string]any {
+	for _, record := range records {
+		if record["event"] == event {
+			return record
+		}
+	}
+	return nil
+}
+
+func cliCounterValue(view selfmetric.View, name string, labels map[string]string) uint64 {
+	for _, family := range view.Families {
+		if family.Name != name {
+			continue
+		}
+		for _, sample := range family.Samples {
+			matched := len(sample.Labels) == len(labels)
+			for _, label := range sample.Labels {
+				matched = matched && labels[label.Name] == label.Value
+			}
+			if matched {
+				return sample.Counter
+			}
+		}
+	}
+	return 0
+}
+
+func cliGaugeValue(view selfmetric.View, name string, labels map[string]string) float64 {
+	for _, family := range view.Families {
+		if family.Name != name {
+			continue
+		}
+		for _, sample := range family.Samples {
+			matched := len(sample.Labels) == len(labels)
+			for _, label := range sample.Labels {
+				matched = matched && labels[label.Name] == label.Value
+			}
+			if matched {
+				return sample.Gauge
+			}
+		}
+	}
+	return 0
+}
 
 func TestRunHelp(t *testing.T) {
 	t.Parallel()

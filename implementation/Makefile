@@ -117,12 +117,14 @@ integration:
 		docker network create "$$network" >/dev/null; \
 		server="$$(docker run -d --network "$$network" --network-alias metricshell \
 			-e METRICSHELL_FINAL_WAIT_MODE=scrapes -e METRICSHELL_FINAL_WAIT_TIMEOUT=5s \
-			-e METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES=1 $(IMAGE)-integration:local -- /workload-fixture)"; \
+			-e METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES=2 $(IMAGE)-integration:local -- /workload-fixture)"; \
 		output="$$(docker run --rm --network "$$network" --entrypoint /final-scrape-fixture $(IMAGE)-integration:local)"; \
-		printf '%s\n' "$$output" | grep -F '"event":"fixture.final_scrape"' >/dev/null; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.final_scrape"' | grep -F '"observed_final_metrics":true' >/dev/null; \
 		code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
 		test "$$code" -eq 0; \
-		printf '%s\n' "$$logs" | grep '"state":"final_wait"' >/dev/null
+		printf '%s\n' "$$logs" | grep '"event":"final_wait.started".*"mode":"scrapes"' >/dev/null; \
+		test "$$(printf '%s\n' "$$logs" | grep -c '"event":"final_scrape.counted"')" -eq 2; \
+		printf '%s\n' "$$logs" | grep '"event":"final_wait.completed".*"reason":"required_scrapes"' >/dev/null
 
 ci: test integration
 
