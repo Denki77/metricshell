@@ -77,8 +77,8 @@ func TestScrapeThresholdIsGenerationBoundAndSaturating(t *testing.T) {
 	result := make(chan Result, 1)
 	go func() { got, _ := waiter.Wait(context.Background()); result <- got }()
 	waitActive(t, waiter)
-	if completed, counted := waiter.Complete(10); counted || completed != 0 {
-		t.Fatalf("wrong generation counted: %d/%v", completed, counted)
+	if completion := waiter.Complete(10); completion.Counted || completion.Completed != 0 || !completion.Tracked {
+		t.Fatalf("wrong generation counted: %+v", completion)
 	}
 
 	var group sync.WaitGroup
@@ -94,8 +94,45 @@ func TestScrapeThresholdIsGenerationBoundAndSaturating(t *testing.T) {
 	if got.Reason != ReasonRequiredScrapes || got.Completed != 3 || waiter.State().Completed != 3 {
 		t.Fatalf("result=%+v state=%+v", got, waiter.State())
 	}
-	if _, counted := waiter.Complete(11); counted {
+	if completion := waiter.Complete(11); completion.Counted {
 		t.Fatal("completion counted after terminal state")
+	}
+}
+
+func TestTransitionAndActivationShareCompletionBoundary(t *testing.T) {
+	configuration := Defaults()
+	waiter, err := New(configuration, 5)
+	if err != nil {
+		t.Fatal(err)
+	}
+	transitionEntered := make(chan struct{})
+	releaseTransition := make(chan struct{})
+	result := make(chan Result, 1)
+	go func() {
+		got, waitErr := waiter.WaitTransition(context.Background(), func() error {
+			close(transitionEntered)
+			<-releaseTransition
+			return nil
+		})
+		if waitErr != nil {
+			t.Errorf("WaitTransition: %v", waitErr)
+		}
+		result <- got
+	}()
+	<-transitionEntered
+	completion := make(chan Completion, 1)
+	go func() { completion <- waiter.Complete(5) }()
+	select {
+	case got := <-completion:
+		t.Fatalf("completion crossed unfinished transition: %+v", got)
+	case <-time.After(10 * time.Millisecond):
+	}
+	close(releaseTransition)
+	if got := <-completion; !got.Counted || !got.Threshold {
+		t.Fatalf("completion = %+v", got)
+	}
+	if got := <-result; got.Reason != ReasonRequiredScrapes {
+		t.Fatalf("result = %+v", got)
 	}
 }
 

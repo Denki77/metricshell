@@ -10,6 +10,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
@@ -59,17 +60,40 @@ type MetricsSource interface {
 type DebugView func() []byte
 type FailureObserver func(Outcome, int)
 
+type FinalOutcome string
+
+const (
+	FinalCompleted  FinalOutcome = "completed"
+	FinalIneligible FinalOutcome = "ineligible"
+	FinalWriteError FinalOutcome = "write_error"
+	FinalCancelled  FinalOutcome = "cancelled"
+)
+
+type FinalResponse struct {
+	Generation uint64
+	Outcome    FinalOutcome
+	Completed  int
+	Counted    bool
+}
+
+type FinalResponseObserver func(FinalResponse)
+
 type Handler struct {
-	configuration Config
-	snapshots     SnapshotSource
-	metrics       MetricsSource
-	filter        *Filter
-	limiter       *Limiter
-	probes        http.Handler
-	debug         DebugView
-	failures      []FailureObserver
-	mu            sync.Mutex
-	inflight      int
+	configuration  Config
+	snapshots      SnapshotSource
+	metrics        MetricsSource
+	filter         *Filter
+	limiter        *Limiter
+	probes         http.Handler
+	debug          DebugView
+	failures       []FailureObserver
+	mu             sync.Mutex
+	inflight       int
+	draining       bool
+	drained        chan struct{}
+	drainedOnce    sync.Once
+	waiter         *finalwait.Waiter
+	finalObservers []FinalResponseObserver
 }
 
 func NewHandler(configuration Config, snapshots SnapshotSource, metrics MetricsSource, probes http.Handler, debug DebugView, failures ...FailureObserver) (*Handler, error) {
@@ -84,11 +108,21 @@ func NewHandler(configuration Config, snapshots SnapshotSource, metrics MetricsS
 	if err != nil {
 		return nil, err
 	}
-	handler := &Handler{configuration: configuration, snapshots: snapshots, metrics: metrics, filter: filter, limiter: limiter, probes: probes, debug: debug, failures: failures}
+	handler := &Handler{
+		configuration: configuration, snapshots: snapshots, metrics: metrics, filter: filter, limiter: limiter,
+		probes: probes, debug: debug, failures: failures, drained: make(chan struct{}),
+	}
 	include, exclude := filter.RuleCounts()
 	_ = metrics.SetGauge(selfmetric.FilterRules, map[string]string{"kind": "include"}, float64(include))
 	_ = metrics.SetGauge(selfmetric.FilterRules, map[string]string{"kind": "exclude"}, float64(exclude))
 	return handler, nil
+}
+
+func (handler *Handler) SetFinalWait(waiter *finalwait.Waiter, observers ...FinalResponseObserver) {
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+	handler.waiter = waiter
+	handler.finalObservers = append([]FinalResponseObserver(nil), observers...)
 }
 
 func (handler *Handler) ServeHTTP(response http.ResponseWriter, request *http.Request) {
@@ -141,8 +175,11 @@ func (handler *Handler) serveMetrics(response http.ResponseWriter, request *http
 		return
 	}
 	defer handler.limiter.Release()
-	handler.changeInflight(1)
-	defer handler.changeInflight(-1)
+	if !handler.acceptMetric() {
+		writeFailure(response, http.StatusServiceUnavailable, "exposition draining\n")
+		return
+	}
+	defer handler.finishMetric()
 
 	active := handler.snapshots.Active()
 	families := active.Validated().Families()
@@ -156,12 +193,14 @@ func (handler *Handler) serveMetrics(response http.ResponseWriter, request *http
 			outcome = ResponseLimit
 		}
 		handler.observe(format, outcome, 0)
+		handler.completeFinal(active.Generation(), outcome)
 		handler.notifyFailure(outcome, http.StatusServiceUnavailable)
 		writeFailure(response, http.StatusServiceUnavailable, "exposition unavailable\n")
 		return
 	}
 	outcome := Write(request.Context(), response, prepared, handler.configuration.WriteTimeout)
 	handler.observe(format, outcome, prepared.UncompressedBytes())
+	handler.completeFinal(prepared.Generation(), outcome)
 	if outcome != Success {
 		handler.notifyFailure(outcome, http.StatusOK)
 	}
@@ -175,11 +214,87 @@ func (handler *Handler) notifyFailure(outcome Outcome, status int) {
 	}
 }
 
-func (handler *Handler) changeInflight(delta int) {
+func (handler *Handler) acceptMetric() bool {
 	handler.mu.Lock()
 	defer handler.mu.Unlock()
-	handler.inflight += delta
+	if handler.draining {
+		return false
+	}
+	handler.inflight++
 	_ = handler.metrics.SetGauge(selfmetric.ExpositionInflight, nil, float64(handler.inflight))
+	return true
+}
+
+func (handler *Handler) finishMetric() {
+	handler.mu.Lock()
+	defer handler.mu.Unlock()
+	handler.inflight--
+	_ = handler.metrics.SetGauge(selfmetric.ExpositionInflight, nil, float64(handler.inflight))
+	if handler.draining && handler.inflight == 0 {
+		handler.drainedOnce.Do(func() { close(handler.drained) })
+	}
+}
+
+func (handler *Handler) completeFinal(generation uint64, outcome Outcome) {
+	handler.mu.Lock()
+	if handler.waiter == nil {
+		handler.mu.Unlock()
+		return
+	}
+	final := FinalResponse{Generation: generation}
+	if outcome == Success {
+		completion := handler.waiter.Complete(generation)
+		if !completion.Tracked {
+			handler.mu.Unlock()
+			return
+		}
+		final.Completed, final.Counted = completion.Completed, completion.Counted
+		if completion.Counted {
+			final.Outcome = FinalCompleted
+		} else {
+			final.Outcome = FinalIneligible
+		}
+		if completion.Threshold {
+			handler.draining = true
+		}
+	} else {
+		state := handler.waiter.State()
+		if !state.Started {
+			handler.mu.Unlock()
+			return
+		}
+		final.Completed = state.Completed
+		if outcome == Timeout {
+			final.Outcome = FinalCancelled
+		} else {
+			final.Outcome = FinalWriteError
+		}
+	}
+	observers := append([]FinalResponseObserver(nil), handler.finalObservers...)
+	handler.mu.Unlock()
+	for _, observer := range observers {
+		if observer != nil {
+			observer(final)
+		}
+	}
+}
+
+// Drain closes metric admission and waits only for handlers accepted before
+// that boundary. The caller supplies the completion-grace deadline.
+func (handler *Handler) Drain(ctx context.Context) bool {
+	handler.mu.Lock()
+	handler.draining = true
+	if handler.inflight == 0 {
+		handler.drainedOnce.Do(func() { close(handler.drained) })
+	}
+	drained := handler.drained
+	handler.mu.Unlock()
+	select {
+	case <-drained:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func (handler *Handler) observe(format Format, outcome Outcome, responseBytes int) {
@@ -256,7 +371,9 @@ func writeFailure(response http.ResponseWriter, status int, body string) {
 type Server struct {
 	listener net.Listener
 	server   *http.Server
-	done     chan error
+	done     chan struct{}
+	mu       sync.Mutex
+	serveErr error
 }
 
 func Bind(configuration Config, handler http.Handler) (*Server, error) {
@@ -273,7 +390,7 @@ func Bind(configuration Config, handler http.Handler) (*Server, error) {
 			Handler: handler, ReadHeaderTimeout: configuration.ReadHeaderLimit,
 			WriteTimeout: configuration.WriteTimeout, MaxHeaderBytes: 16 << 10,
 		},
-		done: make(chan error, 1),
+		done: make(chan struct{}),
 	}
 	return server, nil
 }
@@ -284,7 +401,10 @@ func (server *Server) Start() {
 		if errors.Is(err, http.ErrServerClosed) {
 			err = nil
 		}
-		server.done <- err
+		server.mu.Lock()
+		server.serveErr = err
+		server.mu.Unlock()
+		close(server.done)
 	}()
 }
 
@@ -292,9 +412,25 @@ func (server *Server) Address() net.Addr { return server.listener.Addr() }
 
 func (server *Server) Shutdown(ctx context.Context) error {
 	err := server.server.Shutdown(ctx)
-	serveErr := <-server.done
 	if err != nil {
 		return err
 	}
-	return serveErr
+	<-server.done
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	return server.serveErr
+}
+
+func (server *Server) Close() error {
+	err := server.server.Close()
+	if errors.Is(err, http.ErrServerClosed) {
+		err = nil
+	}
+	<-server.done
+	server.mu.Lock()
+	defer server.mu.Unlock()
+	if err != nil {
+		return err
+	}
+	return server.serveErr
 }

@@ -288,11 +288,23 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 						return failLifecycle(machine, logger)
 					}
 				} else {
-					if err := machine.TransitionEvent(lifecycle.FinalizationWait); err != nil {
+					handler.SetFinalWait(waiter)
+					var waitResult finalwait.Result
+					waitResult, waitErr = waiter.WaitTransition(terminationContext, func() error {
+						return machine.TransitionEvent(lifecycle.FinalizationWait)
+					})
+					if waitErr != nil {
 						return failLifecycle(machine, logger)
 					}
-					if _, waitErr = waiter.Wait(terminationContext); waitErr != nil {
-						return failLifecycle(machine, logger)
+					if waitResult.Reason == finalwait.ReasonRequiredScrapes {
+						drainContext, cancelDrain := context.WithTimeout(context.Background(), configuration.FinalWait.CompletionGrace)
+						drained := handler.Drain(drainContext)
+						if !drained || server.Shutdown(drainContext) != nil {
+							_ = server.Close()
+						}
+						cancelDrain()
+					} else if waitResult.Reason == finalwait.ReasonExternalTermination {
+						_ = server.Close()
 					}
 					if err := machine.TransitionEvent(lifecycle.FinalWaitCompleted); err != nil {
 						return failLifecycle(machine, logger)

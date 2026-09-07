@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
+	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
@@ -184,6 +185,178 @@ func TestServerBindsAndDrains(t *testing.T) {
 	if err := server.Shutdown(ctx); err != nil {
 		t.Fatal(err)
 	}
+	if err := server.Shutdown(ctx); err != nil {
+		t.Fatalf("repeated shutdown: %v", err)
+	}
+}
+
+func TestFinalResponseCountsOnlyCompleteFrozenGeneration(t *testing.T) {
+	holder, registry, state := handlerState(t)
+	configuration := DefaultConfig()
+	configuration.Listen = "127.0.0.1:0"
+	handler, _ := NewHandler(configuration, holder, registry, probe.New(state), nil)
+
+	preFinal, err := finalwait.New(finalwait.Defaults(), holder.Active().Generation())
+	if err != nil {
+		t.Fatal(err)
+	}
+	preFinalResponses := make(chan FinalResponse, 1)
+	handler.SetFinalWait(preFinal, func(response FinalResponse) { preFinalResponses <- response })
+	preFinalResponse := httptest.NewRecorder()
+	handler.ServeHTTP(preFinalResponse, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if preFinalResponse.Code != http.StatusOK {
+		t.Fatalf("pre-final response status=%d", preFinalResponse.Code)
+	}
+	select {
+	case got := <-preFinalResponses:
+		t.Fatalf("pre-final response was tracked: %+v", got)
+	default:
+	}
+
+	waiter, cancel, result, responses := startFinalWait(t, handler, holder.Active().Generation(), 1)
+	defer cancel()
+
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if response.Code != http.StatusOK {
+		t.Fatalf("complete response status=%d", response.Code)
+	}
+	if got := <-result; got.Reason != finalwait.ReasonRequiredScrapes || got.Completed != 1 {
+		t.Fatalf("wait result=%+v", got)
+	}
+	if got := <-responses; got.Outcome != FinalCompleted || !got.Counted || got.Completed != 1 {
+		t.Fatalf("final response=%+v", got)
+	}
+	if waiter.State().Completed != 1 {
+		t.Fatalf("completed=%d", waiter.State().Completed)
+	}
+	rejected := httptest.NewRecorder()
+	handler.ServeHTTP(rejected, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if rejected.Code != http.StatusServiceUnavailable {
+		t.Fatalf("post-threshold status=%d", rejected.Code)
+	}
+
+	wrongHandler, _ := NewHandler(configuration, holder, registry, probe.New(state), nil)
+	wrong, wrongCancel, wrongResult, wrongResponses := startFinalWait(t, wrongHandler, holder.Active().Generation()+1, 1)
+	wrongResponse := httptest.NewRecorder()
+	wrongHandler.ServeHTTP(wrongResponse, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if got := <-wrongResponses; got.Outcome != FinalIneligible || got.Counted || got.Completed != 0 {
+		t.Fatalf("wrong-generation response=%+v", got)
+	}
+	wrongCancel()
+	if got := <-wrongResult; got.Reason != finalwait.ReasonExternalTermination || wrong.State().Completed != 0 {
+		t.Fatalf("wrong-generation result=%+v state=%+v", got, wrong.State())
+	}
+}
+
+func TestFinalResponseClassifiesPartialCancelledAndExcludedRequests(t *testing.T) {
+	holder, registry, state := handlerState(t)
+	configuration := DefaultConfig()
+	configuration.Listen = "127.0.0.1:0"
+	handler, _ := NewHandler(configuration, holder, registry, probe.New(state), nil)
+	waiter, cancel, result, responses := startFinalWait(t, handler, holder.Active().Generation(), 2)
+
+	short := &shortResponseWriter{header: make(http.Header)}
+	handler.ServeHTTP(short, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if got := <-responses; got.Outcome != FinalWriteError || got.Counted {
+		t.Fatalf("short response=%+v", got)
+	}
+
+	zero := &zeroResponseWriter{header: make(http.Header)}
+	handler.ServeHTTP(zero, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if got := <-responses; got.Outcome != FinalWriteError || got.Counted {
+		t.Fatalf("zero-byte response=%+v", got)
+	}
+
+	cancelledContext, cancelRequest := context.WithCancel(context.Background())
+	cancelRequest()
+	cancelled := httptest.NewRequest(http.MethodGet, MetricsPath, nil).WithContext(cancelledContext)
+	handler.ServeHTTP(httptest.NewRecorder(), cancelled)
+	if got := <-responses; got.Outcome != FinalCancelled || got.Counted {
+		t.Fatalf("cancelled response=%+v", got)
+	}
+
+	for _, path := range []string{probe.HealthPath, probe.ReadinessPath, DebugPath} {
+		handler.ServeHTTP(httptest.NewRecorder(), httptest.NewRequest(http.MethodGet, path, nil))
+	}
+	select {
+	case got := <-responses:
+		t.Fatalf("probe/debug produced final response=%+v", got)
+	default:
+	}
+	if waiter.State().Completed != 0 {
+		t.Fatalf("failed/excluded requests completed=%d", waiter.State().Completed)
+	}
+	cancel()
+	<-result
+}
+
+func TestFinalThresholdClosesAdmissionAndDrainsOnlyAcceptedHandlers(t *testing.T) {
+	holder, registry, state := handlerState(t)
+	configuration := DefaultConfig()
+	configuration.Listen = "127.0.0.1:0"
+	handler, _ := NewHandler(configuration, holder, registry, probe.New(state), nil)
+	waiter, cancel, result, _ := startFinalWait(t, handler, holder.Active().Generation(), 1)
+	defer cancel()
+
+	blocked := newBlockingResponseWriter()
+	blockedDone := make(chan struct{})
+	go func() {
+		handler.ServeHTTP(blocked, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+		close(blockedDone)
+	}()
+	<-blocked.entered
+	complete := httptest.NewRecorder()
+	handler.ServeHTTP(complete, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if got := <-result; got.Reason != finalwait.ReasonRequiredScrapes || waiter.State().Completed != 1 {
+		t.Fatalf("threshold result=%+v state=%+v", got, waiter.State())
+	}
+
+	late := httptest.NewRecorder()
+	handler.ServeHTTP(late, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
+	if late.Code != http.StatusServiceUnavailable {
+		t.Fatalf("late status=%d", late.Code)
+	}
+	expired, stop := context.WithCancel(context.Background())
+	stop()
+	if handler.Drain(expired) {
+		t.Fatal("zero-grace drain completed with an accepted handler blocked")
+	}
+	close(blocked.release)
+	<-blockedDone
+	if !handler.Drain(context.Background()) || waiter.State().Completed != 1 {
+		t.Fatalf("accepted handler did not drain or threshold changed: %+v", waiter.State())
+	}
+}
+
+func startFinalWait(t *testing.T, handler *Handler, generation uint64, required int) (*finalwait.Waiter, context.CancelFunc, <-chan finalwait.Result, <-chan FinalResponse) {
+	t.Helper()
+	configuration := finalwait.Defaults()
+	configuration.RequiredScrapes = required
+	waiter, err := finalwait.New(configuration, generation)
+	if err != nil {
+		t.Fatal(err)
+	}
+	responses := make(chan FinalResponse, 16)
+	handler.SetFinalWait(waiter, func(response FinalResponse) { responses <- response })
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan finalwait.Result, 1)
+	go func() {
+		got, waitErr := waiter.Wait(ctx)
+		if waitErr != nil {
+			t.Errorf("final wait: %v", waitErr)
+		}
+		result <- got
+	}()
+	deadline := time.After(time.Second)
+	for !waiter.State().Active {
+		select {
+		case <-deadline:
+			t.Fatal("final wait did not become active")
+		default:
+		}
+	}
+	return waiter, cancel, result, responses
 }
 
 type stateSource struct {
@@ -256,4 +429,14 @@ func (writer *blockingResponseWriter) Write(content []byte) (int, error) {
 	writer.once.Do(func() { close(writer.entered) })
 	<-writer.release
 	return len(content), nil
+}
+
+type zeroResponseWriter struct {
+	header http.Header
+}
+
+func (writer *zeroResponseWriter) Header() http.Header { return writer.header }
+func (writer *zeroResponseWriter) WriteHeader(int)     {}
+func (writer *zeroResponseWriter) Write([]byte) (int, error) {
+	return 0, nil
 }

@@ -111,6 +111,18 @@ integration:
 		test "$$code" -eq 137; printf '%s\n' "$$output" | grep -F '"event":"shutdown.started"' | grep -F '"remaining_ms":1000' >/dev/null
 	@output="$$(docker run --rm --entrypoint /probe-fixture $(IMAGE)-integration:local)"; \
 		printf '%s\n' "$$output" | grep -F '"event":"fixture.probes"' | grep -F '"requests_checked":18' | grep -F '"states_checked":8' >/dev/null
+	@network="metricshell-wave5-$$$$"; server=""; \
+		cleanup() { if test -n "$$server"; then docker rm -f "$$server" >/dev/null 2>&1 || true; fi; docker network rm "$$network" >/dev/null 2>&1 || true; }; \
+		trap cleanup EXIT INT TERM; \
+		docker network create "$$network" >/dev/null; \
+		server="$$(docker run -d --network "$$network" --network-alias metricshell \
+			-e METRICSHELL_FINAL_WAIT_MODE=scrapes -e METRICSHELL_FINAL_WAIT_TIMEOUT=5s \
+			-e METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES=1 $(IMAGE)-integration:local -- /workload-fixture)"; \
+		output="$$(docker run --rm --network "$$network" --entrypoint /final-scrape-fixture $(IMAGE)-integration:local)"; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.final_scrape"' >/dev/null; \
+		code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
+		test "$$code" -eq 0; \
+		printf '%s\n' "$$logs" | grep '"state":"final_wait"' >/dev/null
 
 ci: test integration
 

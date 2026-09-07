@@ -63,11 +63,19 @@ type Result struct {
 }
 
 type State struct {
+	Started    bool
 	Active     bool
 	Generation uint64
 	Completed  int
 	Deadline   time.Time
 	Reason     Reason
+}
+
+type Completion struct {
+	Completed int
+	Counted   bool
+	Threshold bool
+	Tracked   bool
 }
 
 type Waiter struct {
@@ -100,10 +108,22 @@ func newWaiter(configuration Config, generation uint64, now func() time.Time, af
 // Wait runs the configured policy exactly once. Cancellation represents an
 // external termination request and takes precedence when already observable.
 func (waiter *Waiter) Wait(ctx context.Context) (Result, error) {
+	return waiter.WaitTransition(ctx, nil)
+}
+
+// WaitTransition makes transition and final-wait activation one linearized
+// boundary with concurrent response completions.
+func (waiter *Waiter) WaitTransition(ctx context.Context, transition func() error) (Result, error) {
 	waiter.mu.Lock()
 	if waiter.started {
 		waiter.mu.Unlock()
 		return Result{}, ErrAlreadyStarted
+	}
+	if transition != nil {
+		if err := transition(); err != nil {
+			waiter.mu.Unlock()
+			return Result{}, err
+		}
 	}
 	waiter.started, waiter.active = true, true
 	wait := waiter.configuration.Duration
@@ -166,27 +186,28 @@ func (waiter *Waiter) Wait(ctx context.Context) (Result, error) {
 
 // Complete records one eligible complete response for the frozen generation.
 // HTTP response eligibility and write completion are established by exposition.
-func (waiter *Waiter) Complete(generation uint64) (completed int, counted bool) {
+func (waiter *Waiter) Complete(generation uint64) Completion {
 	waiter.mu.Lock()
 	if !waiter.active || waiter.configuration.Mode != Scrapes || generation != waiter.generation || waiter.completed >= waiter.configuration.RequiredScrapes {
-		completed = waiter.completed
+		result := Completion{Completed: waiter.completed, Tracked: waiter.started}
 		waiter.mu.Unlock()
-		return completed, false
+		return result
 	}
 	waiter.completed++
-	completed = waiter.completed
-	if completed == waiter.configuration.RequiredScrapes {
+	result := Completion{Completed: waiter.completed, Counted: true, Tracked: true}
+	if waiter.completed == waiter.configuration.RequiredScrapes {
+		result.Threshold = true
 		waiter.reached.Do(func() { close(waiter.threshold) })
 	}
 	waiter.mu.Unlock()
-	return completed, true
+	return result
 }
 
 func (waiter *Waiter) State() State {
 	waiter.mu.Lock()
 	defer waiter.mu.Unlock()
 	return State{
-		Active: waiter.active, Generation: waiter.generation, Completed: waiter.completed,
+		Started: waiter.started, Active: waiter.active, Generation: waiter.generation, Completed: waiter.completed,
 		Deadline: waiter.deadline, Reason: waiter.reason,
 	}
 }
