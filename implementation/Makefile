@@ -5,7 +5,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 build
+.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 wave5 build
 
 all: ci
 
@@ -111,6 +111,20 @@ integration:
 		test "$$code" -eq 137; printf '%s\n' "$$output" | grep -F '"event":"shutdown.started"' | grep -F '"remaining_ms":1000' >/dev/null
 	@output="$$(docker run --rm --entrypoint /probe-fixture $(IMAGE)-integration:local)"; \
 		printf '%s\n' "$$output" | grep -F '"event":"fixture.probes"' | grep -F '"requests_checked":18' | grep -F '"states_checked":8' >/dev/null
+	@network="metricshell-wave5-$$$$"; server=""; \
+		cleanup() { if test -n "$$server"; then docker rm -f "$$server" >/dev/null 2>&1 || true; fi; docker network rm "$$network" >/dev/null 2>&1 || true; }; \
+		trap cleanup EXIT INT TERM; \
+		docker network create "$$network" >/dev/null; \
+		server="$$(docker run -d --network "$$network" --network-alias metricshell \
+			-e METRICSHELL_FINAL_WAIT_MODE=scrapes -e METRICSHELL_FINAL_WAIT_TIMEOUT=5s \
+			-e METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES=2 $(IMAGE)-integration:local -- /workload-fixture)"; \
+		output="$$(docker run --rm --network "$$network" --entrypoint /final-scrape-fixture $(IMAGE)-integration:local)"; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.final_scrape"' | grep -F '"observed_final_metrics":true' >/dev/null; \
+		code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
+		test "$$code" -eq 0; \
+		printf '%s\n' "$$logs" | grep '"event":"final_wait.started".*"mode":"scrapes"' >/dev/null; \
+		test "$$(printf '%s\n' "$$logs" | grep -c '"event":"final_scrape.counted"')" -eq 2; \
+		printf '%s\n' "$$logs" | grep '"event":"final_wait.completed".*"reason":"required_scrapes"' >/dev/null
 
 ci: test integration
 
@@ -121,6 +135,8 @@ wave2: ci
 wave3: ci
 
 wave4: ci
+
+wave5: ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"

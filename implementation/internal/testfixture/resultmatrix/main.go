@@ -114,7 +114,7 @@ func verifyRejectedConfiguration() error {
 
 func verifyWorkloadResult(environment string, wantExit int) error {
 	command := exec.Command(metricshellPath, "--", workloadPath)
-	command.Env = []string{environment}
+	command.Env = []string{environment, "METRICSHELL_FINAL_WAIT_MODE=immediate"}
 	var stdout, stderr bytes.Buffer
 	command.Stdout = &stdout
 	command.Stderr = &stderr

@@ -1,6 +1,6 @@
 # ISSUE-023. Prometheus exposition server
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -57,3 +57,20 @@ bind failure; health/readiness in every runtime state; graceful drain; and race 
 
 Complete when parser-based golden tests, filtering conformance, bounds/failure tests, lifecycle probes, and concurrent
 snapshot-selection tests pass with all observable errors documented.
+
+## Delivery log
+
+- 2026-09-02: moved to `In Progress`; implemented the bounded listener, `/metrics`, lifecycle probes, safe debug view,
+  Prometheus/OpenMetrics and gzip negotiation, application-family filtering and complete self-metric exposition.
+- 2026-09-02: moved to `Testing`; format, filtering, probe/debug exclusion, saturation, preflight failure, real TCP
+  bind/drain and occupied-listener startup tests passed in Docker with the race detector.
+- 2026-09-02: moved to `Done`; Docker vet/race/dependency/multi-architecture checks and the EN/RU README audit passed.
+
+## Verification evidence
+
+- Each request selects one immutable application generation; filtering is family-atomic and never applies to the
+  reserved self-metric domain.
+- Unsupported methods/media are bounded 4xx responses, saturation and preflight failures are 503, and bind failure
+  exits with `endpoint_bind_failed` before workload start.
+- Successful Prometheus and OpenMetrics responses carry the normative content type, and only OpenMetrics ends with
+  exactly one EOF marker.

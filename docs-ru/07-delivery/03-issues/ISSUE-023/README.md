@@ -1,6 +1,6 @@
 # ISSUE-023. Сервер Prometheus exposition
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -58,3 +58,20 @@ failure; health/readiness в каждом runtime state; graceful drain; race de
 
 Задача завершена, когда проходят parser-based golden tests, filtering conformance, bounds/failure tests, lifecycle
 probes и concurrent snapshot-selection tests, а все наблюдаемые ошибки документированы.
+
+## Журнал выполнения
+
+- 2026-09-02: переведена в `В работе`; реализованы bounded listener, `/metrics`, lifecycle probes, безопасный debug
+  view, Prometheus/OpenMetrics и gzip negotiation, фильтрация application families и полная выдача self-metrics.
+- 2026-09-02: переведена в `Тестирование`; format, filtering, probe/debug exclusion, saturation, preflight failure,
+  real TCP bind/drain и occupied-listener startup tests прошли в Docker с race detector.
+- 2026-09-02: переведена в `Готово`; пройдены Docker vet/race/dependency/multi-architecture checks и EN/RU README audit.
+
+## Свидетельства проверки
+
+- Каждый request выбирает одну immutable application generation; фильтрация family-atomic и не применяется к
+  reserved self-metric domain.
+- Unsupported methods/media дают bounded 4xx, saturation и preflight failures дают 503, bind failure завершается с
+  `endpoint_bind_failed` до запуска workload.
+- Успешные Prometheus и OpenMetrics responses имеют нормативный content type, и только OpenMetrics заканчивается
+  ровно одним EOF marker.

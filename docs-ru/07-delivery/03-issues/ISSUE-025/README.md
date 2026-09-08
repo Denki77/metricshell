@@ -1,6 +1,6 @@
 # ISSUE-025. Ingestion barrier finalization
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -23,3 +23,20 @@ ordering policy.
   concurrent workload exit; generation freeze; race detector.
 - **Условие завершения:** Готово, когда каждый schedule даёт одну deterministic frozen generation без post-barrier
   mutation.
+
+## Журнал выполнения
+
+- 2026-09-02: переведена в `В работе`; в Core добавлены linearized admission barrier, bounded finalization wait и
+  exactly-once freeze final snapshot, общие для каждого transport.
+- 2026-09-02: переведена в `Тестирование`; executing, queued, timeout, repeated-close и post-barrier file/Unix/HTTP
+  schedules прошли под Docker race detector.
+- 2026-09-02: переведена в `Готово`; frozen publications обновляют общие rejection metrics/diagnostics, пройдены Docker
+  vet/race/dependency/multi-architecture checks и EN/RU README audit.
+
+## Свидетельства проверки
+
+- Admission и closure используют одну synchronization boundary, поэтому каждая publication детерминированно находится
+  до или после barrier.
+- Работа, admitted до closure, может установиться в пределах переданного context budget; его expiry замораживает
+  предыдущую last-valid generation, а поздний install отклоняется с `frozen`.
+- Каждый вызов видит одну final generation, а все три transport identities отклоняют post-barrier publications.

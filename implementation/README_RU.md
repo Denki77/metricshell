@@ -5,13 +5,19 @@
 
 ## Текущий объём
 
-Wave 4 завершена. ISSUE-016–ISSUE-022 реализуют единый bounded ingestion core, atomic-file reconciliation,
+Wave 5 завершена. ISSUE-023–ISSUE-028 реализуют bounded exposition, response preparation, finalization ingestion
+barrier, final-wait state machine режимов immediate/duration/scrape-count, complete-response drain и final-wait
+observability. Wave 4
+ISSUE-016–ISSUE-022 реализует единый bounded ingestion core, atomic-file reconciliation,
 acknowledged Unix ingestion MSP/1 и его serialized client, bounded loopback HTTP push, explicit mmap boundary и
 exhaustive cross-adapter conformance corpus.
 ISSUE-011–ISSUE-015 реализуют immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state и отдельный bounded self-metrics registry. Complete accepted application
 snapshots заменяют по одной immutable generation; live self-metrics используют собственный fixed-cardinality state и не
 влияют на application identity.
+Production runtime создаёт один общий `ingestion.Core`, направляет выбранный transport `file`, `unix` или `http` через
+него и финализируется через `Core.CloseAndFreeze(ctx)` до того, как terminal exposition начинает наблюдать frozen
+snapshot.
 
 ## Требования
 
@@ -48,6 +54,12 @@ make wave3
 
 ```sh
 make wave4
+```
+
+Запуск exit gate Wave 5 для exposition и final wait:
+
+```sh
+make wave5
 ```
 
 Docker-contained exit verifier проверяет на реальном artifact отклонённую bootstrap configuration (`64` и единственную
@@ -89,10 +101,14 @@ metricshell version=0.1.0-dev revision=0123456
 - `cmd/metricshell`: entrypoint production-бинарника.
 - `internal/buildinfo`: build identity, передаваемый linker.
 - `internal/cli`: bootstrap command surface.
-- `internal/config`: bootstrap registry ошибок конфигурации.
+- `internal/config`: валидированная workload, shutdown и exposition bootstrap configuration.
 - `internal/conformance`: общий file/Unix/HTTP corpus semantics, state и observability.
 - `internal/diagnostic`: упорядоченные structured lifecycle diagnostics для одной runtime identity.
-- `internal/ingestion`: transport-independent admission, cancellation, result taxonomy и complete-candidate handoff.
+- `internal/exposition`: immutable application/self-metric encoding, response bounds, compression, write outcomes и
+  final-response drain.
+- `internal/finalwait`: validated natural-completion policies, frozen-generation threshold и terminal decisions.
+- `internal/ingestion`: transport-independent admission, cancellation, finalization barrier, result taxonomy и
+  complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter с независимыми wire/decoded limits и exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation и Linux directory-inotify recovery.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing и Unix listener с mode 0660.
@@ -110,8 +126,7 @@ metricshell version=0.1.0-dev revision=0123456
 
 Реализация следует ISSUE-011–ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, спецификациям Application Snapshot Protocol,
 Configuration, Runtime State Machine, Self-Metrics и Structured Logging, ADR-013 о статической multi-architecture
-поставке и сквозному definition of done. Production listener/application
-exposition integration остаётся в ISSUE-023.
+поставке и сквозному definition of done до ISSUE-028 включительно.
 
 ## Инженерный контракт для следующих задач
 

@@ -37,10 +37,83 @@ type record struct {
 	Forced        *bool    `json:"forced,omitempty"`
 	Kind          string   `json:"kind,omitempty"`
 	Transport     string   `json:"transport,omitempty"`
+	Mode          string   `json:"mode,omitempty"`
 	Outcome       string   `json:"outcome,omitempty"`
 	Generation    *uint64  `json:"snapshot_generation,omitempty"`
 	SnapshotBytes *int     `json:"snapshot_bytes,omitempty"`
 	Series        *int     `json:"series,omitempty"`
+	HTTPStatus    *int     `json:"http_status,omitempty"`
+	RequestID     uint64   `json:"request_id,omitempty"`
+	Suppressed    string   `json:"suppressed_event,omitempty"`
+	SuppressedN   uint64   `json:"suppressed_count,omitempty"`
+	WindowMS      *int64   `json:"window_ms,omitempty"`
+}
+
+func (logger *Logger) WriteEndpointBound(component, state string) error {
+	return logger.write(record{
+		Level: "info", Event: "endpoint.bound", Component: component, State: state,
+		Message: "required endpoint bound",
+	})
+}
+
+func (logger *Logger) WriteEndpointBindFailed(component, state string) error {
+	return logger.write(record{
+		Level: "error", Event: "endpoint.bind_failed", Component: component, State: state,
+		Message: "required endpoint could not be bound", Reason: selfmetric.RuntimeFailureBind,
+		ErrorCode: "BIND_FAILED",
+	})
+}
+
+func (logger *Logger) WriteExpositionFailed(state, outcome string, status int) error {
+	return logger.write(record{
+		Level: "warn", Event: "exposition.failed", Component: "exposition", State: state,
+		Message: "metric exposition failed", Outcome: outcome, HTTPStatus: &status,
+	})
+}
+
+func (logger *Logger) WriteFinalWaitStarted(mode, state string, deadline time.Time) error {
+	record := record{
+		Level: "info", Event: "final_wait.started", Component: "final_wait", State: state,
+		Message: "final wait started", Mode: mode,
+	}
+	if !deadline.IsZero() {
+		record.Deadline = deadline.UTC().Format(time.RFC3339Nano)
+	}
+	return logger.write(record)
+}
+
+func (logger *Logger) WriteFinalScrapeCounted(requestID, generation uint64) error {
+	return logger.write(record{
+		Level: "debug", Event: "final_scrape.counted", Component: "final_wait", State: "final_wait",
+		Message: "eligible final scrape counted", RequestID: requestID, Generation: &generation,
+	})
+}
+
+func (logger *Logger) WriteFinalScrapeNotCounted(requestID uint64, outcome string) error {
+	return logger.write(record{
+		Level: "debug", Event: "final_scrape.not_counted", Component: "final_wait", State: "final_wait",
+		Message: "final scrape did not count", RequestID: requestID, Outcome: outcome,
+	})
+}
+
+func (logger *Logger) WriteFinalWaitCompleted(reason, state string, duration time.Duration) error {
+	durationMilliseconds := float64(duration) / float64(time.Millisecond)
+	return logger.write(record{
+		Level: "info", Event: "final_wait.completed", Component: "final_wait", State: state,
+		Message: "final wait completed", Reason: reason, DurationMS: &durationMilliseconds,
+	})
+}
+
+func (logger *Logger) WriteSuppressionSummary(suppressedEvent, reason string, count uint64, window time.Duration) error {
+	windowMilliseconds := window.Milliseconds()
+	record := record{
+		Level: "warn", Event: "logging.suppression_summary", Component: "runtime", State: "running",
+		Message: "diagnostic records suppressed", Suppressed: suppressedEvent, SuppressedN: count, WindowMS: &windowMilliseconds,
+	}
+	if reason != "" {
+		record.Reason = reason
+	}
+	return logger.write(record)
 }
 
 func (logger *Logger) WriteRuntimeInitializing(pid int) error {

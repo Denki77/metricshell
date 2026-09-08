@@ -113,6 +113,14 @@ type Core struct {
 	now        func() time.Time
 	executing  chan struct{}
 	admissions chan struct{}
+
+	barrierMu  sync.Mutex
+	closed     bool
+	admitted   sync.WaitGroup
+	closeOnce  sync.Once
+	freezeOnce sync.Once
+	frozen     chan struct{}
+	final      snapshot.ActiveSnapshot
 }
 
 func New(holder *snapshot.Holder, limits snapshot.Limits, concurrent, pending int, observer Observer) (*Core, error) {
@@ -129,6 +137,7 @@ func NewWithParser(holder *snapshot.Holder, limits snapshot.Limits, concurrent, 
 	return &Core{
 		holder: holder, limits: limits, parser: parser, observer: observer, now: now,
 		executing: make(chan struct{}, concurrent), admissions: make(chan struct{}, concurrent+pending),
+		frozen: make(chan struct{}),
 	}, nil
 }
 
@@ -139,15 +148,29 @@ func (core *Core) Publish(ctx context.Context, transport Transport, candidate []
 		result.Outcome, result.Reason = InternalError, snapshot.ReasonInternal
 		return result
 	}
+	core.barrierMu.Lock()
+	if core.closed {
+		core.barrierMu.Unlock()
+		result.Outcome, result.Reason = Rejected, snapshot.ReasonFrozen
+		core.observer.Declined(result, core.now().Sub(started))
+		return result
+	}
 	if contextExpired(ctx) {
+		core.barrierMu.Unlock()
 		result.Outcome = Timeout
 		core.observer.Declined(result, core.now().Sub(started))
 		return result
 	}
 	select {
 	case core.admissions <- struct{}{}:
-		defer func() { <-core.admissions }()
+		core.admitted.Add(1)
+		core.barrierMu.Unlock()
+		defer func() {
+			<-core.admissions
+			core.admitted.Done()
+		}()
 	default:
+		core.barrierMu.Unlock()
 		result.Outcome = Busy
 		core.observer.Declined(result, core.now().Sub(started))
 		return result
@@ -189,6 +212,33 @@ func (core *Core) Publish(ctx context.Context, transport Transport, candidate []
 	}
 	result.Outcome, result.Generation = Accepted, active.Generation()
 	return result
+}
+
+// CloseAndFreeze closes candidate admission, waits for work admitted before the
+// boundary while ctx permits it, and returns the one immutable final generation.
+func (core *Core) CloseAndFreeze(ctx context.Context) snapshot.ActiveSnapshot {
+	core.closeOnce.Do(func() {
+		core.barrierMu.Lock()
+		core.closed = true
+		core.barrierMu.Unlock()
+		go func() {
+			core.admitted.Wait()
+			core.freeze()
+		}()
+	})
+	select {
+	case <-core.frozen:
+	case <-ctx.Done():
+		core.freeze()
+	}
+	return core.final
+}
+
+func (core *Core) freeze() {
+	core.freezeOnce.Do(func() {
+		core.final = core.holder.Freeze()
+		close(core.frozen)
+	})
 }
 
 func validTransport(transport Transport) bool {
@@ -251,6 +301,9 @@ func (observer *MetricsObserver) Declined(result Result, _ time.Duration) {
 	observer.mu.Lock()
 	defer observer.mu.Unlock()
 	_ = observer.registry.AddCounter(selfmetric.SnapshotPublicationsTotal, map[string]string{"transport": string(result.Transport), "outcome": string(result.Outcome)}, 1)
+	if result.Outcome == Rejected {
+		_ = observer.registry.AddCounter(selfmetric.SnapshotRejectionsTotal, map[string]string{"transport": string(result.Transport), "reason": string(result.Reason)}, 1)
+	}
 }
 
 type DiagnosticObserver struct {
@@ -278,7 +331,10 @@ func (observer *DiagnosticObserver) Completed(result Result, active snapshot.Act
 }
 
 func (observer *DiagnosticObserver) Declined(result Result, _ time.Duration) {
-	if result.Outcome == Busy {
+	switch result.Outcome {
+	case Busy:
 		_ = observer.logger.WriteIngestionOverloaded(observer.state(), string(result.Transport))
+	case Rejected:
+		_ = observer.logger.WriteSnapshotRejected(observer.state(), string(result.Transport), string(result.Reason), 0)
 	}
 }

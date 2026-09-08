@@ -1,6 +1,6 @@
 # ISSUE-026. Final scrape state machine
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -21,3 +21,21 @@ Default N=1 plus finite timeout; immediate, duration, and positive-N modes; prob
 - **Acceptance criteria and required tests:** Every mode; N=1/N>1; timeout; no scraper; external signal; concurrent
   threshold responses; probes; stale-marker-aware verifier behavior.
 - **Completion:** Complete when the state machine terminates exactly once for every event ordering.
+
+## Delivery log
+
+- 2026-09-02: moved to `In Progress`; implemented validated immediate, duration and positive-N scrape modes, finite
+  deadlines, frozen-generation matching and an atomic saturating threshold.
+- 2026-09-02: moved to `Testing`; defaults/ranges, immediate, zero/fixed duration, N=1/N>1, no-scraper timeout,
+  wrong-generation, concurrent threshold and external-termination schedules passed in Docker with the race detector.
+- 2026-09-02: moved to `Done`; natural CLI completion follows the normative lifecycle transitions, earlier container
+  gates explicitly select immediate mode, and Docker vet/race/dependency/multi-architecture plus EN/RU README checks
+  passed.
+
+## Verification evidence
+
+- `scrapes` remains the production default with N=1 and a finite 60-second timeout; configuration is rejected before
+  workload start outside every normative range.
+- Counts are accepted only while the state machine is active and only for its frozen generation, then saturate at N.
+- Immediate completion bypasses `final_wait`; duration/scrape modes enter it and terminate exactly once without changing
+  the resolved workload result.
