@@ -1,6 +1,6 @@
 # ISSUE-034. Настраиваемые capacity и timeout limits
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -60,3 +60,17 @@ structured error-code mapping; platform/container E2E.
 Задача завершена, когда exhaustive configuration-table tests покрывают каждое public property, startup не создаёт
 workload side effects при failure, все boundaries имеют наблюдаемые детерминированные ошибки, а container E2E проверяет
 limits и exit codes.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; завершены настройки log level и selector values, rejection options
+  неактивного transport, effective debug configuration, permanent resource-unavailable exit code mapping и вычисление
+  required_nofile.
+- 2026-09-09: переведено в `Testing`; tests покрывают CLI-over-environment precedence, zero-valued bounds,
+  inactive-transport contradictions, logging validation, required_nofile calculation и boundary predicate для nofile.
+- 2026-09-09: переведено в `Done`; docker-only test target прошёл с расширенной configuration surface.
+
+## Подтверждение проверки
+
+- `go test ./internal/config ./internal/cli`
+- `make test IMAGE=metricshell-issue034-config-limits`

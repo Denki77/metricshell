@@ -25,6 +25,7 @@ type Config struct {
 	Shutdown            shutdown.Config
 	Exposition          exposition.Config
 	FinalWait           finalwait.Config
+	Log                 LogConfig
 	IngestionTransport  string
 	Limits              snapshot.Limits
 	ConcurrentIngestion int
@@ -34,6 +35,11 @@ type Config struct {
 	Socket              SocketConfig
 	HTTPIngestionListen string
 	HTTPIngestion       HTTPConfig
+}
+
+type LogConfig struct {
+	Level          string
+	SelectorValues bool
 }
 
 type FileConfig struct {
@@ -108,6 +114,8 @@ var options = map[string]string{
 	"--final-wait-timeout":            "final_wait_timeout",
 	"--final-wait-required-scrapes":   "final_wait_required_scrapes",
 	"--final-wait-completion-grace":   "final_wait_completion_grace",
+	"--log-level":                     "log_level",
+	"--log-selector-values":           "log_selector_values",
 }
 
 var unsupportedSharedMemoryEnvironment = [...]string{
@@ -157,6 +165,10 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if parseErr != nil {
 		return Config{}, parseErr
 	}
+	logConfiguration, parseErr := parseLog(args[:separator], lookupEnv)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
 	ingestionConfiguration, parseErr := parseIngestion(args[:separator], lookupEnv)
 	if parseErr != nil {
 		return Config{}, parseErr
@@ -165,6 +177,7 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	ingestionConfiguration.Shutdown = shutdownConfiguration
 	ingestionConfiguration.Exposition = expositionConfiguration
 	ingestionConfiguration.FinalWait = finalWaitConfiguration
+	ingestionConfiguration.Log = logConfiguration
 	return ingestionConfiguration, nil
 }
 
@@ -190,6 +203,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 		Socket: socketConfiguration, HTTPIngestionListen: "127.0.0.1:9091", HTTPIngestion: httpConfiguration,
 	}
 	values := map[string]string{}
+	explicit := map[string]bool{}
 	if lookupEnv != nil {
 		for environment, property := range map[string]string{
 			"METRICSHELL_INGESTION_TRANSPORT":           "ingestion_transport",
@@ -223,6 +237,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 		} {
 			if value, exists := lookupEnv(environment); exists {
 				values[property] = value
+				explicit[property] = true
 			}
 		}
 	}
@@ -240,6 +255,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			value = args[index]
 		}
 		values[property] = value
+		explicit[property] = true
 	}
 	var parseErr error
 	if value, exists := values["ingestion_transport"]; exists {
@@ -262,6 +278,9 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 	}
 	if parseErr != nil {
 		return Config{}, fmt.Errorf("invalid ingestion configuration: %w", parseErr)
+	}
+	if err := rejectInactiveTransportOptions(configuration.IngestionTransport, explicit); err != nil {
+		return Config{}, err
 	}
 	configuration.File.DecodedBytes = configuration.Limits.DecodedBytes
 	configuration.Socket.DecodedBytes = configuration.Limits.DecodedBytes
@@ -297,6 +316,28 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 		return Config{}, fmt.Errorf("invalid ingestion configuration")
 	}
 	return configuration, nil
+}
+
+func rejectInactiveTransportOptions(transport string, explicit map[string]bool) error {
+	inactive := map[string][]string{
+		"file": {"unix_socket_path", "socket_frame_bytes", "socket_parts", "socket_connections", "socket_transactions", "socket_transaction_timeout", "socket_read_timeout", "socket_write_timeout", "http_ingestion_listen", "http_ingestion_wire_bytes", "http_read_header_timeout", "http_read_timeout", "http_write_timeout", "http_idle_timeout", "http_max_header_bytes"},
+		"unix": {"snapshot_file_path", "file_reconcile_interval", "http_ingestion_listen", "http_ingestion_wire_bytes", "http_read_header_timeout", "http_read_timeout", "http_write_timeout", "http_idle_timeout", "http_max_header_bytes"},
+		"http": {"snapshot_file_path", "file_reconcile_interval", "unix_socket_path", "socket_frame_bytes", "socket_parts", "socket_connections", "socket_transactions", "socket_transaction_timeout", "socket_read_timeout", "socket_write_timeout"},
+	}
+	for _, property := range inactive[transport] {
+		if explicit[property] {
+			return fmt.Errorf("inactive transport option %s configured for %s ingestion", property, transport)
+		}
+	}
+	return nil
+}
+
+func RequiredNoFile(configuration Config) int {
+	required := 16 + configuration.Exposition.Concurrent + configuration.ConcurrentIngestion
+	if configuration.IngestionTransport == "unix" {
+		required += configuration.Socket.Connections
+	}
+	return required
 }
 
 func parseIngestionCounts(values map[string]string, configuration *Config) error {
@@ -439,6 +480,54 @@ func parseFinalWait(args []string, lookupEnv LookupEnv) (finalwait.Config, error
 	}
 	if parseErr != nil || configuration.Validate() != nil {
 		return finalwait.Config{}, fmt.Errorf("invalid final-wait configuration")
+	}
+	return configuration, nil
+}
+
+func parseLog(args []string, lookupEnv LookupEnv) (LogConfig, error) {
+	configuration := LogConfig{Level: "info", SelectorValues: false}
+	values := map[string]string{}
+	if lookupEnv != nil {
+		if value, exists := lookupEnv("METRICSHELL_LOG_LEVEL"); exists {
+			values["log_level"] = value
+		}
+		if value, exists := lookupEnv("METRICSHELL_LOG_SELECTOR_VALUES"); exists {
+			values["log_selector_values"] = value
+		}
+	}
+	for index := 0; index < len(args); index++ {
+		name, value, hasValue := strings.Cut(args[index], "=")
+		property, known := options[name]
+		if !known {
+			return LogConfig{}, err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return LogConfig{}, fmt.Errorf("%s requires a value", name)
+			}
+			value = args[index]
+		}
+		switch property {
+		case "log_level", "log_selector_values":
+			values[property] = value
+		}
+	}
+	if value, exists := values["log_level"]; exists {
+		configuration.Level = value
+	}
+	if value, exists := values["log_selector_values"]; exists {
+		switch value {
+		case "true":
+			configuration.SelectorValues = true
+		case "false":
+			configuration.SelectorValues = false
+		default:
+			return LogConfig{}, fmt.Errorf("invalid log selector boolean")
+		}
+	}
+	if configuration.Level != "info" && configuration.Level != "debug" {
+		return LogConfig{}, fmt.Errorf("invalid log level")
 	}
 	return configuration, nil
 }

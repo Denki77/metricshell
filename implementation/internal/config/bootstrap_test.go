@@ -196,22 +196,15 @@ func TestParseIngestionDefaultsPrecedenceAndValidation(t *testing.T) {
 	t.Parallel()
 
 	environment := map[string]string{
-		"METRICSHELL_INGESTION_TRANSPORT":           "unix",
-		"METRICSHELL_HTTP_INGESTION_LISTEN":         "127.0.0.1:19091",
-		"METRICSHELL_UNIX_SOCKET_PATH":              "/tmp/env.sock",
-		"METRICSHELL_SNAPSHOT_FILE_PATH":            "/tmp/env.json",
-		"METRICSHELL_MAX_PENDING_INGESTIONS":        "0",
-		"METRICSHELL_MAX_LABELS_PER_SERIES":         "0",
-		"METRICSHELL_MAX_HELP_BYTES":                "0",
-		"METRICSHELL_HTTP_INGESTION_MAX_WIRE_BYTES": "1MiB",
+		"METRICSHELL_INGESTION_TRANSPORT":    "unix",
+		"METRICSHELL_UNIX_SOCKET_PATH":       "/tmp/env.sock",
+		"METRICSHELL_MAX_PENDING_INGESTIONS": "0",
+		"METRICSHELL_MAX_LABELS_PER_SERIES":  "0",
+		"METRICSHELL_MAX_HELP_BYTES":         "0",
 	}
 	lookup := func(name string) (string, bool) { value, ok := environment[name]; return value, ok }
 	configuration, err := Parse([]string{
-		"--ingestion-transport=http",
-		"--http-ingestion-listen=127.0.0.1:0",
 		"--unix-socket-path=/tmp/cli.sock",
-		"--snapshot-file-path=/tmp/cli.json",
-		"--file-reconcile-interval=100ms",
 		"--max-concurrent-ingestions=2",
 		"--max-snapshot-bytes=64KiB",
 		"--max-decoded-input-bytes=128KiB",
@@ -223,18 +216,12 @@ func TestParseIngestionDefaultsPrecedenceAndValidation(t *testing.T) {
 		"--socket-transaction-timeout=100ms",
 		"--socket-read-timeout=100ms",
 		"--socket-write-timeout=100ms",
-		"--http-read-header-timeout=100ms",
-		"--http-read-timeout=100ms",
-		"--http-write-timeout=100ms",
-		"--http-idle-timeout=1s",
-		"--http-max-header-bytes=1KiB",
 		"--", "program",
 	}, testNow, lookup)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if configuration.IngestionTransport != "http" || configuration.HTTPIngestionListen != "127.0.0.1:0" ||
-		configuration.UnixSocketPath != "/tmp/cli.sock" || configuration.File.Path != "/tmp/cli.json" {
+	if configuration.IngestionTransport != "unix" || configuration.UnixSocketPath != "/tmp/cli.sock" {
 		t.Fatalf("transport endpoints = %+v", configuration)
 	}
 	if configuration.PendingIngestion != 0 || configuration.Limits.LabelsPerSeries != 0 || configuration.Limits.HelpBytes != 0 {
@@ -251,6 +238,53 @@ func TestParseIngestionDefaultsPrecedenceAndValidation(t *testing.T) {
 		"--socket-max-frame-bytes=512B", "--socket-max-connections=65", "--http-ingestion-max-wire-bytes=63KiB",
 		"--http-idle-timeout=999ms",
 	} {
+		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("Parse accepted %s", option)
+		}
+	}
+}
+
+func TestParseRejectsInactiveTransportOptions(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"--ingestion-transport=http", "--unix-socket-path=/tmp/cli.sock", "--", "program"},
+		{"--ingestion-transport=unix", "--snapshot-file-path=/tmp/cli.json", "--", "program"},
+		{"--ingestion-transport=file", "--http-ingestion-listen=127.0.0.1:9091", "--", "program"},
+	} {
+		if _, err := Parse(args, testNow, nil); err == nil {
+			t.Errorf("Parse accepted inactive transport options %q", args)
+		}
+	}
+}
+
+func TestParseLogPrecedenceAndRequiredNoFile(t *testing.T) {
+	t.Parallel()
+
+	environment := map[string]string{
+		"METRICSHELL_LOG_LEVEL":           "info",
+		"METRICSHELL_LOG_SELECTOR_VALUES": "false",
+	}
+	lookup := func(name string) (string, bool) { value, ok := environment[name]; return value, ok }
+	configuration, err := Parse([]string{
+		"--log-level=debug",
+		"--log-selector-values=true",
+		"--max-concurrent-scrapes=8",
+		"--max-concurrent-ingestions=2",
+		"--socket-max-connections=4",
+		"--", "program",
+	}, testNow, lookup)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Log.Level != "debug" || !configuration.Log.SelectorValues {
+		t.Fatalf("log config = %+v", configuration.Log)
+	}
+	if got, want := RequiredNoFile(configuration), 16+8+2+4; got != want {
+		t.Fatalf("RequiredNoFile = %d, want %d", got, want)
+	}
+
+	for _, option := range []string{"--log-level=trace", "--log-selector-values=yes"} {
 		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
 			t.Errorf("Parse accepted %s", option)
 		}
