@@ -1,11 +1,12 @@
 PROJECT_ROOT := ..
 DOCKERFILE := $(CURDIR)/Dockerfile
 REVISION ?= $(shell git -C $(PROJECT_ROOT) rev-parse --verify HEAD 2>/dev/null || printf unknown)
+VERSION ?= $(shell sed -n '1p' $(PROJECT_ROOT)/VERSION)
 IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 wave5 build
+.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 wave5 wave6 build release
 
 all: ci
 
@@ -139,4 +140,7 @@ wave4: ci
 wave5: ci
 
 build:
-	docker build --target runtime --platform "$(PLATFORM)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"
+	docker build --target runtime --platform "$(PLATFORM)" --build-arg VERSION="$(VERSION)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"
+
+release:
+	docker build --target release --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"

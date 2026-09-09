@@ -4,6 +4,8 @@ ARG REPO_URI=github.com/Denki77/metricshell
 FROM ${GO_IMAGE} AS source
 ARG REPO_URI
 WORKDIR /src
+COPY ["implementation/Dockerfile", "./Dockerfile"]
+COPY ["implementation/Makefile", "./Makefile"]
 COPY ["implementation/go.mod", "./"]
 COPY ["implementation/client", "./client"]
 COPY ["implementation/cmd", "./cmd"]
@@ -26,8 +28,24 @@ RUN version="$(cat /project/VERSION)" && \
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
       -o /out/linux_arm64/metricshell ./cmd/metricshell && \
+    sha256sum /out/linux_amd64/metricshell /out/linux_arm64/metricshell > /out/SHA256SUMS && \
+    sha256sum -c /out/SHA256SUMS && \
     actual="$(go run -ldflags="-X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" ./cmd/metricshell --version)" && \
     test "${actual}" = "metricshell version=${version} revision=${REVISION}"
+
+FROM source AS release
+ARG REVISION=unknown
+RUN version="$(cat /project/VERSION)" && \
+    mkdir -p /release/linux_amd64 /release/linux_arm64 && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
+      -o /release/linux_amd64/metricshell ./cmd/metricshell && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
+      -o /release/linux_arm64/metricshell ./cmd/metricshell && \
+    (cd /release && sha256sum linux_amd64/metricshell linux_arm64/metricshell > SHA256SUMS) && \
+    (cd /release && sha256sum -c SHA256SUMS) && \
+    printf 'version=%s\nrevision=%s\n' "${version}" "${REVISION}" > /release/METADATA
 
 FROM source AS build
 ARG REVISION=unknown
@@ -77,5 +95,11 @@ COPY --from=integration-build /out/final-scrape-fixture /final-scrape-fixture
 ENTRYPOINT ["/metricshell"]
 
 FROM scratch AS runtime
+ARG VERSION=dev
+ARG REVISION=unknown
+LABEL org.opencontainers.image.title="MetricShell" \
+      org.opencontainers.image.description="Bounded local metric supervisor for finite container workloads" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.revision="${REVISION}"
 COPY --from=build /out/metricshell /metricshell
 ENTRYPOINT ["/metricshell"]
