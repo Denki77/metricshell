@@ -1,0 +1,22 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: metricshell-final-sample
+  labels:
+    app.kubernetes.io/name: metricshell
+    metricshell.io/example: job-integration
+spec:
+  selector:
+    matchLabels:
+      metricshell.io/scrape: "true"
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5s
+      scrapeTimeout: 2s
+      honorLabels: false
+      relabelings:
+        - action: replace
+          sourceLabels: [__meta_kubernetes_pod_label_metricshell_io_replica]
+          targetLabel: metricshell_replica
+
