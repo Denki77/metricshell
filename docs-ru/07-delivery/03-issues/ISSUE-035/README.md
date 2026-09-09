@@ -1,6 +1,6 @@
 # ISSUE-035. Набор fault, soak и race tests
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,19 @@
   OOM container; signal/publication/scrape races; long reconciliation/drain.
 - **Условие завершения:** Готово, когда production binary проходит suites документированной длительности с reproducible
   seeds и сохранёнными failure artifacts.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; добавлен production-binary fault fixture, который внутри Docker integration
+  image покрывает HTTP malformed floods, slow client disconnects, queue saturation, scrape/publication races, bind/path
+  startup failure и cgroup OOM.
+- 2026-09-09: переведено в `Testing`; добавлен Makefile target `fault` как reproducible docker-only entrypoint suite и
+  подключён к `ci`.
+- 2026-09-09: переведено в `Done`; suite проверяет bounded recovery, overload logs, отсутствие workload start после
+  startup bind failure и OOM exit behavior.
+
+## Подтверждение проверки
+
+- `go test ./internal/testfixture/faultsuite`
+- `make fault IMAGE=metricshell-issue035-fault`
+- `make test IMAGE=metricshell-issue035-fault`

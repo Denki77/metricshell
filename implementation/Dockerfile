@@ -79,7 +79,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/probe-fixture ./internal/testfixture/probe && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
-      -ldflags="-s -w -buildid=" -o /out/final-scrape-fixture ./internal/testfixture/finalscrape
+      -ldflags="-s -w -buildid=" -o /out/final-scrape-fixture ./internal/testfixture/finalscrape && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/faultsuite-fixture ./internal/testfixture/faultsuite
 
 FROM scratch AS integration
 ENV METRICSHELL_FINAL_WAIT_MODE=immediate
@@ -92,6 +94,7 @@ COPY --from=integration-build /out/result-matrix-fixture /result-matrix-fixture
 COPY --from=integration-build /out/termination-fixture /termination-fixture
 COPY --from=integration-build /out/probe-fixture /probe-fixture
 COPY --from=integration-build /out/final-scrape-fixture /final-scrape-fixture
+COPY --from=integration-build /out/faultsuite-fixture /faultsuite-fixture
 ENTRYPOINT ["/metricshell"]
 
 FROM scratch AS runtime

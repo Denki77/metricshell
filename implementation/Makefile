@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration ci wave1 wave2 wave3 wave4 wave5 wave6 build release
+.PHONY: all fmt test integration fault ci wave1 wave2 wave3 wave4 wave5 wave6 build release
 
 all: ci
 
@@ -127,7 +127,23 @@ integration:
 		test "$$(printf '%s\n' "$$logs" | grep -c '"event":"final_scrape.counted"')" -eq 2; \
 		printf '%s\n' "$$logs" | grep '"event":"final_wait.completed".*"reason":"required_scrapes"' >/dev/null
 
-ci: test integration
+fault:
+	docker build --target integration --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE)-fault:local "$(PROJECT_ROOT)"
+	@for mode in malformed-flood slow-disconnect scrape-race; do \
+		output="$$(docker run --rm -e METRICSHELL_INGESTION_TRANSPORT=http -e FAULTSUITE_MODE="$$mode" $(IMAGE)-fault:local -- /faultsuite-fixture 2>&1)"; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.faultsuite"' | grep -F "\"mode\":\"$$mode\"" | grep -F '"ok":true' >/dev/null; \
+	done
+	@output="$$(docker run --rm -e METRICSHELL_INGESTION_TRANSPORT=http -e METRICSHELL_MAX_CONCURRENT_INGESTIONS=1 -e METRICSHELL_MAX_PENDING_INGESTIONS=0 -e FAULTSUITE_MODE=saturation $(IMAGE)-fault:local -- /faultsuite-fixture 2>&1)"; \
+		printf '%s\n' "$$output" | grep -F '"event":"fixture.faultsuite","mode":"saturation","ok":true' >/dev/null; \
+		printf '%s\n' "$$output" | grep -F '"event":"ingestion.overloaded"' >/dev/null
+	@code=0; output="$$(docker run --rm -e METRICSHELL_INGESTION_TRANSPORT=http -e METRICSHELL_EXPOSITION_LISTEN=127.0.0.1:9091 -e METRICSHELL_HTTP_INGESTION_LISTEN=127.0.0.1:9091 $(IMAGE)-fault:local -- /faultsuite-fixture 2>&1)" || code=$$?; \
+		test "$$code" -eq 72; \
+		printf '%s\n' "$$output" | grep -F '"event":"endpoint.bind_failed"' >/dev/null; \
+		test "$$(printf '%s\n' "$$output" | grep -c '"event":"workload.started"')" -eq 0
+	@code=0; docker run --rm --memory=32m -e METRICSHELL_INGESTION_TRANSPORT=http -e FAULTSUITE_MODE=oom $(IMAGE)-fault:local -- /faultsuite-fixture >/dev/null 2>&1 || code=$$?; \
+		test "$$code" -eq 137
+
+ci: test integration fault
 
 wave1: ci
 
