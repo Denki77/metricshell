@@ -72,8 +72,15 @@ Build a minimal runtime image for a selected Linux architecture:
 make build PLATFORM=linux/amd64 IMAGE=metricshell
 ```
 
-The Makefile only invokes Docker targets; `make ci` runs build/unit checks and real-container acceptance fixtures. The
-Dockerfile has no Make dependency, and no host Go command or auxiliary shell orchestration script is used.
+The Makefile only invokes Docker targets; `make ci` runs build/unit checks, real-container acceptance fixtures, fault
+injection, controlled benchmark artifact generation, and supply-chain verification with an ephemeral CI signing key
+outside the repository. The release `supply-chain` target requires external signing-key and public-key files supplied as
+BuildKit secrets. The Dockerfile has no Make dependency, and no host Go command or auxiliary shell orchestration script
+is used.
+
+Supply-chain artifacts use `SHA256SUMS` as the signed manifest. It covers the release binaries, `go.mod`, raw
+`MODULES.jsonl` / `GOVULNCHECK.json` inputs, and every generated evidence file. SBOM verification compares module
+components against the signed module graph, including module versions and sums.
 
 Run a workload without shell interpretation:
 

@@ -1,6 +1,6 @@
 # ISSUE-037. Release supply-chain pipeline
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -21,3 +21,24 @@
   subject; clean rebuild; amd64/arm64 OCI verification; offline verification instructions.
 - **Условие завершения:** Готово, когда каждый published artifact traceable, signed, reproducible и independently
   verifiable.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; добавлена local release evidence generation для checksums, detached Ed25519
+  signature из внешнего BuildKit signing-key secret, provenance subjects, SBOM components из `go list -m -json all`,
+  vulnerability policy decision из `govulncheck -json` и offline verification instructions.
+- 2026-09-09: переведено в `Testing`; добавлены tamper tests для binary/checksum mismatch, signature corruption,
+  incomplete SBOM, wrong provenance subject и policy-blocking vulnerability reports.
+- 2026-09-09: переведено в `Done`; Docker stage `supply-chain-artifacts` и Makefile targets `supply-chain` /
+  `supply-chain-ci` экспортируют independently verifiable release evidence из static release output без хранения
+  private signing key в repository.
+- 2026-09-10: усилена release evidence verification; подписанный manifest `SHA256SUMS` теперь покрывает raw
+  scanner/module inputs и generated evidence files, а SBOM verification сверяет каждый Go module с подписанным
+  `MODULES.jsonl`, включая versions и sums.
+
+## Подтверждение проверки
+
+- `go test ./internal/supplychain ./internal/releaseverify`
+- `make supply-chain-ci IMAGE=metricshell-issue037-supply-chain`
+- `make test IMAGE=metricshell-issue037-supply-chain`
+- `make wave6 IMAGE=metricshell-wave6`

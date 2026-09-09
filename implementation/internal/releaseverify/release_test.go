@@ -34,6 +34,43 @@ func TestMakefileExportsReleaseThroughDockerOnlyTarget(t *testing.T) {
 	)
 }
 
+func TestSupplyChainPipelineIsDockerOnlyAndVerifiable(t *testing.T) {
+	t.Parallel()
+
+	dockerfile := readText(t, filepath.Join("..", "..", "Dockerfile"))
+	requireAll(t, dockerfile,
+		"# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e",
+		"FROM source AS supply-chain",
+		"COPY --from=release /release /supply/release",
+		"cp go.mod /supply/release/go.mod",
+		"go list -m -json all > /supply/modules.jsonl",
+		"golang.org/x/vuln/cmd/govulncheck@v1.8.0 -json ./...",
+		"--mount=type=secret,id=release_signing_key",
+		"go run ./internal/testfixture/supplychain",
+		"FROM scratch AS supply-chain-artifacts",
+	)
+	makefile := readText(t, filepath.Join("..", "..", "Makefile"))
+	requireAll(t, makefile,
+		"supply-chain:",
+		"RELEASE_SIGNING_KEY_FILE",
+		"RELEASE_SIGNING_PUBLIC_KEY_FILE",
+		"docker build --target supply-chain-artifacts",
+		"supply-chain-ci:",
+		"ci: test integration fault benchmark supply-chain-ci",
+	)
+	source := readText(t, filepath.Join("..", "supplychain", "evidence.go"))
+	requireAll(t, source,
+		`"MODULES.jsonl"`,
+		`"GOVULNCHECK.json"`,
+		`"SBOM.json"`,
+		`"PROVENANCE.json"`,
+		`"VULNERABILITIES.json"`,
+		"readModules(filepath.Join(directory, \"MODULES.jsonl\"))",
+	)
+	requireNotContains(t, source, "seedMaterial")
+	requireNotContains(t, source, "NewKeyFromSeed([]byte")
+}
+
 func TestPinnedMultistageCopyExampleForbidsMutableArtifactTags(t *testing.T) {
 	t.Parallel()
 

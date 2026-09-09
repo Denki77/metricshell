@@ -1,3 +1,4 @@
+# syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 ARG GO_IMAGE=golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 ARG REPO_URI=github.com/Denki77/metricshell
 
@@ -59,6 +60,25 @@ RUN mkdir -p /benchmark && \
 
 FROM scratch AS benchmark-artifacts
 COPY --from=benchmark /benchmark /benchmark
+
+FROM source AS supply-chain
+ARG REVISION=unknown
+COPY --from=release /release /supply/release
+RUN version="$(cat /project/VERSION)" && \
+    cp go.mod /supply/release/go.mod && \
+    sha256sum go.mod >> /supply/release/SHA256SUMS && \
+    go list -m -json all > /supply/modules.jsonl
+RUN status=0; \
+    go run golang.org/x/vuln/cmd/govulncheck@v1.8.0 -json ./... > /supply/govulncheck.json || status="$?"; \
+    if test "${status}" -ne 0 -a "${status}" -ne 3; then exit "${status}"; fi
+RUN --mount=type=secret,id=release_signing_key,target=/run/secrets/release_signing_key,required=true \
+    --mount=type=secret,id=release_public_key,target=/run/secrets/release_public_key,required=true \
+    version="$(cat /project/VERSION)" && \
+    go run ./internal/testfixture/supplychain /supply/release "${version}" "${REVISION}" \
+      /run/secrets/release_signing_key /run/secrets/release_public_key /supply/modules.jsonl /supply/govulncheck.json
+
+FROM scratch AS supply-chain-artifacts
+COPY --from=supply-chain /supply/release /release
 
 FROM source AS build
 ARG REVISION=unknown

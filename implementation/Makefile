@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration fault benchmark ci wave1 wave2 wave3 wave4 wave5 wave6 build release
+.PHONY: all fmt test integration fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 build release
 
 all: ci
 
@@ -146,7 +146,25 @@ fault:
 benchmark:
 	docker build --target benchmark-artifacts --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist/benchmark" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
 
-ci: test integration fault benchmark
+supply-chain:
+	@test -n "$(RELEASE_SIGNING_KEY_FILE)"
+	@test -n "$(RELEASE_SIGNING_PUBLIC_KEY_FILE)"
+	docker build --target supply-chain-artifacts --build-arg REVISION="$(REVISION)" \
+		--secret id=release_signing_key,src="$(RELEASE_SIGNING_KEY_FILE)" \
+		--secret id=release_public_key,src="$(RELEASE_SIGNING_PUBLIC_KEY_FILE)" \
+		--output type=local,dest="$(CURDIR)/dist/supply-chain" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
+
+supply-chain-ci:
+	@temp="$$(mktemp -d)"; \
+		cleanup() { rm -rf "$$temp"; }; \
+		trap cleanup EXIT INT TERM; \
+		docker run --rm -v "$(CURDIR):/src" -v "$$temp:/keys" -w /src $(GO_IMAGE) \
+			go run ./internal/testfixture/signingkey /keys/private.hex /keys/public.hex; \
+		$(MAKE) supply-chain IMAGE="$(IMAGE)" REVISION="$(REVISION)" \
+			RELEASE_SIGNING_KEY_FILE="$$temp/private.hex" \
+			RELEASE_SIGNING_PUBLIC_KEY_FILE="$$temp/public.hex"
+
+ci: test integration fault benchmark supply-chain-ci
 
 wave1: ci
 
@@ -157,6 +175,8 @@ wave3: ci
 wave4: ci
 
 wave5: ci
+
+wave6: ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg VERSION="$(VERSION)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"

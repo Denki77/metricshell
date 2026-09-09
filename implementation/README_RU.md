@@ -72,8 +72,14 @@ Docker-contained exit verifier проверяет на реальном artifact
 make build PLATFORM=linux/amd64 IMAGE=metricshell
 ```
 
-Makefile только вызывает Docker targets; `make ci` запускает build/unit checks и real-container acceptance fixtures.
-Dockerfile не зависит от Make; host-команды Go и вспомогательные shell orchestration scripts не используются.
+Makefile только вызывает Docker targets; `make ci` запускает build/unit checks, real-container acceptance fixtures,
+fault injection, controlled benchmark artifact generation и supply-chain verification с ephemeral CI signing key вне
+repository. Release target `supply-chain` требует внешние signing-key и public-key files, переданные как BuildKit
+secrets. Dockerfile не зависит от Make; host-команды Go и вспомогательные shell orchestration scripts не используются.
+
+Supply-chain artifacts используют `SHA256SUMS` как signed manifest. Он покрывает release binaries, `go.mod`, raw
+`MODULES.jsonl` / `GOVULNCHECK.json` inputs и каждый generated evidence file. SBOM verification сверяет module
+components с подписанным module graph, включая module versions и sums.
 
 Запуск workload без shell interpretation:
 
