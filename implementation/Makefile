@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration fault ci wave1 wave2 wave3 wave4 wave5 wave6 build release
+.PHONY: all fmt test integration fault benchmark ci wave1 wave2 wave3 wave4 wave5 wave6 build release
 
 all: ci
 
@@ -143,7 +143,10 @@ fault:
 	@code=0; docker run --rm --memory=32m -e METRICSHELL_INGESTION_TRANSPORT=http -e FAULTSUITE_MODE=oom $(IMAGE)-fault:local -- /faultsuite-fixture >/dev/null 2>&1 || code=$$?; \
 		test "$$code" -eq 137
 
-ci: test integration fault
+benchmark:
+	docker build --target benchmark-artifacts --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist/benchmark" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
+
+ci: test integration fault benchmark
 
 wave1: ci
 

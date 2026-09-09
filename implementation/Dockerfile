@@ -47,6 +47,19 @@ RUN version="$(cat /project/VERSION)" && \
     (cd /release && sha256sum -c SHA256SUMS) && \
     printf 'version=%s\nrevision=%s\n' "${version}" "${REVISION}" > /release/METADATA
 
+FROM source AS benchmark
+ARG REVISION=unknown
+RUN mkdir -p /benchmark && \
+    version="$(cat /project/VERSION)" && \
+    CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
+      -o /benchmark/metricshell ./cmd/metricshell && \
+    go test -run '^TestBenchmarkSuiteContract$' -bench '^BenchmarkReleaseSuite$' -benchtime=30x -count=1 ./internal/benchrelease > /benchmark/results.txt && \
+    printf '{"schema_version":1,"version":"%s","revision":"%s","repetitions":30,"warmups":3,"transports":["file","unix","http"],"profiles":["idle","load"],"platform":"linux/amd64","cpu_set":"0","memory":"64MiB","correctness_separate_from_thresholds":true}\n' "${version}" "${REVISION}" > /benchmark/metadata.json
+
+FROM scratch AS benchmark-artifacts
+COPY --from=benchmark /benchmark /benchmark
+
 FROM source AS build
 ARG REVISION=unknown
 ARG TARGETOS
