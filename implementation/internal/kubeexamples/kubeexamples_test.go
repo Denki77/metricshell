@@ -53,6 +53,42 @@ func TestJobIntegrationManifestsEncodeFinalScrapeContract(t *testing.T) {
 	)
 }
 
+func TestLifecycleControlManifestsEncodeOuterBounds(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("..", "..", "examples", "kubernetes", "lifecycle-controls")
+	job := readExample(t, root, "job-lifecycle.yaml")
+	cron := readExample(t, root, "cronjob-forbid.yaml")
+	readme := readExample(t, root, "README.md")
+
+	requireAll(t, job,
+		"kind: Job",
+		"activeDeadlineSeconds: 95",
+		"ttlSecondsAfterFinished: 300",
+		"backoffLimit: 0",
+		"restartPolicy: Never",
+		"terminationGracePeriodSeconds: 32",
+		"METRICSHELL_SHUTDOWN_TOTAL_GRACE",
+		"value: 30s",
+		"METRICSHELL_WORKLOAD_SHUTDOWN_TIMEOUT",
+		"value: 28s",
+		"METRICSHELL_SHUTDOWN_RESERVE",
+		"value: 2s",
+	)
+	requireAll(t, cron,
+		"kind: CronJob",
+		"concurrencyPolicy: Forbid",
+		"activeDeadlineSeconds: 95",
+		"ttlSecondsAfterFinished: 300",
+		"restartPolicy: Never",
+		"terminationGracePeriodSeconds: 32",
+	)
+	requireAll(t, readme,
+		"measurable two-second margin",
+		"`CronJob.concurrencyPolicy: Forbid`",
+	)
+}
+
 func readExample(t *testing.T, root, name string) string {
 	t.Helper()
 	content, err := os.ReadFile(filepath.Join(root, name))

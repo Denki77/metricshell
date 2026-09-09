@@ -1,6 +1,6 @@
 # ISSUE-030. Kubernetes lifecycle controls
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -21,3 +21,15 @@ activeDeadlineSeconds, ttlSecondsAfterFinished, termination grace, and CronJob F
 - **Acceptance criteria and required tests:** Deadline before/after workload; 32s external versus 30s internal baseline;
   TTL cleanup; CronJob Forbid; restart Never; forced termination.
 - **Completion:** Complete when manifests encode every lifecycle bound and conformance tests measure the safety margin.
+
+## Delivery log
+
+- 2026-09-09: moved to `In Progress`; added Kubernetes lifecycle control manifests for finite Jobs and CronJob overlap
+  prevention.
+- 2026-09-09: moved to `Testing`; static conformance checks assert 32s external grace over 30s internal grace,
+  activeDeadlineSeconds, TTL, restartPolicy Never, backoffLimit 0 and CronJob Forbid.
+- 2026-09-09: moved to `Done`; lifecycle examples document the external-versus-internal bound relationship.
+
+## Verification evidence
+
+- `go test ./internal/kubeexamples`

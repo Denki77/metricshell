@@ -1,0 +1,57 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metricshell-lifecycle-controls
+  labels:
+    app.kubernetes.io/name: metricshell
+    metricshell.io/example: lifecycle-controls
+spec:
+  activeDeadlineSeconds: 95
+  ttlSecondsAfterFinished: 300
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: metricshell
+        metricshell.io/scrape: "true"
+        metricshell.io/replica: lifecycle-controls
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 32
+      automountServiceAccountToken: false
+      containers:
+        - name: application
+          image: ghcr.io/denki77/metricshell-example@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          args: ["--", "/workload"]
+          env:
+            - name: METRICSHELL_SHUTDOWN_TOTAL_GRACE
+              value: 30s
+            - name: METRICSHELL_WORKLOAD_SHUTDOWN_TIMEOUT
+              value: 28s
+            - name: METRICSHELL_SHUTDOWN_RESERVE
+              value: 2s
+            - name: METRICSHELL_FINAL_WAIT_MODE
+              value: scrapes
+            - name: METRICSHELL_FINAL_WAIT_TIMEOUT
+              value: 60s
+            - name: METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES
+              value: "1"
+          ports:
+            - name: metrics
+              containerPort: 9090
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+          volumeMounts:
+            - name: runtime
+              mountPath: /run/metricshell
+      volumes:
+        - name: runtime
+          emptyDir:
+            medium: Memory
+
