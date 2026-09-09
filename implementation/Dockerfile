@@ -101,5 +101,6 @@ LABEL org.opencontainers.image.title="MetricShell" \
       org.opencontainers.image.description="Bounded local metric supervisor for finite container workloads" \
       org.opencontainers.image.version="${VERSION}" \
       org.opencontainers.image.revision="${REVISION}"
+USER 65532:65532
 COPY --from=build /out/metricshell /metricshell
 ENTRYPOINT ["/metricshell"]
