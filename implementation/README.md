@@ -5,19 +5,24 @@ and dependency graph.
 
 ## Current scope
 
-Wave 5 is complete. ISSUE-023 through ISSUE-028 provide bounded exposition, response preparation, the finalization
-ingestion barrier, the immediate/duration/scrape-count final-wait state machine, complete-response drain and final-wait
-observability. Wave 4
-ISSUE-016 through ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation,
-acknowledged MSP/1 Unix ingestion and its serialized client, bounded loopback HTTP push, the explicit mmap boundary,
-and an exhaustive cross-adapter conformance corpus. ISSUE-011 through ISSUE-015 provide the immutable snapshot model,
-strict whole-candidate parser/validator, atomic last-valid holder, exact generation-zero state and a separate bounded
-self-metrics registry.
+Core through Wave 6 is complete and ready for operational use in the complete-snapshot profile. Publishers replace the
+whole metric set at once; partial metric updates are intentionally out of scope for this release.
+
+ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate parser/validator, atomic
+last-valid holder, exact generation-zero state and a separate bounded self-metrics registry. ISSUE-016 through
+ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation, acknowledged MSP/1 Unix ingestion and its
+serialized client, bounded loopback HTTP push, the explicit mmap boundary, and an exhaustive cross-adapter conformance
+corpus. ISSUE-023 through ISSUE-028 provide bounded exposition, response preparation, the finalization ingestion
+barrier, the immediate/duration/scrape-count final-wait state machine, complete-response drain and final-wait
+observability. ISSUE-029 through ISSUE-031 add Kubernetes Job/CronJob examples, lifecycle controls and multi-replica
+Prometheus verification. ISSUE-032 through ISSUE-037 add static multi-architecture release artifacts, container
+hardening defaults, configurable capacity/time limits, fault/soak/race gates, controlled release benchmarks and signed
+supply-chain evidence.
+
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
-fixed-cardinality state and do not affect application identity.
-Production runtime creates one shared `ingestion.Core`, routes the selected `file`, `unix` or `http` ingestion
-transport through it, and finalizes via `Core.CloseAndFreeze(ctx)` before terminal exposition observes the frozen
-snapshot.
+fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
+routes the selected `file`, `unix` or `http` ingestion transport through it, and finalizes via
+`Core.CloseAndFreeze(ctx)` before terminal exposition observes the frozen snapshot.
 
 ## Requirements
 
@@ -62,6 +67,38 @@ Run the Wave 5 exposition and final-wait exit gate:
 make wave5
 ```
 
+Run the Wave 6 Kubernetes, hardening, release, benchmark and supply-chain exit gate:
+
+```sh
+make wave6
+```
+
+Run the fault-injection gate:
+
+```sh
+make fault
+```
+
+Export controlled benchmark artifacts:
+
+```sh
+make benchmark
+```
+
+Build static multi-architecture release artifacts:
+
+```sh
+make release
+```
+
+Export signed supply-chain evidence with release signing keys supplied as BuildKit secrets:
+
+```sh
+make supply-chain \
+  RELEASE_SIGNING_KEY_FILE=/path/to/private.hex \
+  RELEASE_SIGNING_PUBLIC_KEY_FILE=/path/to/public.hex
+```
+
 The Docker-contained exit verifier checks the real artifact's rejected bootstrap configuration (`64` and one
 `configuration.rejected` record), all workload exits `0-255`, and INT/TERM mappings. Product exit codes are observed
 inside the container so Docker CLI failures cannot be confused with MetricShell results.
@@ -82,6 +119,10 @@ Supply-chain artifacts use `SHA256SUMS` as the signed manifest. It covers the re
 `MODULES.jsonl` / `GOVULNCHECK.json` inputs, and every generated evidence file. SBOM verification compares module
 components against the signed module graph, including module versions and sums.
 
+Kubernetes examples live under `examples/kubernetes/` and cover direct Job discovery, lifecycle controls, CronJob
+concurrency policy, PodMonitor integration and multi-replica Prometheus scrape validation. Docker hardening examples
+live under `examples/docker/` and document non-root, read-only, no-new-privileges and tmpfs runtime defaults.
+
 Run a workload without shell interpretation:
 
 ```sh
@@ -99,13 +140,14 @@ is embedded because it is not required by the architecture and would weaken repr
 toolchain, architecture, and identity, build flags remove local paths, VCS probing, and random build IDs.
 
 ```text
-metricshell version=0.1.0-dev revision=0123456
+metricshell version=0.1.2 revision=0123456
 ```
 
 ## Package layout
 
 - `client`: public official MSP/1 connection writer with complete-publication serialization and typed errors.
 - `cmd/metricshell`: production executable entrypoint.
+- `internal/benchrelease`: controlled release benchmark contract and artifact checks.
 - `internal/buildinfo`: linker-provided build identity.
 - `internal/cli`: bootstrap command surface.
 - `internal/config`: validated workload, shutdown and exposition bootstrap configuration.
@@ -114,27 +156,32 @@ metricshell version=0.1.0-dev revision=0123456
 - `internal/exposition`: immutable application/self-metric encoding, response bounds, compression, write outcomes and
   final-response drain.
 - `internal/finalwait`: validated natural-completion policies, frozen-generation threshold and terminal decisions.
+- `internal/hardening`: container-hardening example and runtime-default verification.
 - `internal/ingestion`: transport-independent admission, cancellation, finalization barrier, result taxonomy and
   complete-candidate handoff.
 - `internal/httpingest`: loopback-only POST adapter with independent wire/decoded limits and exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation and Linux directory-inotify recovery.
+- `internal/kubeexamples`: Kubernetes Job, CronJob, lifecycle and Prometheus example verification.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
+- `internal/promverify`: multi-replica Prometheus scrape and label-cardinality verification helpers.
+- `internal/releaseverify`: release, Dockerfile, pinned-image and supply-chain contract checks.
 - `internal/shutdown`: validated shutdown budgets, deadlines, phase contexts, and completion reasons.
 - `internal/selfmetric`: bounded self-metric registry, immutable scrape views and Prometheus/OpenMetrics text encoding.
 - `internal/snapshot`: immutable application snapshot model, parser, canonicalization, atomic holder, limits and rejection registry.
+- `internal/supplychain`: signed release evidence, SBOM, provenance and vulnerability verification.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
-- `internal/testfixture`: binaries used only by real-container acceptance tests.
+- `internal/testfixture`: binaries used only by real-container acceptance, fault, release and supply-chain tests.
 - `internal/dependencyboundary`: production/research, public-API, primitive, module and license boundary checks.
 - `../VERSION`: repository-wide project version.
 
 ## Normative context
 
-Implementation follows ISSUE-011 through ISSUE-022, EPIC-001, ADR-001–ADR-011, ADR-014–ADR-015, the Application Snapshot Protocol,
-Configuration, Runtime State
-Machine, Self-Metrics and Structured Logging specifications, ADR-013 static multi-architecture distribution, and the
-cross-cutting definition of done through ISSUE-028.
+Implementation follows ISSUE-011 through ISSUE-037, EPIC-001, ADR-001–ADR-015, the Application Snapshot Protocol,
+Configuration, Runtime State Machine, Self-Metrics and Structured Logging specifications, ADR-012 Kubernetes viability,
+ADR-013 static multi-architecture distribution, ADR-014 security and limits, ADR-015 final benchmark policy, and the
+cross-cutting definition of done through Wave 6.
 
 ## Engineering contract for subsequent issues
 
