@@ -1,6 +1,6 @@
 # ISSUE-031. Integration test нескольких реплик Prometheus
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -21,3 +21,15 @@
 - **Критерии приёмки и обязательные тесты:** Две и более replicas; одна missing publication; duplicate label; target
   disappearance/stale marker; delayed scrape; aggregate count false positive.
 - **Условие завершения:** Готово, когда test падает при отсутствии expected final sample у любой named replica.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; добавлен bounded Prometheus verification helper, проверяющий named replicas
+  независимо.
+- 2026-09-09: переведено в `Testing`; unit tests покрывают per-replica success, aggregate-only false positives,
+  duplicate replica samples и stale-only/missing samples.
+- 2026-09-09: переведено в `Done`; Kubernetes example docs описывают replica-specific final sample verification.
+
+## Подтверждение проверки
+
+- `go test ./internal/promverify`

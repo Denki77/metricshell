@@ -1,0 +1,84 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: metricshell-final-sample
+  labels:
+    app.kubernetes.io/name: metricshell
+    metricshell.io/example: job-integration
+spec:
+  activeDeadlineSeconds: 95
+  ttlSecondsAfterFinished: 300
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: metricshell
+        metricshell.io/scrape: "true"
+        metricshell.io/replica: final-sample
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/path: /metrics
+        prometheus.io/port: "9090"
+    spec:
+      restartPolicy: Never
+      terminationGracePeriodSeconds: 32
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: application
+          image: ghcr.io/denki77/metricshell-example@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          imagePullPolicy: IfNotPresent
+          args: ["--", "/workload"]
+          env:
+            - name: METRICSHELL_EXPOSITION_LISTEN
+              value: 0.0.0.0:9090
+            - name: METRICSHELL_INGESTION_TRANSPORT
+              value: file
+            - name: METRICSHELL_SNAPSHOT_FILE_PATH
+              value: /run/metricshell/snapshot.json
+            - name: METRICSHELL_FINAL_WAIT_MODE
+              value: scrapes
+            - name: METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES
+              value: "1"
+            - name: METRICSHELL_FINAL_WAIT_TIMEOUT
+              value: 60s
+            - name: METRICSHELL_SHUTDOWN_TOTAL_GRACE
+              value: 30s
+          ports:
+            - name: metrics
+              containerPort: 9090
+          readinessProbe:
+            httpGet:
+              path: /readyz
+              port: metrics
+            periodSeconds: 1
+            failureThreshold: 1
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: metrics
+            periodSeconds: 5
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65532
+            runAsGroup: 65532
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: runtime
+              mountPath: /run/metricshell
+      volumes:
+        - name: runtime
+          emptyDir:
+            medium: Memory
+

@@ -64,6 +64,14 @@ func (logger *Logger) WriteEndpointBindFailed(component, state string) error {
 	})
 }
 
+func (logger *Logger) WriteResourceUnavailable(resource, state string) error {
+	return logger.write(record{
+		Level: "error", Event: "runtime.failed", Component: "runtime", State: state,
+		Message: "required runtime resource is unavailable", Reason: selfmetric.RuntimeFailureResource,
+		ErrorCode: "RESOURCE_UNAVAILABLE", Kind: resource,
+	})
+}
+
 func (logger *Logger) WriteExpositionFailed(state, outcome string, status int) error {
 	return logger.write(record{
 		Level: "warn", Event: "exposition.failed", Component: "exposition", State: state,

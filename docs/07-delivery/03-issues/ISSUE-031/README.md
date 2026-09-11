@@ -1,6 +1,6 @@
 # ISSUE-031. Multi-replica Prometheus integration test
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -21,3 +21,15 @@ Query each configured replica independently; aggregate request counts are insuff
 - **Acceptance criteria and required tests:** Two or more replicas; one missing publication; duplicate label; target
   disappearance/stale marker; delayed scrape; aggregate count false positive.
 - **Completion:** Complete when the test fails if any named replica lacks its own expected final sample.
+
+## Delivery log
+
+- 2026-09-09: moved to `In Progress`; added a bounded Prometheus verification helper that validates named replicas
+  independently.
+- 2026-09-09: moved to `Testing`; unit tests cover per-replica success, aggregate-only false positives, duplicate
+  replica samples and stale-only/missing samples.
+- 2026-09-09: moved to `Done`; Kubernetes example docs now describe replica-specific final sample verification.
+
+## Verification evidence
+
+- `go test ./internal/promverify`

@@ -1,0 +1,25 @@
+services:
+  application:
+    image: metricshell:local
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    pids_limit: 64
+    mem_limit: 64m
+    ulimits:
+      nofile:
+        soft: 64
+        hard: 64
+    environment:
+      METRICSHELL_EXPOSITION_LISTEN: 0.0.0.0:9090
+      METRICSHELL_INGESTION_TRANSPORT: unix
+      METRICSHELL_UNIX_SOCKET_PATH: /run/metricshell/ingest.sock
+    ports:
+      - "127.0.0.1:19100:9090"
+    tmpfs:
+      - /run/metricshell:mode=0700,uid=65532,gid=65532
+    command: ["--", "/workload"]
+

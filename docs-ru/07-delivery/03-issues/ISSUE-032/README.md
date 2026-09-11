@@ -1,6 +1,6 @@
 # ISSUE-032. Статические multi-arch release artifacts
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -25,3 +25,17 @@ amd64/arm64, checksum, version, OCI metadata, pinned multi-stage copy.
   architecture; digest-pinned copy; container `--version`; multi-arch manifest.
 - **Условие завершения:** Готово, когда independent clean builders воспроизводят verifiable artifacts обеих
   architectures.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; добавлен Docker `release` target, выпускающий static linux/amd64 и
+  linux/arm64 binaries с release metadata и checksums.
+- 2026-09-09: переведено в `Testing`; Docker test stage проверяет release checksums и static multi-arch build coverage,
+  unit tests фиксируют Dockerfile/Makefile release contract.
+- 2026-09-09: переведено в `Done`; pinned multi-stage copy documentation запрещает mutable artifact tags как release
+  evidence.
+
+## Подтверждение проверки
+
+- `go test ./internal/releaseverify`
+- `make test IMAGE=metricshell-issue032-release`

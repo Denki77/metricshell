@@ -5,6 +5,7 @@ const (
 	ExitConfigurationInvalid  = 64
 	ExitInternalFailure       = 70
 	ExitConfigurationRejected = 70
+	ExitResourceUnavailable   = 71
 	ExitEndpointBindFailed    = 72
 	ExitWorkloadStartFailed   = 73
 )

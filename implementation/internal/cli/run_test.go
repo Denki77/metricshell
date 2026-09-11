@@ -327,3 +327,14 @@ func TestRunRejectsOvercommittedShutdownBeforeWorkloadStart(t *testing.T) {
 		t.Fatalf("configuration rejection missing: %s", stderr.String())
 	}
 }
+
+func TestNoFileAvailabilityBoundary(t *testing.T) {
+	t.Parallel()
+
+	if nofileAvailable(63, 64) {
+		t.Fatal("nofileAvailable accepted required-1")
+	}
+	if !nofileAvailable(64, 64) {
+		t.Fatal("nofileAvailable rejected exact required limit")
+	}
+}

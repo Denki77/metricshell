@@ -109,6 +109,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				"final_wait_timeout":     configuration.FinalWait.Timeout.String(),
 				"final_wait_required":    configuration.FinalWait.RequiredScrapes,
 				"final_wait_grace":       configuration.FinalWait.CompletionGrace.String(),
+				"log_level":              configuration.Log.Level,
+				"log_selector_values":    configuration.Log.SelectorValues,
 				"ingestion_transport":    configuration.IngestionTransport,
 				"unix_socket_path":       configuration.UnixSocketPath,
 				"http_ingestion_listen":  configuration.HTTPIngestionListen,
@@ -117,6 +119,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				"decoded_input_bytes":    configuration.Limits.DecodedBytes,
 				"concurrent_ingestions":  configuration.ConcurrentIngestion,
 				"pending_ingestions":     configuration.PendingIngestion,
+				"required_nofile":        config.RequiredNoFile(configuration),
 			})
 			if marshalErr != nil {
 				return []byte("{}\n")
@@ -129,6 +132,13 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			})
 		if handlerErr != nil {
 			return rejectConfiguration(machine, metrics, logger, handlerErr)
+		}
+		if !hasNoFile(config.RequiredNoFile(configuration)) {
+			_ = metrics.AddCounter(selfmetric.RuntimeFailuresTotal, map[string]string{"reason": selfmetric.RuntimeFailureResource}, 1)
+			_ = logger.WriteResourceUnavailable("nofile", string(machine.State()))
+			_ = machine.TransitionEvent(lifecycle.RuntimeFailed)
+			_ = machine.TransitionEvent(lifecycle.CleanupCompleted)
+			return exitCodes.ExitResourceUnavailable
 		}
 		server, bindErr := exposition.Bind(configuration.Exposition, handler)
 		if bindErr != nil {
@@ -514,4 +524,16 @@ func finalizationContext(configuration config.Config, plan *shutdown.Plan, at ti
 		}
 	}
 	return context.WithTimeout(context.Background(), configuration.FinalWait.Timeout)
+}
+
+func hasNoFile(required int) bool {
+	var limit syscall.Rlimit
+	if err := syscall.Getrlimit(syscall.RLIMIT_NOFILE, &limit); err != nil {
+		return false
+	}
+	return nofileAvailable(limit.Cur, required)
+}
+
+func nofileAvailable(soft uint64, required int) bool {
+	return soft >= uint64(required)
 }

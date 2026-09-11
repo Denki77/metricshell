@@ -1,6 +1,6 @@
 # ISSUE-034. Configurable capacity and timeout limits
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -63,3 +63,17 @@ and platform/container E2E.
 
 Complete when exhaustive configuration-table tests cover every public property, startup performs no workload side effect
 on failure, all boundaries have observable deterministic errors, and container E2E validates limits and exit codes.
+
+## Delivery log
+
+- 2026-09-09: moved to `In Progress`; completed log-level and selector-value configuration, inactive transport option
+  rejection, effective debug configuration, permanent resource-unavailable exit code mapping, and required_nofile
+  computation.
+- 2026-09-09: moved to `Testing`; tests cover CLI-over-environment precedence, zero-valued bounds, inactive transport
+  contradictions, logging validation, required_nofile calculation, and the nofile boundary predicate.
+- 2026-09-09: moved to `Done`; docker-only test target passed with the expanded configuration surface.
+
+## Verification evidence
+
+- `go test ./internal/config ./internal/cli`
+- `make test IMAGE=metricshell-issue034-config-limits`

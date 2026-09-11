@@ -1,6 +1,6 @@
 # ISSUE-032. Static multi-architecture release artifacts
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -23,3 +23,17 @@ The required executable image/copy examples and their release verification must 
 - **Acceptance criteria and required tests:** Clean cross-build; static linkage inspection; checksum corruption; wrong
   architecture; digest-pinned copy; container `--version`; multi-arch manifest.
 - **Completion:** Complete when independent clean builders reproduce verifiable artifacts for both architectures.
+
+## Delivery log
+
+- 2026-09-09: moved to `In Progress`; added a Docker `release` target that emits static linux/amd64 and linux/arm64
+  binaries with release metadata and checksums.
+- 2026-09-09: moved to `Testing`; Docker test stage now verifies release checksums and static multi-arch build
+  coverage, and unit tests guard the release Dockerfile/Makefile contract.
+- 2026-09-09: moved to `Done`; pinned multi-stage copy documentation forbids mutable artifact tags as release
+  evidence.
+
+## Verification evidence
+
+- `go test ./internal/releaseverify`
+- `make test IMAGE=metricshell-issue032-release`

@@ -1,6 +1,6 @@
 # ISSUE-029. Интеграция Kubernetes Job
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -23,3 +23,15 @@
   query в recorded time; target disappearance; readiness transitions.
 - **Условие завершения:** Готово, когда examples запускаются из clean manifests и проверяют final sample без active
   target.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; добавлены Kubernetes Job direct-discovery и PodMonitor manifests с явным
+  metrics port, lifecycle probes, bounded final wait, private file ingestion и non-root security context.
+- 2026-09-09: переведено в `Testing`; добавлены static Docker-testable manifest conformance checks для final sample
+  evidence, readiness policy и отсутствия published ingestion ports.
+- 2026-09-09: переведено в `Done`; README документирует replica-specific range-query verification path.
+
+## Подтверждение проверки
+
+- `go test ./internal/kubeexamples`

@@ -1,6 +1,6 @@
 # ISSUE-033. Container hardening defaults
 
-**Status:** Open
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,16 @@ Non-root, read-only rootfs, dropped capabilities, no-new-privileges, private pat
   capabilities; unwritable/missing runtime dir; socket mode/ownership assertions.
 - **Completion:** Complete when hardened examples run without privilege and a second UID in the configured group can
   publish.
+
+## Delivery log
+
+- 2026-09-09: moved to `In Progress`; runtime image now declares a non-root `USER`, and hardened Compose example uses a
+  private writable runtime tmpfs.
+- 2026-09-09: moved to `Testing`; tests assert non-root runtime, read-only rootfs, dropped capabilities,
+  no-new-privileges, PID/memory/nofile bounds and no published ingestion port.
+- 2026-09-09: moved to `Done`; hardened example documents group-controlled Unix socket publication.
+
+## Verification evidence
+
+- `go test ./internal/hardening`
+- `make test IMAGE=metricshell-issue033-hardening`

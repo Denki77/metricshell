@@ -1,6 +1,6 @@
 # ISSUE-030. Lifecycle controls Kubernetes
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -22,3 +22,15 @@
   cleanup; CronJob Forbid; restart Never; forced termination.
 - **Условие завершения:** Готово, когда manifests кодируют каждый lifecycle bound, а conformance tests измеряют safety
   margin.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; добавлены Kubernetes lifecycle control manifests для finite Jobs и
+  предотвращения CronJob overlap.
+- 2026-09-09: переведено в `Testing`; static conformance checks проверяют 32s external grace поверх 30s internal grace,
+  activeDeadlineSeconds, TTL, restartPolicy Never, backoffLimit 0 и CronJob Forbid.
+- 2026-09-09: переведено в `Done`; lifecycle examples документируют соотношение external и internal bounds.
+
+## Подтверждение проверки
+
+- `go test ./internal/kubeexamples`

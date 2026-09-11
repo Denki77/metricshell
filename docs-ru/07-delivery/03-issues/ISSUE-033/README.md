@@ -1,6 +1,6 @@
 # ISSUE-033. Defaults container hardening
 
-**Статус:** Открыто
+**Статус:** Готово
 **Готовность:** Готово к разработке
 
 **Эпик:** [EPIC-001 Core](../../02-epics/EPIC-001-core.md)  
@@ -23,3 +23,16 @@
   capabilities; unwritable/missing runtime dir; socket mode/ownership assertions.
 - **Условие завершения:** Готово, когда hardened examples работают без privilege, а второй UID в configured group может
   публиковать.
+
+## Журнал поставки
+
+- 2026-09-09: переведено в `In Progress`; runtime image объявляет non-root `USER`, hardened Compose example использует
+  private writable runtime tmpfs.
+- 2026-09-09: переведено в `Testing`; tests проверяют non-root runtime, read-only rootfs, dropped capabilities,
+  no-new-privileges, PID/memory/nofile bounds и отсутствие published ingestion port.
+- 2026-09-09: переведено в `Done`; hardened example документирует group-controlled Unix socket publication.
+
+## Подтверждение проверки
+
+- `go test ./internal/hardening`
+- `make test IMAGE=metricshell-issue033-hardening`
