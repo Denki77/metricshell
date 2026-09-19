@@ -14,6 +14,7 @@ This part is about documentation of the project requirements.
 * [Non-Functional Requirements](non-functional-requirements.md)
 * [Constraints](constraints.md)
 * [Acceptance Criteria](acceptance-criteria.md)
+* [Extension for managed aggregations — newest FR and NFR](FR-NFR-managed-aggregation-requirements-extension.md)
 
 ---
 

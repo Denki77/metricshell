@@ -17,6 +17,7 @@
 - [Ограничения](constraints.md)
 - [Критерии приёмки](acceptance-criteria.md)
 - [Оценка существующих решений](existing-solutions-evaluation.md)
+- [Расширение функциональности — новые функциональные и нефункциональные требования](FR-NFR-managed-aggregation-requirements-extension.md)
 
 ---
 
