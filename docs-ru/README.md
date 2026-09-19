@@ -15,3 +15,4 @@
 - [Архитектурные решения](06-architecture/adr/README.md)
 - [Завершение архитектурных изысканий до уровня CORE](06-architecture/CORE_COMPLETION.md)
 - [Delivery plans, epics и issues](07-delivery/README.md)
+- [Расширение скоупа MetricShell до агрегации метрик и архитектурное исследование](05-architecture-investigation/managed-aggregation-architecture-investigation.md)
