@@ -1,0 +1,7 @@
+candidate	publishers	min_accepted	max_accepted
+serialized_overload	32	0	33
+serialized	1	1000	1000
+global_mutex	1	1000	1000
+sharded	1	1000	1000
+atomic_family	1	1000	1000
+copy_on_write	1	1000	1000

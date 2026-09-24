@@ -201,7 +201,7 @@ Concurrency model, linearization contract, idempotency policy, backpressure poli
 
 ### Статус
 
-Planned.
+In progress.
 
 ---
 

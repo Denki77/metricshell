@@ -1,0 +1,4 @@
+key	value
+environment_id	darwin-linux-aarch64
+host_os	darwin
+docker_platform	linux-aarch64

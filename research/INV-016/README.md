@@ -73,6 +73,13 @@ INV-016 does not change Core; signed-histogram support is separate future scope.
 - Publisher ownership/races for deletion: INV-017; staleness, freeze and epoch cleanup: INV-020.
 - Snapshot materialization strategy, resource limits and cadence: INV-019.
 
+## Follow-up Status
+
+[INV-017](../INV-017/README.md) is now in progress. Its matching-fingerprint macOS/LinuxKit reference run covers all
+five concurrency candidates and E-017.1–E-017.9, including registry-wide snapshot linearizability and the explicit
+overload fairness contract; Ubuntu confirmation and ADR review remain pending. This does not change the completed
+INV-016 semantic decision.
+
 ## Running the Prototype
 
 ```bash

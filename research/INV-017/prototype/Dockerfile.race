@@ -1,0 +1,5 @@
+FROM golang:1.25
+WORKDIR /src
+COPY ["go.mod", "./"]
+COPY ["cmd", "./cmd/"]
+ENTRYPOINT ["go", "run", "-race", "./cmd/inv017"]
