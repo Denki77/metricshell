@@ -80,6 +80,12 @@ concurrency candidates and E-017.1–E-017.9, including registry-wide snapshot l
 fairness contract. Its decision is recorded in [ADR-017](../../docs/06-architecture/adr/ADR-017.md). This does not change
 the completed INV-016 semantic decision.
 
+## Follow-up Research Status
+
+INV-018 now contains the in-progress executable legacy-client and transport viability evidence in
+[`../INV-018/`](../INV-018). It does not change the completed INV-016 semantic conclusions; Ubuntu confirmation and the
+INV-018 decision record remain pending.
+
 ## Running the Prototype
 
 ```bash

@@ -1,0 +1,15 @@
+key	value
+run_date_utc	2026-09-24T19:55:06Z
+repository_head_sha	24e5fe6a87702adb1a5aa01acf21884e22127359
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	8
+benchmark_code_fingerprint_sha256	a5a256f20b747d561c24f4d3b6132c3bb486c21d23ccba6f464277d86033fb7d
+docker_server_version	29.8.0
+docker_info	linux/aarch64 ncpu=6 memory=8320028672
+container_kernel	Linux 34ded3dfd082 7.0.12-linuxkit #1 SMP PREEMPT Thu Aug 27 14:02:21 UTC 2026 aarch64 Linux
+server_image_id	sha256:fe946b371a337810c681fe6b608f655e16ef5fc52ef708454b74a0bf0b7b4ccb
+php54_base_image	devilbox/php-fpm-5.4@sha256:0060e0fc7f3f89d88b54fcac5a9767f4df02880c23415d3dba8ced497c296b12
+php54_image_id	sha256:05440cda403be37644cad1c5e201884d4e67d3a7fae13e2b561986f98afd3169
+php_runtime	PHP 5.4.45 (cli) (built: Feb 12 2023 20:17:08) 
+short_lived_repetitions_per_matrix_cell	100
+persistent_operations_per_client	200

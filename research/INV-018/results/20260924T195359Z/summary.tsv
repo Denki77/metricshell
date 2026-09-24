@@ -1,0 +1,8 @@
+experiment	case	result	detail
+E-018.1	php54_basic	pass	inc/set/observe plus accepted/rejected/transport/protocol categories
+E-018.2	php54_multiprocess	pass	4 workers x 25; no shared PHP registry
+E-018.3	shell_cli	pass	short-lived helper; exit 3 transport, exit 4 rejection
+E-018.4	startup_race	pass	endpoint-before-client and bounded retry
+E-018.5	reconnect_restart	pass	reconnect stateless; restart is empty epoch
+E-018.6	transport_comparison	pass	Unix and HTTP functional parity; 1/8/32-client observations
+E-018.6	persistent_transport_generator	pass	connection-per-operation Unix/HTTP plus HTTP reuse at 1/8/32/128 clients
