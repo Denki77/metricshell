@@ -1,0 +1,6 @@
+candidate	samples	valid
+serialized	165	true
+global_mutex	513	true
+sharded	3618	true
+atomic_family	7217	true
+copy_on_write	39720	true

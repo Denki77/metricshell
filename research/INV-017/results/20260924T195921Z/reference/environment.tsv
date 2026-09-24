@@ -1,0 +1,13 @@
+key	value
+run_date_utc	2026-09-24T19:59:40Z
+repository_head_sha	ffbb1a07556820b959cb8ea69a4fb9cdba4a6789
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	10
+benchmark_code_fingerprint_sha256	22bc1820e394d9e7331be2857ca2298376b0d410ce52728833f1ca2f04792697
+docker_server_version	27.4.0
+docker_info	linux/x86_64 ncpu=6 memory=8061063168
+container_kernel	Linux fbf7c81040e7 6.10.14-linuxkit #1 SMP PREEMPT_DYNAMIC Fri Nov 29 17:24:06 UTC 2024 x86_64 Linux
+prototype_image_id	sha256:ac6789ee387797511361dce8a37611edad2cb86243b49b162a1179c11ba813d7
+ops_per_publisher	1000
+repetitions	3
+run_role	reference
