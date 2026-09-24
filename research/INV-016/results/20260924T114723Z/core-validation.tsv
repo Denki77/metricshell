@@ -1,0 +1,8 @@
+file	expected	actual	series	canonical_bytes	result
+/results/snapshot.json	pass	pass	5	646	pass
+/results/empty-snapshot.json	pass	pass	0	35	pass
+/results/histogram-negative-sum.json	reject:histogram_invalid	reject:histogram_invalid	-	-	pass
+/results/histogram-cross-zero.json	pass	pass	1	261	pass
+/results/histogram-negative-buckets.json	reject:histogram_invalid	reject:histogram_invalid	-	-	pass
+/results/histogram-balanced-signed.json	reject:histogram_invalid	reject:histogram_invalid	-	-	pass
+/results/histogram-negative-infinity.json	reject:histogram_invalid	reject:histogram_invalid	-	-	pass

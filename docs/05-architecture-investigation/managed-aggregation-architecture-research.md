@@ -107,7 +107,10 @@ Assertions: accepted SET replaces the value; rejected input does not.
 
 #### E-016.3 — Histogram semantics
 
-Test observations on bucket boundaries and invalid inputs.
+Compare a non-negative-only candidate with signed-observation candidates. Test negative, zero, positive, NaN, +Inf and
+-Inf observations; negative and mixed-sign bucket boundaries; sums becoming negative and crossing zero; and repeated
+negative/positive observations. Materialize representative snapshots and record separately whether the prototype
+candidate accepts them and whether the existing Core validator accepts them.
 
 Assertions: one accepted observation updates count/sum/buckets exactly once; +Inf equals total count; no partial state is visible; changed bucket schema is rejected.
 
@@ -139,13 +142,17 @@ Assertions: snapshot is self-contained, contains all active managed series, pass
 
 Semantic clarity, Prometheus compatibility, legacy-client simplicity, deterministic validation, minimal client state, protocol clarity and ability to generate complete Core snapshots.
 
+Prototype assertion success demonstrates internal consistency and preservation of the tested invariants for a candidate.
+It does not by itself select that candidate as the product or architecture decision. Ordering, retry/idempotency,
+external protocol, resource limits and lifecycle-dependent semantics remain deferred to INV-017 through INV-020.
+
 ### Decision Output
 
 Managed-registry semantic ADR/specification, accepted descriptor/operation model, unsupported-operation list and semantic reference tests.
 
 ### Status
 
-Planned.
+In progress.
 
 ---
 

@@ -6,3 +6,8 @@
 !implementation/cmd/**
 !implementation/internal/
 !implementation/internal/**
+!research/
+!research/INV-016/
+!research/INV-016/corecheck/
+!research/INV-016/corecheck/main.go
+!research/INV-016/corecheck/docker.go.mod

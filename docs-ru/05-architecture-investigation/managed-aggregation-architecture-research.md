@@ -99,7 +99,14 @@ Assertions:
 
 #### E-016.3 — Histogram
 
-Assertions: observation меняет count/sum/applicable buckets ровно один раз; +Inf=count; partial state отсутствует; bucket schema после observations не меняется.
+Сравнить candidate, разрешающий только неотрицательные значения, с candidates, допускающими signed observations.
+Проверить отрицательные, нулевые, положительные, NaN, +Inf и -Inf observations; отрицательные и mixed-sign bucket
+boundaries; переход sum в отрицательное значение и обратно через ноль; повторные отрицательные/положительные
+observations. Сформировать репрезентативные snapshots и раздельно зафиксировать принятие prototype candidate и
+существующим Core validator.
+
+Assertions: принятая observation меняет count/sum/applicable buckets ровно один раз; +Inf=count; partial state
+отсутствует; bucket schema после observations не меняется.
 
 #### E-016.4 — Descriptor conflicts
 
@@ -121,13 +128,17 @@ Assertions: observation меняет count/sum/applicable buckets ровно о�
 
 Semantic clarity, Prometheus compatibility, простота legacy client, deterministic validation, minimal client state и возможность сформировать complete Core snapshot.
 
+Успех prototype assertions доказывает внутреннюю согласованность candidate и сохранение проверяемых инвариантов, но сам
+по себе не выбирает product/architecture decision. Ordering, retry/idempotency, внешний protocol, resource limits и
+lifecycle-dependent semantics отложены до INV-017–INV-020.
+
 ### Decision Output
 
 ADR/specification managed-registry semantics, descriptor/operation model, unsupported operations, semantic reference tests.
 
 ### Статус
 
-Planned.
+In progress.
 
 ---
 
