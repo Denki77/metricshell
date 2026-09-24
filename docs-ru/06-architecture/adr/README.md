@@ -15,3 +15,4 @@
 - [ADR-013 — Checksummed static artifacts и pinned multi-stage integration](ADR-013.md)
 - [ADR-014 — Local non-root operation и whole-candidate resource bounds](ADR-014.md)
 - [ADR-015 — Bounded complete-snapshot architecture с event-driven reconciliation](ADR-015.md)
+- [ADR-016 — Семантическая модель Managed Registry](ADR-016.md)

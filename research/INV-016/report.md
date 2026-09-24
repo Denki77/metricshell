@@ -1,14 +1,18 @@
 # INV-016 Report — Managed Registry Semantics
 
-Status: in progress
+Status: completed
 
 Run date: 2026-09-24
 
 Reference run: `results/20260924T114723Z`
 
+Ubuntu confirmation run: `results/20260924T123514Z`
+
 Environment: Docker Desktop 29.8.0, LinuxKit 7.0.12, linux/aarch64
 
 Result: 64/64 candidate-invariant assertions passed; 7/7 expected Core compatibility outcomes matched
+
+Decision: [ADR-016](../../docs/06-architecture/adr/ADR-016.md)
 
 ## Goal and Evidence Rule
 
@@ -47,12 +51,12 @@ Increment/add produced an exact value. Initialization worked for a new series. R
 and overflow rejected atomically. Repeated/increasing absolute values worked in one ordered stream. A decreasing set and
 the prototype's unsupported reset left state unchanged. A new registry started empty.
 
-### Result and provisional recommendation
+### Final investigation conclusion
 
-Increment/add is the strongest baseline. Initialization and monotonic absolute update are provisionally viable in one
-ordered mutation stream. The unsupported-reset PASS only describes this candidate; it does not prove reset is wrong.
-Same-epoch reset is provisionally discouraged because it needs explicit reset identity/created-time semantics absent
-from the current snapshot contract. New epoch is already an unambiguous reset.
+The accepted baseline is explicit initialization plus increment/add with a non-negative finite delta. A new epoch starts
+empty and a counter cannot silently decrease within one epoch. Monotonic absolute update is feasible in one ordered
+mutation stream but is not accepted as an external operation. The unsupported-reset PASS only describes this candidate;
+same-epoch reset is neither accepted nor prohibited here.
 
 ### Deferred
 
@@ -69,10 +73,10 @@ Core accepts finite values and `NaN`/`±Inf`. Candidates were SET alone or SET p
 SET preserved every Core numeric class. Finite ADD/SUB worked in an ordered stream; arithmetic with special values
 rejected atomically. This demonstrates feasibility, not API necessity.
 
-### Provisional recommendation and deferred
+### Final investigation conclusion and deferred
 
-SET is the minimum. ADD/SUB may be a convenience operation. INV-017 must define ordering; INV-018 must show external
-client value.
+SET is the required baseline. ADD/SUB is feasible in an ordered stream; INV-017 must define its concurrency semantics
+and INV-018 must establish whether it belongs in the external API.
 
 ## Histogram Semantics
 
@@ -111,11 +115,14 @@ Negative observations are valid in the wider Prometheus instrumentation model. C
 reject their history: a final non-negative sum with non-negative buckets passes. A negative intermediate/final sum cannot
 be published, and OpenMetrics negative-bound histograms require an omitted sum that Core cannot express.
 
-### Provisional recommendation and deferred
+### Final investigation conclusion and deferred
 
-Use the non-negative subset for an initial Core-compatible candidate. This follows from the existing complete-snapshot
-boundary and predictable `_sum` semantics, not from a claim that negative observations are universally invalid. Signed
-support would require explicit future Core scope review; INV-016 does not authorize it.
+Use non-negative observations and non-negative fixed bucket boundaries for initial Managed Aggregation. This follows
+from the existing complete-snapshot boundary and predictable `_sum` semantics, not from a claim that negative
+observations are universally invalid. Signed support would require explicit future Core scope review; INV-016 does not
+authorize it. A negative observation followed by a positive observation can yield a Core-accepted final snapshot when
+its final sum and boundaries are non-negative, demonstrating that a complete snapshot does not encode observation
+history. The registry must nevertheless reject state that cannot safely cross the Core boundary when materialized.
 
 ## Descriptor Declaration
 
@@ -133,16 +140,17 @@ The prototype implemented explicit declaration and rejected undeclared operation
 disprove implicit declaration. The independent reason to prefer explicit internal semantics is that buckets, HELP and
 exact label schema cannot be inferred from generic increment/set/observe without protocol defaults.
 
-### Provisional recommendation and deferred
+### Final investigation conclusion and deferred
 
-Prefer explicit descriptors at the registry boundary and allow a convenience call to hide them. INV-018 decides the
-external client shape.
+Descriptors are explicit at the registry semantic boundary and define metric-family identity, type, HELP, label schema
+and histogram bucket schema where applicable. A convenience client may hide declaration. INV-018 decides the external
+client and wire shape.
 
 ## Identity and Conflicts
 
-Core family name plus canonical labels produced stable identity. Reordered labels coalesced; missing/extra labels
-rejected. Type, HELP, labels, buckets, derived names and reserved names conflicted atomically. Operation-level duplicate
-object-key parsing belongs to INV-018 transport work.
+Metric family plus canonical label set determines series identity. Reordered labels coalesced; missing/extra labels
+violated the descriptor schema. Type, HELP, labels, buckets, derived names and reserved names conflicted atomically, and
+rejected mutations preserved prior valid state. Wire-format duplicate-key parsing belongs to INV-018.
 
 ## Batch Semantics
 
@@ -158,8 +166,9 @@ stale-marker/exposition policy, freeze and epoch cleanup, deferred to INV-017 an
 ## Snapshot Atomicity and Core Compatibility
 
 Rejected mutations remained byte-identical to the prior complete snapshot. Populated, empty and signed candidate
-snapshots were checked by the actual Core parser. Prototype acceptance, Core acceptance and recommendation are reported
-separately.
+snapshots were checked by the actual Core parser. Managed Registry must materialize one complete candidate application
+snapshot and pass it through the existing Core validation/installation boundary. Managed Aggregation is not an
+alternative Core, and ADR-001–ADR-015 remain unchanged.
 
 ## Observational Benchmarks
 
@@ -176,13 +185,22 @@ Thirty five-series materializations took 144,125 ns total (4,804 ns each).
 
 These are observations, not limits or performance decisions. INV-019 owns those conclusions.
 
-## Reproducibility and Conclusion
+## Portable Confirmation
 
-Run `./research/INV-016/run-bench.sh` on macOS and Ubuntu. Benchmark fingerprint:
-`1f4be9f67c79cb5710dc24bcc6401c1f3d2112f95ee66933e4a1dfd3eb435f1e`; Core source fingerprint:
-`6cb7e1021fb8806af25a8d3470cf2b789d4958089777a837c800d94c6dc26f9d`. Both must match on Ubuntu.
+| Role | Environment | Docker | Result |
+| --- | --- | --- | --- |
+| Reference | macOS/LinuxKit, linux/aarch64 | 29.8.0 | 64/64 assertions; 7/7 Core outcomes |
+| Confirmation | Ubuntu/LinuxKit, linux/x86_64 | 27.4.0 | 64/64 assertions; 7/7 Core outcomes |
 
-INV-016 now establishes feasibility and compatibility evidence rather than a normative operation set. Explicit internal
-descriptors and a non-negative histogram subset are provisional recommendations. Counter absolute set, same-epoch reset,
-gauge arithmetic, external batching and deletion remain deferred. No ADR is created. Status remains **in progress**
-until matching-fingerprint Ubuntu evidence is retained and reviewed.
+Both runs have benchmark fingerprint
+`1f4be9f67c79cb5710dc24bcc6401c1f3d2112f95ee66933e4a1dfd3eb435f1e` and Core source fingerprint
+`6cb7e1021fb8806af25a8d3470cf2b789d4958089777a837c800d94c6dc26f9d`. Semantic assertions and the complete Core
+compatibility matrix match; no architecturally significant difference was found. Timing differences across ARM64 and
+x86_64 are observations only and are not a portable acceptance criterion. INV-019 owns performance conclusions.
+
+## Conclusion
+
+INV-016 establishes the descriptor-driven semantic boundary, counter and gauge baselines, initial Core-compatible
+histogram subset, canonical identity/conflict rules, epoch reset and complete-snapshot handoff captured by ADR-016.
+Counter absolute update, same-epoch reset, gauge arithmetic concurrency, external batching, transport, deletion,
+materialization limits and lifecycle remain deferred to INV-017–INV-020.

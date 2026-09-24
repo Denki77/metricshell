@@ -134,11 +134,12 @@ lifecycle-dependent semantics отложены до INV-017–INV-020.
 
 ### Decision Output
 
-ADR/specification managed-registry semantics, descriptor/operation model, unsupported operations, semantic reference tests.
+[ADR-016](../06-architecture/adr/ADR-016.md) фиксирует semantic model managed registry. Внешние operations и детали
+protocol остаются в scope INV-017–INV-020.
 
 ### Статус
 
-In progress.
+Завершено.
 
 ---
 

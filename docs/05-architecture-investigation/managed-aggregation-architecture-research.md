@@ -148,11 +148,12 @@ external protocol, resource limits and lifecycle-dependent semantics remain defe
 
 ### Decision Output
 
-Managed-registry semantic ADR/specification, accepted descriptor/operation model, unsupported-operation list and semantic reference tests.
+[ADR-016](../06-architecture/adr/ADR-016.md) records the managed-registry semantic model. External operations and
+protocol details remain assigned to INV-017 through INV-020.
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
