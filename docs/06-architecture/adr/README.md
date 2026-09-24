@@ -15,3 +15,4 @@
 - [ADR-013 — Distribute Checksummed Static Artifacts with Pinned Multi-stage Integration](ADR-013.md)
 - [ADR-014 — Enforce Local Non-root Operation and Whole-candidate Resource Bounds](ADR-014.md)
 - [ADR-015 — Use Bounded Complete-snapshot Architecture with Event-driven Reconciliation](ADR-015.md)
+- [ADR-016 — Managed Registry Semantic Model](ADR-016.md)
