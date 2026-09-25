@@ -1,0 +1,5 @@
+series	alloc_delta_bytes	encoded_bytes	build_ms	encode_ms	core_install_ms	scrape_ms	encoded_bytes_per_series	alloc_bytes_per_series
+100	9408	9519	0.013	0.116	0.002	0.001075	95	94.1
+1000	89408	100719	0.023	1.420	0.011	0.001062	100	89.4
+10000	885312	1057719	0.178	15.370	0.383	0.001094	105	88.5
+20000	1762336	2170951	1.087	33.966	0.284	0.001071	108	88.1
