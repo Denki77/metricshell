@@ -1,6 +1,6 @@
 # ISSUE-MA-002. Managed domain model and descriptor semantics
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -43,3 +43,16 @@ Table-driven unit tests for numeric edge cases, NaN/Inf, labels, descriptor conf
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented production descriptors, canonical family/series identity, stable
+  semantic rejection classes and counter, gauge and classic-histogram operations.
+- 2026-09-26: moved to `Testing`; added table-driven edge, conflict, label-order, histogram and all-or-nothing batch
+  tests and audited the implementation README.
+- 2026-09-26: moved to `Done`; Docker-only full tests and the focused managed-package race run passed.
+
+## Verification evidence
+
+- `cd implementation && make test`
+- `go test -race ./internal/managed` (inside the pinned Docker toolchain)

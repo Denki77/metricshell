@@ -23,6 +23,9 @@ Prometheus verification. ISSUE-032 through ISSUE-037 add static multi-architectu
 hardening defaults, configurable capacity/time limits, fault/soak/race gates, controlled release benchmarks and signed
 supply-chain evidence.
 
+ISSUE-MA-002 provides the managed semantic core: explicit descriptors, canonical label identity, counter
+initialize/add, gauge set, Core-compatible classic histogram observations, deterministic conflicts and atomic batches.
+
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
 routes the selected `file`, `unix` or `http` ingestion transport through it, and finalizes via
@@ -166,6 +169,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/httpingest`: loopback-only POST adapter with independent wire/decoded limits and exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation and Linux directory-inotify recovery.
 - `internal/kubeexamples`: Kubernetes Job, CronJob, lifecycle and Prometheus example verification.
+- `internal/managed`: descriptor-driven managed metric semantics and immutable state views.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
