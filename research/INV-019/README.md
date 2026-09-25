@@ -1,10 +1,12 @@
 # INV-019 — Performance, Snapshot Materialization and Resource Limits
 
-**Status:** in progress
+**Status:** completed
 
 **Reference run:** `results/20260925T090317Z`
 
-**Ubuntu confirmation:** pending
+**Ubuntu confirmation:** `results/20260925T092043Z` — confirmed
+
+**Decision:** [ADR-019](../../docs/06-architecture/adr/ADR-019.md)
 
 **Report:** [report.md](report.md)
 
@@ -15,13 +17,18 @@ while continuously publishing consistent complete snapshots with bounded resourc
 
 ## Current Result
 
-The macOS-host Docker Desktop/LinuxKit ARM64 reference run passed 20/20 portable assertions and all seven INV-019
-experiments. It confirms the initial hypotheses: encoding after every mutation and cloning the registry on every
-mutation scale poorly; cardinality and histogram buckets dominate retained and encoded size; immutable
-generation-cached responses preserve a single generation during concurrent mutation and slow reads.
+The macOS-host Docker Desktop/LinuxKit ARM64 reference run and Ubuntu-host Docker Desktop/LinuxKit x86_64 confirmation
+run each passed 20/20 portable assertions and E-019.1–E-019.7. Both used fingerprint
+`2a37bb25d9d3c09167d97d8861a42e4902e0874b903fd00f6896e4328ea97112`.
 
-This is not yet a completed investigation. The same fingerprint must pass on the Ubuntu host before ADR-019 and final
-limits are accepted.
+Both runs confirm that the generation cache returns complete registry-wide generations: linked counter, gauge,
+histogram-count and histogram-sum markers always matched the encoded generation, including concurrent and delayed
+readers. Mixed-generation responses were zero in both environments. Bounded queue admission, visible overload
+rejection, pre-mutation policy rejection, fatal cgroup OOM separation and the `nofile=64` evidence also matched.
+
+Performance is deliberately not portable: the reference mutation cells observed roughly 3.52–7.46 million ops/s,
+while Ubuntu observed roughly 0.27–0.43 million ops/s; 10,000-series generation-cache encoding was 8.504 ms versus
+19.305 ms. These are environment-sensitive observations, not SLA values or guarantees.
 
 ## Run the Prototype
 
@@ -80,14 +87,14 @@ code. The fingerprint covers the Dockerfile, Go source, module file, runner, exp
 - Operation rates exclude transport, parsing and ACK costs; INV-018 retains those measurements.
 - Core installation is represented by immutable byte ownership and validity gating, not the production Core parser.
 - Docker stats sampling is coarse and may miss short peaks; Go allocation counters provide the fine-grained comparison.
-- The reference host is LinuxKit ARM64, not native Linux. Ubuntu confirmation is deliberately still pending.
+- Both hosts used Docker Desktop/LinuxKit; Ubuntu confirmation is x86_64 but is not native-kernel evidence.
 - Timing and resource observations are environment-sensitive; only semantic assertions are portable.
 - The tested 20,000-series, 100-bucket and 1,024-queue endpoints are coverage, not production defaults. Exact defaults
   require an explicit memory/response/latency/safety-margin selection rule and remain deferred.
 
 ## Better Follow-up Benchmarking
 
-After portable confirmation, repeat on an otherwise idle native Ubuntu host with pinned CPUs, fixed governor and at
+For stronger capacity estimates, repeat on an otherwise idle native Ubuntu host with pinned CPUs, fixed governor and at
 least 30 repetitions; retain raw distributions. Add end-to-end Unix framing/parser/ACK cost, production Core validation,
 GC pause histograms, heap profiles, high-frequency scrape rates, response-write cancellation, publisher connection
 limits and a sustained 50/80/100/120% offered-load soak. Test cgroup v1 and v2, native AMD64 and ARM64, and run the Go

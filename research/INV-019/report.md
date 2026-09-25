@@ -1,6 +1,6 @@
 # INV-019 Report — Performance, Snapshot Materialization and Resource Limits
 
-Status: in progress
+Status: completed
 
 Run date: 2026-09-25
 
@@ -10,7 +10,11 @@ Reference environment: Docker Desktop 29.8.0, LinuxKit 7.0.12, linux/aarch64, 2-
 
 Result: 20/20 portable assertions passed; all seven required experiments and the additional local benchmarks completed
 
-Ubuntu confirmation: pending; ADR-019 is intentionally not created yet
+Ubuntu confirmation run: `results/20260925T092043Z`
+
+Confirmation environment: Docker Desktop 27.4.0, LinuxKit 6.10.14, linux/x86_64, 2-CPU container limit, 512 MiB memory limit
+
+Decision: [ADR-019](../../docs/06-architecture/adr/ADR-019.md)
 
 ## Goal and Evidence Rule
 
@@ -18,12 +22,12 @@ INV-019 evaluates the representative ADR-016/017 managed registry: explicit boun
 and complete registry-wide snapshots. Assertions establish portable safety properties. Throughput, latency, CPU, RSS,
 allocation and scheduler-dependent sample counts are observations and are not portable promises.
 
-The run used one portable source/runner fingerprint. The reference result keeps the research in progress until that
-fingerprint is confirmed on Ubuntu.
+Both runs used portable source/runner fingerprint
+`2a37bb25d9d3c09167d97d8861a42e4902e0874b903fd00f6896e4328ea97112`.
 
 ## Candidates
 
-| Candidate                        | Mutation cost                          | Scrape behavior                                      | Disposition before Ubuntu confirmation                  |
+| Candidate                        | Mutation cost                          | Scrape behavior                                      | Final disposition                                       |
 |----------------------------------|----------------------------------------|------------------------------------------------------|---------------------------------------------------------|
 | Re-encode after every mutation   | full registry encoding per operation   | pre-encoded                                          | reject; cost scales with operation rate and cardinality |
 | Materialize on scrape            | minimal mutation                       | full encode for every scrape                         | viable fallback; repeated unchanged scrapes repeat work |
@@ -127,6 +131,33 @@ guarantee.
 - Main run: the retained 2-CPU/512-MiB container completed in 5,473 ms. Sampled memory peaked at approximately
   24.3 MiB. Coarse Docker sampling can miss short peaks, so it is not used as a hard bound.
 
+## Ubuntu Confirmation
+
+The Ubuntu-host/LinuxKit x86_64 evidence is complete, including `environment.tsv` and `fd-limit.tsv`. Its fingerprint
+exactly matches the reference. Both environments passed 20/20 portable assertions and all seven experiment summaries.
+
+| Portable evidence               |                        Reference ARM64 | Ubuntu x86_64 | Result               |
+|---------------------------------|---------------------------------------:|--------------:|----------------------|
+| Portable assertions             |                                  20/20 |         20/20 | match                |
+| E-019.1–E-019.7                 |                               7/7 PASS |      7/7 PASS | match                |
+| E-019.5 complete responses      |                                142,901 |        83,014 | observation differs  |
+| E-019.5 mixed generations       |                                      0 |             0 | match                |
+| E-019.5 slow-reader completions |                                     19 |            22 | both exercised       |
+| Cache hits / misses             |                           142,872 / 31 |  82,902 / 114 | both paths exercised |
+| Queue capacities                |             1/16/64/1,024 exact bounds |          same | match                |
+| Policy rejection                | 20,001 series and 101 buckets rejected |          same | match                |
+| cgroup OOM                      |             exit 137, `OOMKilled=true` |          same | match                |
+| `nofile=64`                     |                                   PASS |          PASS | match                |
+
+E-019.5 validates the whole encoded body, not only its header. In every response the generation header and linked
+counter, gauge, histogram-count and histogram-sum markers were equal. Old immutable response bytes remained valid while
+new commits made the cached generation stale and caused later materialization.
+
+Environment-sensitive measurements did not need to match and did not. Reference operation cells observed roughly
+3.52–7.46 million ops/s versus roughly 0.27–0.43 million ops/s on Ubuntu. At 10,000 series, generation-cache encoding
+was 8.504 ms versus 19.305 ms; whole-run wall time was 5,473 ms versus 11,393 ms; sampled memory peaks were approximately
+24.3 MiB and 24.75 MiB. These differences do not change any portable conclusion and are not SLAs or guarantees.
+
 ## Additional Benchmarks Executed
 
 No listed INV-019 variant was replaced by a future-work agreement. The run includes every candidate snapshot strategy,
@@ -142,7 +173,7 @@ linked-generation evidence set is retained.
 
 The architecture requires bounded, independently configurable limits, but this run does not contain a product memory
 budget, maximum response budget, materialization-latency objective, queue-residence objective or agreed safety margin.
-Consequently it cannot justify exact production defaults. The supported conclusions pending Ubuntu and ADR-019 are:
+Consequently it cannot justify exact production defaults. The accepted architectural conclusions are:
 
 - snapshot strategy: generation-based immutable encoded cache;
 - series cardinality: bounded and tested through 20,000; exact default and maximum are deferred;
@@ -191,9 +222,16 @@ requiring equal timings. Architecture-specific image IDs must differ legitimatel
 
 ## Conclusion
 
-The reference evidence supports the hypothesis and provisionally selects generation-based immutable snapshot caching
+The matching reference and Ubuntu evidence supports the hypothesis and selects generation-based immutable snapshot caching
 with independent limits for series, histogram buckets and queued work. Re-encode-per-mutation and whole-registry
 copy-on-write are rejected as tested. Normal limit rejection is safe and distinct from cgroup OOM. Exact production
 defaults remain deferred because the required budget/latency/safety-margin selection inputs are not yet fixed.
 
-INV-019 remains **in progress** until the identical fingerprint is run on Ubuntu and ADR-019 records the final limits.
+Matching-fingerprint reference and Ubuntu evidence closes INV-019. ADR-019 selects generation-based immutable encoded
+snapshot caching and independent bounded controls for active series, histogram buckets and owner admission queue. It
+retains ADR-017 observable overload rejection, distinguishes policy rejection from fatal cgroup OOM, and keeps managed
+state entering Core only as a complete candidate snapshot under ADR-004. Exact production defaults and maxima remain
+deferred to an explicit budget/latency/workload-shape/safety-margin selection rule. INV-020 retains lifecycle, freeze,
+final snapshot and shutdown semantics.
+
+INV-019 is **completed** and its decision is recorded by ADR-019.
