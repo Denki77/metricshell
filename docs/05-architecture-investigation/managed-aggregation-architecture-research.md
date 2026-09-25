@@ -408,7 +408,7 @@ Snapshot materialization strategy, managed limits, overload behavior, benchmark 
 
 ### Status
 
-Planned.
+In progress.
 
 ---
 

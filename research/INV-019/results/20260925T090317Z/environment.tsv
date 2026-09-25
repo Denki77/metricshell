@@ -1,0 +1,14 @@
+key	value
+run_date_utc	2026-09-25T09:03:37Z
+repository_head_sha	395c59757b72ebd6379fba6625d8eea4f3ba0f16
+benchmark_scope_diff_clean	false
+benchmark_scope_untracked_count	15
+benchmark_code_fingerprint_sha256	2a37bb25d9d3c09167d97d8861a42e4902e0874b903fd00f6896e4328ea97112
+docker_server_version	29.8.0
+docker_info	linux/aarch64 ncpu=6 memory=8320028672 kernel=7.0.12-linuxkit os=Docker Desktop
+container_kernel	Linux da7c49b338d8 7.0.12-linuxkit #1 SMP PREEMPT Thu Aug 27 14:02:21 UTC 2026 aarch64 Linux
+prototype_image_id	sha256:62292596209ad1fe86e31b87ddf0f0b3e3d28b7d8e8be4fa763fbca3e59e8f26
+cpu_limit	2
+memory_limit_bytes	536870912
+oom_memory_limit_bytes	33554432
+fd_limit	64

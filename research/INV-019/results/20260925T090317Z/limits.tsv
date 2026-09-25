@@ -1,0 +1,5 @@
+series	buckets	queue_capacity	result
+100	10	1024	accepted
+20000	100	64	accepted
+20001	10	64	series_limit
+100	101	64	bucket_limit
