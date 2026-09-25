@@ -327,11 +327,13 @@ are secondary evidence rather than the transport-selection criterion.
 
 ### Decision Output
 
-Selected managed-operation transport/protocol direction and reference legacy-client contract.
+[ADR-018](../06-architecture/adr/ADR-018.md) selects the initial local managed-operation transport, versioned bounded
+protocol direction and stateless legacy-client contract. Exact successful-ACK semantics remain an INV-017 dependency;
+numeric resource limits remain INV-019 scope.
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 

@@ -84,8 +84,8 @@ INV-020 validates the full lifecycle integration and must use the selected seman
 | ID      | Topic                                                                                         | Status      | Evidence            | Decision                                     |
 |---------|-----------------------------------------------------------------------------------------------|-------------|---------------------|----------------------------------------------|
 | INV-016 | [Managed Registry Semantics](managed-aggregation-architecture-research.md#inv-016)            | Completed   | `research/INV-016/` | [ADR-016](../06-architecture/adr/ADR-016.md) |
-| INV-017 | [Concurrent Publishers and Ordering](managed-aggregation-architecture-research.md#inv-017)    | Completed | `research/INV-017/` | [ADR-017](../06-architecture/adr/ADR-017.md) |
-| INV-018 | [Legacy Client and Transport Viability](managed-aggregation-architecture-research.md#inv-018) | Completed     | `research/INV-018/` | [ADR-017](../06-architecture/adr/ADR-018.md) |
+| INV-017 | [Concurrent Publishers and Ordering](managed-aggregation-architecture-research.md#inv-017)    | Completed   | `research/INV-017/` | [ADR-017](../06-architecture/adr/ADR-017.md) |
+| INV-018 | [Legacy Client and Transport Viability](managed-aggregation-architecture-research.md#inv-018) | Completed   | `research/INV-018/` | [ADR-018](../06-architecture/adr/ADR-018.md) |
 | INV-019 | [Performance and Resource Limits](managed-aggregation-architecture-research.md#inv-019)       | Planned     | `research/INV-019/` | ADR-019 / benchmark and limit specification  |
 | INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Planned     | `research/INV-020/` | ADR-020 / lifecycle specification update     |
 

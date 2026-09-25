@@ -1,211 +1,115 @@
 # INV-018 Report — Legacy Client and Transport Viability
 
-**Status:** in progress
+**Status:** completed
 
-**Run date:** 2026-09-24
+**Run dates:** 2026-09-24
 
-**Docker server:** 29.8.0
+**Reference run:** `results/20260924T195359Z`
 
-**Docker platform:** LinuxKit/aarch64
+**Ubuntu-host confirmation:** `results/20260924T200230Z` — confirmed
 
-**Reference run:** `results/20260924T185603Z`
-
-**Summary:** `results/20260924T185603Z/summary.tsv`
+**Decision:** [ADR-018](../../docs/06-architecture/adr/ADR-018.md)
 
 ## Goal
 
-Validate or reject the INV-018 assumption that PHP 5.4, shell and simple CLI workloads can publish individual Managed
-Aggregation operations without maintaining complete registry state, and compare Unix stream socket and local HTTP as
-the initial local operation transport.
+Determine whether PHP 5.4, shell and CLI workloads can submit individual Managed Aggregation operations without complete
+registry state, and select an initial local operation transport and framing contract.
 
 ## Prototype
 
-The prototype is located in `research/INV-018`.
+- `prototype/cmd/inv018` — server, short-lived CLI and persistent generator.
+- `clients/metricshell.php` — PHP 5.4-compatible stateless client.
+- `clients/Dockerfile` — pinned PHP image containing the client, avoiding runtime host bind mounts.
+- `compose.yml` — stand using a named runtime volume.
+- `run-bench.sh` — reproducible runner, diagnostics, assertions and fingerprint.
 
-- `prototype/cmd/inv018` — one binary containing the registry server and short-lived CLI client.
-- `prototype/cmd/inv018 benchmark` — persistent in-container generator that records per-ACK latency without per-operation
-  Compose exec or process startup.
-- `clients/metricshell.php` — PHP 5.4-compatible stateless client using built-in stream functions.
-- `compose.yml` — isolated server and real PHP 5.4.45 runtime stand.
-- `run-bench.sh` — reproducible experiment runner and fingerprint generator.
-- `results/<timestamp>` — assertions, summaries, raw replies, logs, observations and environment metadata.
+The registry is research-only. Core validation and production Managed Registry remain outside this transport prototype;
+ADR-016 is authoritative for registry semantics.
 
-The operation envelope is JSON with explicit `version`, `op`, `metric`, `value` and labels. Unix uses one newline-delimited
-request and one JSON ACK per connection. HTTP uses one `POST /v1/operations` and one JSON response. This protocol is
-separate from the Core snapshot protocol; clients never serialize a complete Prometheus registry.
+## Run Environments
 
-## Run Commands
+| Environment                   | Docker | Container platform       | Result                     | Assertions | Fingerprint                                                        |
+|-------------------------------|-------:|--------------------------|----------------------------|-----------:|--------------------------------------------------------------------|
+| macOS host / Docker LinuxKit  | 29.8.0 | LinuxKit 7.0.12, aarch64 | `results/20260924T195359Z` |      41/41 | `a5a256f20b747d561c24f4d3b6132c3bb486c21d23ccba6f464277d86033fb7d` |
+| Ubuntu host / Docker LinuxKit | 27.4.0 | LinuxKit 6.10.14, x86_64 | `results/20260924T200230Z` |      41/41 | `a5a256f20b747d561c24f4d3b6132c3bb486c21d23ccba6f464277d86033fb7d` |
 
-Full run:
+Both used PHP 5.4.45, 6 daemon CPUs and approximately 8 GB daemon memory. The Ubuntu-host result is not native
+Ubuntu-kernel evidence. The PHP base is pinned by digest in `clients/Dockerfile`.
 
-```bash
-./research/INV-018/run-bench.sh
-```
+## Correctness Results
 
-Inspect the latest result:
+Both environments passed the same 41/41 assertions and all persistent matrix cells with zero operation errors.
 
-```bash
-latest="$(cat research/INV-018/latest-results.txt)"
-cat "$latest/summary.tsv"
-cat "$latest/assertions.tsv"
-cat "$latest/benchmarks.tsv"
-cat "$latest/persistent-transport-benchmarks.tsv"
-cat "$latest/transport-comparison.tsv"
-cat "$latest/environment.tsv"
-```
+| Experiment                 | Result | Evidence                                                                |
+|----------------------------|--------|-------------------------------------------------------------------------|
+| E-018.1 PHP 5.4            | pass   | increment/set/observe and accepted/transport/protocol/rejected outcomes |
+| E-018.2 Multiprocess       | pass   | four independent processes, exact increments, no shared PHP registry    |
+| E-018.3 CLI/permissions    | pass   | short-lived helper; allowed access and denied unprivileged UID/GID      |
+| E-018.4 Startup            | pass   | endpoint ready before clients; pre-submit retry bounded                 |
+| E-018.5 Reconnect/restart  | pass   | exact reconnect accumulation; restart created a new empty epoch         |
+| E-018.6 Protocol/transport | pass   | parity, framing bounds, malformed/partial frames and version cases      |
 
-The exact stand and manual commands are documented in [README.md](README.md).
+The prototype accepted 65,536 bytes and rejected 65,537 bytes. This proves bounded framing, not the correct production
+limit. Exact limits remain INV-019 scope.
 
-## Run Environment and Fingerprint
+## Performance Observations
 
-| Environment             | Date       | Docker | Container platform             | Result                     | Fingerprint                                                        |
-|-------------------------|------------|-------:|--------------------------------|----------------------------|--------------------------------------------------------------------|
-| Docker Desktop on macOS | 2026-09-24 | 29.8.0 | LinuxKit/aarch64               | `results/20260924T195359Z` | `a5a256f20b747d561c24f4d3b6132c3bb486c21d23ccba6f464277d86033fb7d` |
-| Ubuntu                  | pending    |      — | expected Linux/x86_64 or ARM64 | pending                    | must match reference                                               |
+`benchmarks.tsv` includes Compose exec and process startup per operation. It is an end-to-end short-lived helper
+observation and cannot compare transport throughput.
 
-The fingerprint covers `prototype/`, `clients/`, `compose.yml` and `run-bench.sh`. The PHP image is also pinned by digest:
-`sha256:05440cda403be37644cad1c5e201884d4e67d3a7fae13e2b561986f98afd3169`. These inputs give macOS and Ubuntu one
-stand identity even when their Docker host architecture differs. Repository HEAD, kernel, image ID and host resources
-are recorded separately in `environment.tsv`.
+The persistent generator starts once per cell. Profile A uses a new connection per operation; profile B reuses HTTP
+connections. Unix reuse was not added because the selected Unix contract is one operation per connection.
 
-Because matching Ubuntu evidence and the ADR are not yet present, the research status remains **in progress**.
+| Environment        | Transport/profile  | 1-client ops/s | 128-client ops/s | 128-client ACK p95 | Errors |
+|--------------------|--------------------|---------------:|-----------------:|-------------------:|-------:|
+| macOS-host ARM64   | Unix connection/op |        8,419.9 |         31,242.6 |           9.856 ms |      0 |
+| macOS-host ARM64   | HTTP connection/op |        3,950.1 |         32,800.3 |           9.350 ms |      0 |
+| macOS-host ARM64   | HTTP reused        |        9,543.6 |         47,795.6 |           7.027 ms |      0 |
+| Ubuntu-host x86_64 | Unix connection/op |        3,561.3 |          8,494.0 |          40.698 ms |      0 |
+| Ubuntu-host x86_64 | HTTP connection/op |        1,939.5 |         10,172.0 |          29.991 ms |      0 |
+| Ubuntu-host x86_64 | HTTP reused        |        3,566.0 |         15,016.9 |          22.294 ms |      0 |
 
-## Results
-
-All 41/41 correctness assertions passed.
-
-| Experiment                   | Result | Evidence                                                                                                              |
-|------------------------------|--------|-----------------------------------------------------------------------------------------------------------------------|
-| E-018.1 PHP 5.4 basic        | pass   | PHP 5.4.45 performed increment, set and observe and distinguished accepted, transport, protocol and rejected outcomes |
-| E-018.2 PHP multiprocess     | pass   | four independent worker processes each produced exactly 25 increments; unrelated state remained                       |
-| E-018.3 Shell/CLI            | pass   | helper succeeded without another daemon; transport failure exited 3 and rejection exited 4                            |
-| E-018.4 Startup race         | pass   | server readiness preceded clients; 3 × 20 ms missing-endpoint retry failed in 159 ms, without unbounded wait          |
-| E-018.5 Reconnect/restart    | pass   | three independent connections accumulated exactly; restart changed epoch and cleared registry                         |
-| E-018.6 Transport comparison | pass   | persistent generator covered 12 transport/profile/client cells; framing/version negatives rejected                    |
-
-The PHP worker processes shared only the socket endpoint. They did not share a PHP registry, snapshot file or IPC state.
-Worker exit did not delete another worker's series.
-
-The prototype accepted exactly 65,536 bytes and rejected 65,537 bytes. This proves enforcement of its bounded framing,
-not that 64 KiB is the correct production limit. The value remains an initial research safety bound pending INV-019.
-The Unix path also rejected a connection closed before its newline delimiter. Supported version `1` was accepted;
-missing, invalid and unsupported versions were rejected deterministically.
-
-## End-to-End Short-Lived Helper Observation
-
-| Transport | Concurrent clients | Operations | Elapsed ms | Observed ops/s | Errors |
-|-----------|-------------------:|-----------:|-----------:|---------------:|-------:|
-| Unix      |                  1 |        100 |  9,488.566 |           10.5 |      0 |
-| Unix      |                  8 |         96 |  1,611.486 |           59.6 |      0 |
-| Unix      |                 32 |         96 |  1,587.146 |           60.5 |      0 |
-| HTTP      |                  1 |        100 |  9,424.338 |           10.6 |      0 |
-| HTTP      |                  8 |         96 |  1,744.837 |           55.0 |      0 |
-| HTTP      |                 32 |         96 |  1,482.650 |           64.7 |      0 |
-
-These numbers include one `docker compose exec` for every CLI operation. They measure the deliberately simple shell
-integration path plus Docker orchestration, not server throughput or transport latency. The near-equal Unix/HTTP values
-therefore do not prove transport equivalence and are not production limits. Their useful result is that all tested
-client-count cells completed without an operation error.
-
-## Persistent-Generator Transport Observations
-
-The generator process starts once per complete cell and performs all operations internally. Profile A opens, sends one
-operation, receives one ACK and closes for every operation. Profile B reuses HTTP connections. The Unix candidate remains
-one-operation-per-connection; its reuse profile is explicitly rejected instead of silently changing protocol semantics.
-
-| Transport | Profile                  | Clients | Operations |    Ops/s | ACK p50 ms | ACK p95 ms | ACK p99 ms | Errors |
-|-----------|--------------------------|--------:|-----------:|---------:|-----------:|-----------:|-----------:|-------:|
-| Unix      | connection per operation |       1 |        200 |  9,648.9 |      0.091 |      0.175 |      0.343 |      0 |
-| Unix      | connection per operation |       8 |      1,600 | 32,335.5 |      0.190 |      0.554 |      0.772 |      0 |
-| Unix      | connection per operation |      32 |      6,400 | 32,136.1 |      0.768 |      2.432 |      3.385 |      0 |
-| Unix      | connection per operation |     128 |     25,600 | 31,407.0 |      3.187 |     10.052 |     14.445 |      0 |
-| HTTP      | connection per operation |       1 |        200 |  4,686.5 |      0.203 |      0.296 |      0.455 |      0 |
-| HTTP      | connection per operation |       8 |      1,600 | 23,440.2 |      0.273 |      0.815 |      1.055 |      0 |
-| HTTP      | connection per operation |      32 |      6,400 | 34,239.3 |      0.701 |      2.082 |      3.386 |      0 |
-| HTTP      | connection per operation |     128 |     25,600 | 32,502.1 |      3.185 |      9.528 |     13.279 |      0 |
-| HTTP      | reused connection        |       1 |        200 |  8,906.1 |      0.106 |      0.152 |      0.170 |      0 |
-| HTTP      | reused connection        |       8 |      1,600 | 46,437.6 |      0.128 |      0.414 |      0.782 |      0 |
-| HTTP      | reused connection        |      32 |      6,400 | 55,226.8 |      0.362 |      1.651 |      2.364 |      0 |
-| HTTP      | reused connection        |     128 |     25,600 | 45,910.0 |      2.071 |      7.163 |      9.940 |      0 |
-
-These are LinuxKit/ARM64 observations without CPU pinning or controlled cgroups. They are secondary evidence and must not
-be treated as portable guarantees, production throughput or the primary reason to prefer Unix.
+These observations lack CPU pinning and controlled cgroups. They are not guarantees, limits or the primary reason for
+the transport decision.
 
 ## Transport Evaluation
 
-| Criterion              | Unix stream socket                           | Local HTTP                                                    |
-|------------------------|----------------------------------------------|---------------------------------------------------------------|
-| PHP 5.4 dependency     | built-in `stream_socket_client`              | built-in TCP streams; HTTP parsing needed without curl        |
-| Shell path             | short-lived helper                           | curl is convenient but not guaranteed; helper still preferred |
-| Framing                | simple newline candidate; bounded frame      | standard HTTP framing; bounded body                           |
-| Local security         | filesystem owner/group/mode                  | loopback or network namespace policy                          |
-| Debugging              | helper required for convenient use           | curl/wget friendly                                            |
-| Listener exposure      | no TCP listener                              | requires TCP listener even when local-only                    |
-| Startup/failure        | bind before workload; connect/reject visible | bind before workload; status and connect errors visible       |
-| Operational complexity | no network configuration                     | TCP listener/address and network policy                       |
-| Prototype correctness  | all variants passed                          | all variants passed                                           |
+| Criterion         | Unix domain stream socket                | Local HTTP/TCP                               |
+|-------------------|------------------------------------------|----------------------------------------------|
+| PHP 5.4           | built-in `stream_socket_client`          | built-in TCP streams; HTTP handling required |
+| Shell/CLI         | short-lived helper                       | curl convenient but not guaranteed           |
+| Locality/security | filesystem endpoint and owner/group/mode | address, listener and network policy surface |
+| Network exposure  | none                                     | TCP listener required                        |
+| Framing           | simple bounded newline-delimited JSON    | standard HTTP framing and bounded body       |
+| Debugging         | less convenient than curl                | curl/wget friendly                           |
+| Viability         | all cases passed                         | all cases passed                             |
 
-Unix remains preferred primarily because Managed Aggregation is a local same-workload boundary. It provides filesystem
-ownership/mode control, requires no TCP listener, works with PHP 5.4 stream APIs and fits the one-binary/local-workload
-model. The stand demonstrated both an allowed client and a UID/GID without socket permission being denied. `0660` is a
-prototype mode, not a production permission decision. HTTP's debugging advantage is real, but it does not justify
-requiring two production transports. Performance observations are secondary evidence.
+Unix is selected primarily because Managed Aggregation is a local same-workload boundary. Its filesystem security,
+absence of a TCP listener, PHP 5.4 compatibility and operational simplicity fit the product model. HTTP is viable but
+does not improve the required initial use case enough to justify a second mandatory transport.
 
-## Acceptable Values Selected for Follow-up
+## Protocol and Client Conclusions
 
-These are inputs to ADR-018 and later limit research, not accepted production defaults:
+- Initial version `1` is explicit. Supported version is accepted; missing, invalid and unsupported versions reject.
+- Unix framing is bounded newline-delimited JSON, one operation per connection and one JSON response.
+- Legacy clients keep no complete snapshot, registry or cross-process registry state.
+- Outcomes distinguish accepted, transport/connect, protocol/framing and semantic/server rejection.
+- The transport exposes an explicit response boundary. ADR-017 defines the exact successful-ACK registry commit semantics.
+- Retry is safe before definite submission. Missing ACK after possible submission means unknown outcome; no blind retry
+  is allowed without ADR-017 idempotency semantics.
+- Endpoint readiness precedes publication. Prototype retries, delays and timeouts are not defaults.
+- Reconnect does not rebuild state; a new MetricShell process starts a new empty epoch.
+- Filesystem permissions are required, but prototype mode `0660` is not a production requirement.
 
-- operation protocol version candidate: integer `1`; supported, missing, invalid and unsupported behavior is tested;
-- one operation and one explicit ACK per request;
-- bounded operation framing is required; 64 KiB inclusive is only the prototype safety bound and initial candidate;
-- transport/connect error and semantic rejection must be distinguishable to CLI callers;
-- listener readiness before workload start is the primary startup contract;
-- retry, when offered by a convenience client, must have a finite count and delay;
-- reconnect requires no registry reconstruction;
-- server restart creates a new empty epoch.
+## Limitations and Follow-up
 
-The demonstrated `3 × 20 ms` retry and 2-second client I/O deadline are prototype controls, not selected product values.
-A startup/connect retry is safe when the connection was not established and the request definitely was not submitted.
-If a write may have succeeded but the ACK is lost, the outcome is unknown and the client must not blindly retry.
-The transport carries explicit accepted/rejected outcomes, but whether a production ACK means queued, committed or
-deduplicated is resolved by INV-017.
-
-## Limitations
-
-- The registry is a research mutex implementation and does not replace INV-017 concurrency evidence.
-- Core snapshot validation and the production Managed Registry are outside this transport stand. ADR-016 remains
-  authoritative for registry semantics.
-- The legacy image is amd64 and emulated on the reference ARM64 host; compatibility is demonstrated, performance is not.
-- Descriptor declaration, batch atomicity, idempotency keys, ACK-loss behavior, backpressure and lifecycle freeze remain
-  outside this prototype.
-- Allowed/denied Unix access was tested; production UID/GID deployment matrices and final socket mode remain integration concerns.
-- Only the macOS/LinuxKit reference environment is retained so far.
-
-## Additional Benchmarks
-
-The runner covers Unix and HTTP at 1/8/32/128 clients, connection-per-operation and HTTP connection reuse, ACK
-p50/p95/p99, PHP and CLI, four independent legacy workers, reconnect, bounded pre-submit retry, readiness-before-client,
-restart/new epoch, exact and over-limit payloads, malformed JSON, incomplete Unix framing, version cases, deterministic
-PHP outcomes and allowed/denied Unix access. Negative results are retained in individual logs.
-
-INV-019 should add CPU/RSS, warmups, pinned CPUs/cgroup memory, longer cells, slow readers and saturation. ACK loss,
-unknown outcome and deduplication remain INV-017 scope. Repeat this exact runner on Ubuntu; the fingerprint must remain
-`d89830368f7df46e2f9ea628ef54c7f6d195d49ffa4baa3efb21274e5a0af146`.
+- Confirmation used an Ubuntu host with Docker LinuxKit; native Ubuntu Docker Engine/kernel remains untested.
+- INV-019 owns frame size, connection/queue limits, CPU/RSS budgets and thresholds.
+- INV-020 owns in-flight freeze, final state and lifecycle integration.
+- Production UID/GID/mode and deployment configuration remain specification/delivery work.
 
 ## Conclusion
 
-The viability assumption is supported by the current environment: real PHP 5.4 and shell-friendly short-lived commands
-can submit managed operations without owning a complete registry. Unix socket is provisionally preferred over local HTTP,
-with a versioned framing candidate, explicit outcome and bounded frames. The exact production bound is not selected.
-
-This is not yet a final architecture decision. Ubuntu matching-fingerprint confirmation and ADR review are still required,
-so INV-018 remains in progress.
-
-## Decision Output
-
-- Prototype and CLI: `prototype/`
-- PHP 5.4 reference client: `clients/metricshell.php`
-- Runner and portable stand: `run-bench.sh`, `compose.yml`
-- Reference evidence: `results/20260924T185603Z/`
-- Provisional future ADR input: Unix socket + versioned per-operation request/ACK; stateless clients; bounded framing
-- Pending: Ubuntu confirmation and ADR-018 or rejected-alternative record
+INV-018 is complete. Unix domain stream socket is the initial local Managed Aggregation transport with a versioned,
+bounded, one-operation/one-response protocol and stateless legacy clients. HTTP remains a tested viable alternative for
+possible future scope. The decision is recorded in [ADR-018](../../docs/06-architecture/adr/ADR-018.md).
