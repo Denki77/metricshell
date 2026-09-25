@@ -19,7 +19,10 @@ The first standalone -- is mandatory for workload execution. Every token after i
 shell interpretation. An empty workload argv is configuration_invalid. MetricShell options after -- are workload
 arguments. Shell behavior requires an explicit shell workload such as -- /bin/sh -c command.
 
-Core has no mode option. In particular, --mode, --mode=snapshot, and --mode=managed-registry are invalid.
+The ownership mode is selected by `--mode` / `METRICSHELL_MODE`. The default and explicit `snapshot` values select the
+existing complete-snapshot ingestion path. `managed-registry` selects the managed bootstrap path. CLI takes precedence
+over the environment. Unknown values are configuration errors. Snapshot-ingestion properties cannot be configured
+explicitly with `managed-registry`; this prevents hybrid ownership before the workload starts.
 
 ## Sources and precedence
 
@@ -45,6 +48,10 @@ invalid values are fatal before workload start.
 | socket.path           | --unix-socket-path      | METRICSHELL_UNIX_SOCKET_PATH      | /run/metricshell/ingest.sock   |
 | file.path             | --snapshot-file-path    | METRICSHELL_SNAPSHOT_FILE_PATH    | /run/metricshell/snapshot.json |
 | shutdown.deadline     | --shutdown-deadline     | METRICSHELL_SHUTDOWN_DEADLINE     | empty                          |
+
+| Property | CLI    | Environment      | Default  |
+|----------|--------|------------------|----------|
+| mode     | --mode | METRICSHELL_MODE | snapshot |
 
 ingestion.transport is exactly one of file, unix, or http. Only the selected ingestion listener/watcher is activated.
 Explicit transport-specific options for an inactive transport are rejected to expose configuration mistakes.

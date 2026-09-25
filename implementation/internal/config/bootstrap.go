@@ -20,7 +20,15 @@ const (
 
 type LookupEnv func(string) (string, bool)
 
+type Mode string
+
+const (
+	ModeSnapshot        Mode = "snapshot"
+	ModeManagedRegistry Mode = "managed-registry"
+)
+
 type Config struct {
+	Mode                Mode
 	Workload            []string
 	Shutdown            shutdown.Config
 	Exposition          exposition.Config
@@ -71,6 +79,7 @@ type HTTPConfig struct {
 }
 
 var options = map[string]string{
+	"--mode":                          "mode",
 	"--shutdown-total-grace":          "total_grace",
 	"--workload-shutdown-timeout":     "workload_timeout",
 	"--shutdown-reserve":              "reserve",
@@ -152,6 +161,10 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if separator == len(args)-1 {
 		return Config{}, err.Bootstrap.CommandRequired
 	}
+	mode, parseErr := parseMode(args[:separator], lookupEnv)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
 
 	shutdownConfiguration, parseErr := parseShutdown(args[:separator], now, lookupEnv)
 	if parseErr != nil {
@@ -174,11 +187,42 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 		return Config{}, parseErr
 	}
 	ingestionConfiguration.Workload = args[separator+1:]
+	ingestionConfiguration.Mode = mode
 	ingestionConfiguration.Shutdown = shutdownConfiguration
 	ingestionConfiguration.Exposition = expositionConfiguration
 	ingestionConfiguration.FinalWait = finalWaitConfiguration
 	ingestionConfiguration.Log = logConfiguration
 	return ingestionConfiguration, nil
+}
+
+func parseMode(args []string, lookupEnv LookupEnv) (Mode, error) {
+	mode := ModeSnapshot
+	if lookupEnv != nil {
+		if value, exists := lookupEnv("METRICSHELL_MODE"); exists {
+			mode = Mode(value)
+		}
+	}
+	for index := 0; index < len(args); index++ {
+		name, value, hasValue := strings.Cut(args[index], "=")
+		property, known := options[name]
+		if !known {
+			return "", err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return "", fmt.Errorf("%s requires a value", name)
+			}
+			value = args[index]
+		}
+		if property == "mode" {
+			mode = Mode(value)
+		}
+	}
+	if mode != ModeSnapshot && mode != ModeManagedRegistry {
+		return "", fmt.Errorf("invalid mode %q", mode)
+	}
+	return mode, nil
 }
 
 func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
@@ -254,8 +298,10 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			}
 			value = args[index]
 		}
-		values[property] = value
-		explicit[property] = true
+		if property != "mode" {
+			values[property] = value
+			explicit[property] = true
+		}
 	}
 	var parseErr error
 	if value, exists := values["ingestion_transport"]; exists {
@@ -278,6 +324,13 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 	}
 	if parseErr != nil {
 		return Config{}, fmt.Errorf("invalid ingestion configuration: %w", parseErr)
+	}
+	if mode, modeErr := parseMode(args, lookupEnv); modeErr != nil {
+		return Config{}, modeErr
+	} else if mode == ModeManagedRegistry {
+		for property := range explicit {
+			return Config{}, fmt.Errorf("snapshot ingestion option %s conflicts with managed-registry mode", property)
+		}
 	}
 	if err := rejectInactiveTransportOptions(configuration.IngestionTransport, explicit); err != nil {
 		return Config{}, err
@@ -333,8 +386,11 @@ func rejectInactiveTransportOptions(transport string, explicit map[string]bool) 
 }
 
 func RequiredNoFile(configuration Config) int {
-	required := 16 + configuration.Exposition.Concurrent + configuration.ConcurrentIngestion
-	if configuration.IngestionTransport == "unix" {
+	required := 16 + configuration.Exposition.Concurrent
+	if configuration.Mode == ModeSnapshot {
+		required += configuration.ConcurrentIngestion
+	}
+	if configuration.Mode == ModeSnapshot && configuration.IngestionTransport == "unix" {
 		required += configuration.Socket.Connections
 	}
 	return required

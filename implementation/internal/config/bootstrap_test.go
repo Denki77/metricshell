@@ -27,8 +27,63 @@ func TestParseWorkloadAndShutdownDefaults(t *testing.T) {
 	if configuration.FinalWait != finalwait.Defaults() {
 		t.Fatalf("final-wait defaults = %+v", configuration.FinalWait)
 	}
+	if configuration.Mode != ModeSnapshot {
+		t.Fatalf("mode = %q, want %q", configuration.Mode, ModeSnapshot)
+	}
 	if configuration.IngestionTransport != "unix" || configuration.UnixSocketPath != "/run/metricshell/ingest.sock" {
 		t.Fatalf("ingestion defaults = %+v", configuration)
+	}
+}
+
+func TestParseModeSelectionAndPrecedence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		env  map[string]string
+		want Mode
+	}{
+		{name: "default", args: []string{"--", "program"}, want: ModeSnapshot},
+		{name: "explicit snapshot", args: []string{"--mode=snapshot", "--", "program"}, want: ModeSnapshot},
+		{name: "managed", args: []string{"--mode", "managed-registry", "--", "program"}, want: ModeManagedRegistry},
+		{name: "environment", args: []string{"--", "program"}, env: map[string]string{"METRICSHELL_MODE": "managed-registry"}, want: ModeManagedRegistry},
+		{name: "cli precedence", args: []string{"--mode=snapshot", "--", "program"}, env: map[string]string{"METRICSHELL_MODE": "managed-registry"}, want: ModeSnapshot},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lookup := func(name string) (string, bool) { value, ok := test.env[name]; return value, ok }
+			configuration, err := Parse(test.args, testNow, lookup)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if configuration.Mode != test.want {
+				t.Fatalf("Mode = %q, want %q", configuration.Mode, test.want)
+			}
+		})
+	}
+}
+
+func TestParseRejectsInvalidOrHybridMode(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"--mode=unknown", "--", "program"},
+		{"--mode=", "--", "program"},
+		{"--mode=managed-registry", "--ingestion-transport=file", "--", "program"},
+		{"--mode=managed-registry", "--snapshot-file-path=/tmp/snapshot.json", "--", "program"},
+	} {
+		if _, err := Parse(args, testNow, nil); err == nil {
+			t.Errorf("Parse(%q) succeeded", args)
+		}
+	}
+	lookup := func(name string) (string, bool) {
+		values := map[string]string{"METRICSHELL_MODE": "managed-registry", "METRICSHELL_INGESTION_TRANSPORT": "unix"}
+		value, ok := values[name]
+		return value, ok
+	}
+	if _, err := Parse([]string{"--", "program"}, testNow, lookup); err == nil {
+		t.Error("Parse accepted simultaneous managed and snapshot ownership")
 	}
 }
 

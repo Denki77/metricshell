@@ -3,6 +3,7 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net"
 	"sync"
@@ -10,12 +11,26 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
+	"github.com/Denki77/metricshell/implementation/internal/config"
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 )
+
+func TestManagedModeDoesNotStartSnapshotIngestion(t *testing.T) {
+	t.Parallel()
+
+	configuration := config.Config{Mode: config.ModeManagedRegistry, IngestionTransport: "invalid"}
+	stop, err := startConfiguredIngestion(context.Background(), configuration, nil)
+	if err != nil {
+		t.Fatalf("startConfiguredIngestion() error = %v", err)
+	}
+	if err := stop(); err != nil {
+		t.Fatalf("stop() error = %v", err)
+	}
+}
 
 func TestRunVersion(t *testing.T) {
 	t.Parallel()

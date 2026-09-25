@@ -99,6 +99,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		debugView := func() []byte {
 			include, exclude := len(configuration.Exposition.Include), len(configuration.Exposition.Exclude)
 			content, marshalErr := json.Marshal(map[string]any{
+				"mode":                   configuration.Mode,
 				"exposition_listen":      configuration.Exposition.Listen,
 				"max_response_bytes":     configuration.Exposition.ResponseBytes,
 				"max_concurrent_scrapes": configuration.Exposition.Concurrent,
@@ -150,7 +151,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		server.Start()
 		ingestionContext, stopIngestion := context.WithCancel(context.Background())
-		stopSelectedIngestion, ingestionErr := startIngestion(ingestionContext, configuration, core)
+		stopSelectedIngestion, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core)
 		if ingestionErr != nil {
 			stopIngestion()
 			_ = server.Close()
@@ -507,6 +508,13 @@ func startIngestion(ctx context.Context, configuration config.Config, core *inge
 	default:
 		return nil, fmt.Errorf("unknown ingestion transport %q", configuration.IngestionTransport)
 	}
+}
+
+func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core) (func() error, error) {
+	if configuration.Mode == config.ModeManagedRegistry {
+		return func() error { return nil }, nil
+	}
+	return startIngestion(ctx, configuration, core)
 }
 
 func ensurePrivateParent(path string) error {

@@ -19,7 +19,10 @@ metricshell --help
 без shell interpretation. Пустой workload argv даёт configuration_invalid. MetricShell options после -- являются
 аргументами workload. Shell behavior требует явный workload, например -- /bin/sh -c command.
 
-У Core нет option mode. В частности, --mode, --mode=snapshot и --mode=managed-registry невалидны.
+Режим владения выбирается через `--mode` / `METRICSHELL_MODE`. Значение по умолчанию и явное значение `snapshot`
+выбирают существующий путь приёма полных снимков. `managed-registry` выбирает границу запуска управляемого реестра.
+CLI имеет приоритет над environment. Неизвестные значения являются ошибкой конфигурации. Свойства приёма снимков
+нельзя задавать явно вместе с `managed-registry`, что исключает гибридное владение до запуска workload.
 
 ## Источники и precedence
 
@@ -45,6 +48,10 @@ variables фатальны до запуска workload.
 | socket.path           | --unix-socket-path      | METRICSHELL_UNIX_SOCKET_PATH      | /run/metricshell/ingest.sock   |
 | file.path             | --snapshot-file-path    | METRICSHELL_SNAPSHOT_FILE_PATH    | /run/metricshell/snapshot.json |
 | shutdown.deadline     | --shutdown-deadline     | METRICSHELL_SHUTDOWN_DEADLINE     | пусто                          |
+
+| Property | CLI    | Environment      | Default  |
+|----------|--------|------------------|----------|
+| mode     | --mode | METRICSHELL_MODE | snapshot |
 
 ingestion.transport имеет только одно значение: file, unix или http. Активируется только выбранный ingestion
 listener/watcher. Явные transport-specific options неактивного transport отклоняются для обнаружения configuration

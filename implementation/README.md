@@ -8,6 +8,10 @@ and dependency graph.
 Core through Wave 6 is complete and ready for operational use in the complete-snapshot profile. Publishers replace the
 whole metric set at once; partial metric updates are intentionally out of scope for this release.
 
+Managed Aggregation Wave 1 adds an explicit ownership boundary. Snapshot ownership remains the default; use
+`--mode=managed-registry` or `METRICSHELL_MODE=managed-registry` to select the managed bootstrap path. Explicit snapshot
+ingestion settings are rejected in managed mode so the two ownership models cannot be combined.
+
 ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state and a separate bounded self-metrics registry. ISSUE-016 through
 ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation, acknowledged MSP/1 Unix ingestion and its
