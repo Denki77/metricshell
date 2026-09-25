@@ -1,0 +1,5 @@
+kind	wait_mode	exit_code	readiness_http	metrics_http	final_visible	kubernetes_api_used
+job	duration	17	503	200	true	false
+job	scrapes	17	503	200	true	false
+cronjob	duration	17	503	200	true	false
+cronjob	scrapes	17	503	200	true	false
