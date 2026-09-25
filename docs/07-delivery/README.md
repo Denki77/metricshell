@@ -6,7 +6,7 @@ This section connects accepted requirements, investigations, ADRs, and specifica
 
 - [Requirements-to-ADR traceability](01-traceability/requirements-research-adr-traceability.md)
 - [EPIC-001: MetricShell Core](02-epics/EPIC-001-core.md)
-- [ISSUE-001](03-issues/ISSUE-001/README.md) through [ISSUE-037](03-issues/ISSUE-037/README.md)
+- [ISSUE-001](03-issues/ISSUE-001.md) through [ISSUE-037](03-issues/ISSUE-037.md)
 
 ## Normative relationship
 
