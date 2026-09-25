@@ -1,6 +1,6 @@
 # ISSUE-MA-004. Bounded single-owner mutation loop
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -45,3 +45,16 @@ Concurrency matrix with 1/2/8/32/128 publishers; counter/gauge/histogram/descrip
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented the bounded single-owner loop, post-commit results, global commit
+  ordering, explicit overload/cancellation/closed outcomes and managed queue configuration.
+- 2026-09-26: moved to `Testing`; covered 1/2/8/32/128 publishers, gauge/histogram/descriptor ordering, exact queue
+  capacity, cancellation, closure and configuration boundaries and audited the implementation README.
+- 2026-09-26: moved to `Done`; the Docker-only full race, vet, dependency and multi-architecture build gate passed.
+
+## Verification evidence
+
+- `cd implementation && make test`
+- `go test -race ./internal/managed ./internal/config ./internal/cli` (inside the pinned Docker toolchain)

@@ -29,6 +29,7 @@ const (
 
 type Config struct {
 	Mode                Mode
+	Managed             ManagedConfig
 	Workload            []string
 	Shutdown            shutdown.Config
 	Exposition          exposition.Config
@@ -43,6 +44,10 @@ type Config struct {
 	Socket              SocketConfig
 	HTTPIngestionListen string
 	HTTPIngestion       HTTPConfig
+}
+
+type ManagedConfig struct {
+	QueueCapacity int
 }
 
 type LogConfig struct {
@@ -80,6 +85,7 @@ type HTTPConfig struct {
 
 var options = map[string]string{
 	"--mode":                          "mode",
+	"--managed-queue-capacity":        "managed_queue_capacity",
 	"--shutdown-total-grace":          "total_grace",
 	"--workload-shutdown-timeout":     "workload_timeout",
 	"--shutdown-reserve":              "reserve",
@@ -165,6 +171,10 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if parseErr != nil {
 		return Config{}, parseErr
 	}
+	managedConfiguration, parseErr := parseManaged(args[:separator], lookupEnv, mode)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
 
 	shutdownConfiguration, parseErr := parseShutdown(args[:separator], now, lookupEnv)
 	if parseErr != nil {
@@ -188,11 +198,52 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	}
 	ingestionConfiguration.Workload = args[separator+1:]
 	ingestionConfiguration.Mode = mode
+	ingestionConfiguration.Managed = managedConfiguration
 	ingestionConfiguration.Shutdown = shutdownConfiguration
 	ingestionConfiguration.Exposition = expositionConfiguration
 	ingestionConfiguration.FinalWait = finalWaitConfiguration
 	ingestionConfiguration.Log = logConfiguration
 	return ingestionConfiguration, nil
+}
+
+func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig, error) {
+	configuration := ManagedConfig{QueueCapacity: 64}
+	value := ""
+	explicit := false
+	if lookupEnv != nil {
+		value, explicit = lookupEnv("METRICSHELL_MANAGED_QUEUE_CAPACITY")
+	}
+	for index := 0; index < len(args); index++ {
+		name, candidate, hasValue := strings.Cut(args[index], "=")
+		property, known := options[name]
+		if !known {
+			return ManagedConfig{}, err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return ManagedConfig{}, fmt.Errorf("%s requires a value", name)
+			}
+			candidate = args[index]
+		}
+		if property == "managed_queue_capacity" {
+			value, explicit = candidate, true
+		}
+	}
+	if explicit {
+		if mode != ModeManagedRegistry {
+			return ManagedConfig{}, fmt.Errorf("managed queue capacity requires managed-registry mode")
+		}
+		parsed, parseErr := parseCount(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
+		}
+		configuration.QueueCapacity = parsed
+	}
+	if configuration.QueueCapacity < 1 || configuration.QueueCapacity > 1024 {
+		return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
+	}
+	return configuration, nil
 }
 
 func parseMode(args []string, lookupEnv LookupEnv) (Mode, error) {
@@ -298,7 +349,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			}
 			value = args[index]
 		}
-		if property != "mode" {
+		if property != "mode" && property != "managed_queue_capacity" {
 			values[property] = value
 			explicit[property] = true
 		}

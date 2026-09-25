@@ -78,6 +78,14 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
 		managedRegistry := bootstrapManagedRegistry(configuration.Mode)
+		var managedOwner *managed.Owner
+		if managedRegistry != nil {
+			managedOwner, err = managed.NewOwner(managedRegistry, configuration.Managed.QueueCapacity)
+			if err != nil {
+				return rejectConfiguration(machine, metrics, logger, err)
+			}
+			defer managedOwner.Close()
+		}
 		if err := metrics.SetFinalWaitMode(selfmetric.FinalWaitMode(configuration.FinalWait.Mode)); err != nil {
 			return failLifecycle(machine, logger)
 		}
@@ -126,6 +134,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			}
 			if managedRegistry != nil {
 				debugConfiguration["managed_generation"] = managedRegistry.Read().Generation
+				debugConfiguration["managed_queue_capacity"] = managedOwner.State().Capacity
 			}
 			content, marshalErr := json.Marshal(debugConfiguration)
 			if marshalErr != nil {

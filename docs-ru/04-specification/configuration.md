@@ -53,6 +53,9 @@ variables фатальны до запуска workload.
 |----------|--------|------------------|----------|
 | mode     | --mode | METRICSHELL_MODE | snapshot |
 
+Управляемый режим добавляет `--managed-queue-capacity` / `METRICSHELL_MANAGED_QUEUE_CAPACITY`. Параметр допустим только
+с `managed-registry`, использует грамматику count и задаёт ограниченную очередь допуска single-owner.
+
 ingestion.transport имеет только одно значение: file, unix или http. Активируется только выбранный ingestion
 listener/watcher. Явные transport-specific options неактивного transport отклоняются для обнаружения configuration
 mistakes.

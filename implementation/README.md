@@ -28,6 +28,9 @@ initialize/add, gauge set, Core-compatible classic histogram observations, deter
 ISSUE-MA-003 wraps that core in one in-memory registry per execution: every managed bootstrap begins with an empty
 generation `0`, each successful commit advances once, rejected mutations preserve the complete state, and reads return
 a detached view of exactly one generation. No persistence, replay or disconnect-driven cleanup path exists.
+ISSUE-MA-004 routes managed mutations through one bounded owner goroutine. Admission is non-blocking and produces an
+explicit overload result when the configured queue is full; success is returned only after the owner commits and
+assigns the registry-wide commit order.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -172,7 +175,8 @@ metricshell version=0.1.2 revision=0123456
 - `internal/httpingest`: loopback-only POST adapter with independent wire/decoded limits and exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation and Linux directory-inotify recovery.
 - `internal/kubeexamples`: Kubernetes Job, CronJob, lifecycle and Prometheus example verification.
-- `internal/managed`: descriptor-driven semantics, execution-scoped registry, generation accounting and detached views.
+- `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop,
+  generation/commit accounting and detached views.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.

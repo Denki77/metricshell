@@ -80,6 +80,7 @@ A candidate violating any limit is rejected atomically and cannot partially modi
 | Canonical property           | Environment variable                     | Default |  Allowed range |
 |------------------------------|------------------------------------------|--------:|---------------:|
 | `socket.frame_bytes`         | `METRICSHELL_SOCKET_MAX_FRAME_BYTES`     |  `8KiB` | `1KiB`–`64KiB` |
+| `managed.queue_capacity`     | `METRICSHELL_MANAGED_QUEUE_CAPACITY`     |    `64` | `1`–`1024`     |
 | `socket.parts`               | `METRICSHELL_SOCKET_MAX_PARTS`           |   `256` |     `1`–`1024` |
 | `socket.connections`         | `METRICSHELL_SOCKET_MAX_CONNECTIONS`     |     `8` |       `1`–`64` |
 | `socket.transactions`        | `METRICSHELL_SOCKET_MAX_TRANSACTIONS`    |     `4` |       `1`–`32` |

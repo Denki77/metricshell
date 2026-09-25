@@ -53,6 +53,9 @@ invalid values are fatal before workload start.
 |----------|--------|------------------|----------|
 | mode     | --mode | METRICSHELL_MODE | snapshot |
 
+Managed mode adds `--managed-queue-capacity` / `METRICSHELL_MANAGED_QUEUE_CAPACITY`. It is valid only with
+`managed-registry`, uses the count grammar, and configures the bounded single-owner admission queue.
+
 ingestion.transport is exactly one of file, unix, or http. Only the selected ingestion listener/watcher is activated.
 Explicit transport-specific options for an inactive transport are rejected to expose configuration mistakes.
 

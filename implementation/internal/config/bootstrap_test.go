@@ -87,6 +87,27 @@ func TestParseRejectsInvalidOrHybridMode(t *testing.T) {
 	}
 }
 
+func TestParseManagedQueueCapacity(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-queue-capacity=16", "--", "program"}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Managed.QueueCapacity != 16 {
+		t.Fatalf("queue capacity = %d", configuration.Managed.QueueCapacity)
+	}
+	for _, args := range [][]string{
+		{"--managed-queue-capacity=1", "--", "program"},
+		{"--mode=managed-registry", "--managed-queue-capacity=0", "--", "program"},
+		{"--mode=managed-registry", "--managed-queue-capacity=1025", "--", "program"},
+	} {
+		if _, err := Parse(args, testNow, nil); err == nil {
+			t.Errorf("Parse(%q) succeeded", args)
+		}
+	}
+}
+
 func TestParseShutdownPrecedence(t *testing.T) {
 	t.Parallel()
 
