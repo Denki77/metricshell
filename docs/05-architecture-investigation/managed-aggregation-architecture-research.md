@@ -479,11 +479,12 @@ Deterministic freeze semantics, bounded shutdown, acknowledgement clarity, Core 
 
 ### Decision Output
 
-Lifecycle ADR, freeze/in-flight semantics, lifecycle specification updates and proof that Managed Aggregation composes with Core.
+[ADR-020](../06-architecture/adr/ADR-020.md) records lifecycle, freeze/in-flight semantics, final materialization and
+composition with the existing Core lifecycle.
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 [Investigation overview](managed-aggregation-architecture-investigation.md) | [Documentation index](../README.md)

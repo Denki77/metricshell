@@ -1,6 +1,6 @@
 # INV-020 Report — Managed Aggregation Lifecycle and Core Integration
 
-Status: in progress
+Status: completed
 
 Run date: 2026-09-25
 
@@ -14,7 +14,7 @@ Ubuntu confirmation run: `results/20260925T121532Z`
 
 Confirmation environment: Docker Desktop 27.4.0, LinuxKit 6.10.14, linux/x86_64, 2-CPU container limit, 256 MiB memory limit
 
-Decision: evidence complete; status remains in progress until ADR-020 is prepared and accepted
+Decision: [ADR-020](../../docs/06-architecture/adr/ADR-020.md)
 
 ## Goal and Evidence Rule
 
@@ -27,12 +27,12 @@ Both runs used portable source/runner fingerprint
 
 ## Candidate Freeze Boundaries
 
-| Candidate                      | Bounded | Observed disposition                                              | Provisional evaluation                                        |
+| Candidate                      | Bounded | Observed disposition                                              | Final evaluation                                              |
 |--------------------------------|--------:|-------------------------------------------------------------------|---------------------------------------------------------------|
 | Immediate freeze               |     yes | one committed item retained; already received queue omitted       | deterministic but discards admissible work unnecessarily      |
 | Drain all fully received work  |      no | all four modeled items retained                                   | rejected without a deadline                                   |
 | Explicit flush/close handshake |      no | all four modeled items retained                                   | rejected as mandatory; crashed client can withhold completion |
-| Bounded hybrid                 |     yes | admitted work retained through the bound; late admission rejected | provisionally selected                                        |
+| Bounded hybrid                 |     yes | admitted work retained through the bound; late admission rejected | selected by ADR-020                                           |
 
 The bounded hybrid matches the existing Core rule: entering `finalizing` closes admission first; an item admitted before
 closure may finish only within the remaining finalization budget. The owner commit order is the linearization boundary.
@@ -90,8 +90,26 @@ generation zero. There is no replay, recovery or attachment to a prior workload 
 
 Job and CronJob shapes were crossed with duration and scrape-count waits. All four retained workload exit `17`, exposed
 the frozen state with metrics `200`, reported readiness `503`, and required no Kubernetes API. A real container
-Job-shaped run waited at least the configured 250 ms (observed end-to-end Docker lifecycle: 513 ms) and exited `17`.
+Job-shaped run waited at least the configured 250 ms and exited `17` in both environments.
 This validates container semantics, not live-cluster discovery or scrape scheduling.
+
+## Cross-environment Confirmation
+
+| Portable evidence                               |    ARM64 reference |      Ubuntu x86_64 | Result |
+|-------------------------------------------------|-------------------:|-------------------:|--------|
+| Portable fingerprint                            | `bbdde683...6264f` | `bbdde683...6264f` | match  |
+| Assertions                                      |              54/54 |              54/54 | match  |
+| E-020.1–E-020.7                                 |           7/7 PASS |           7/7 PASS | match  |
+| Process lifecycle cases                         |                3/3 |                3/3 | match  |
+| Natural / signal / Job-shaped exit              |      17 / 143 / 17 |      17 / 143 / 17 | match  |
+| Single-winner freeze rounds                     |              30/30 |              30/30 | match  |
+| Late publishers accepted after freeze           |            0/1,000 |            0/1,000 | match  |
+| Final-state/failure/epoch/Kubernetes invariants |               PASS |               PASS | match  |
+
+The semantic evidence matches exactly. Timing does not: the main container wall time was 220 ms on ARM64 and 3,811 ms
+on Ubuntu x86_64; the Job-shaped end-to-end Docker lifecycle was 430 ms and 4,245 ms respectively. Freeze-race maximum
+per-round p99 was 0.010208 ms and 0.031733 ms. These scheduler, runtime and host observations are not portable contracts,
+defaults or SLAs.
 
 ## Additional Benchmarks Executed
 
@@ -109,9 +127,10 @@ No locally executable planned variant was replaced by a future-work agreement:
 - Job and CronJob shapes under both duration and scrape-count policies;
 - fixed 2-CPU/256-MiB container envelope and environment fingerprint capture.
 
-The current result directory is the only retained INV-020 result set; there are no superseded local runs.
+The two retained result directories are the matching-fingerprint ARM64 reference and Ubuntu x86_64 confirmation. No
+superseded INV-020 evidence set remains.
 
-## Provisional Lifecycle Contract and Acceptable Values
+## Lifecycle Contract and Acceptable Values
 
 The matching-fingerprint evidence supports:
 
@@ -156,11 +175,12 @@ repetitions. Exercise maximum cardinality, queue saturation, slow partial socket
 cgroup memory pressure, slow/cancelled scrapers and randomized concurrent exit/signal races under the race detector.
 Measure queue residence and final materialization/install distributions against an explicitly configured reserve.
 
-## Provisional Conclusion
+## Conclusion
 
 Matching-fingerprint macOS ARM64 and Ubuntu x86_64 evidence supports the bounded hybrid freeze boundary and composes it
 with Core without changing Core semantics. It rejects unbounded full drain and a mandatory client handshake; immediate
 freeze remains a bounded fallback but loses already admitted complete work. All application state becomes immutable
 before final-wait entry, while self-metrics and Core-defined eligible scrape counting may continue.
 
-INV-020 remains **in progress** until ADR-020 is prepared and accepted, as required by the investigation workflow.
+ADR-020 accepts this lifecycle contract. INV-020 is **completed**, and the Managed Aggregation research sequence
+INV-016–INV-020 is complete.

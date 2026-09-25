@@ -19,3 +19,4 @@
 - [ADR-017 — Сериализация мутаций Managed Registry через одного bounded owner](ADR-017.md)
 - [ADR-018 — Локальный transport Managed Aggregation и protocol legacy-клиентов](ADR-018.md)
 - [ADR-019 — Материализация snapshot Managed Registry и границы resource controls](ADR-019.md)
+- [ADR-020 — Lifecycle, freeze и интеграция Managed Aggregation с Core](ADR-020.md)

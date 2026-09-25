@@ -1,12 +1,14 @@
 # INV-020 — Managed Aggregation Lifecycle and Core Integration
 
-**Status:** in progress
+**Status:** completed
 
 **macOS reference run:** `results/20260925T122604Z`
 
 **Ubuntu confirmation:** `results/20260925T121532Z` — confirmed
 
 **Report:** [report.md](report.md)
+
+**Decision:** [ADR-020](../../docs/06-architecture/adr/ADR-020.md)
 
 ## Question
 
@@ -17,12 +19,25 @@ the existing Core final-scrape lifecycle?
 
 The matching-fingerprint macOS-host Docker Desktop/LinuxKit ARM64 and Ubuntu-host Docker Desktop/LinuxKit x86_64 runs
 each passed 54/54 portable assertions, all E-020.1–E-020.7 summaries and three process-level lifecycle checks. All four
-freeze candidates and all six receive-to-ACK shutdown stages were executed. The evidence provisionally selects a
+freeze candidates and all six receive-to-ACK shutdown stages were executed. The evidence selects a
 bounded hybrid: close admission first, allow only already admitted work to reach commit within the remaining
 finalization budget, then freeze and install exactly one complete generation.
 
-Ubuntu confirmation is complete. The research remains **in progress** until ADR-020 is prepared and accepted; no ADR
-is created by this package yet.
+Ubuntu confirmation is complete and the lifecycle decision is accepted in ADR-020. INV-020 and the Managed
+Aggregation research sequence INV-016–INV-020 are complete.
+
+## Final Cross-environment Comparison
+
+| Evidence                    |    ARM64 reference |      Ubuntu x86_64 |
+|-----------------------------|-------------------:|-------------------:|
+| Fingerprint                 | `bbdde683...6264f` | `bbdde683...6264f` |
+| Portable assertions         |              54/54 |              54/54 |
+| E-020.1–E-020.7             |           7/7 PASS |           7/7 PASS |
+| Process lifecycle           |           3/3 PASS |           3/3 PASS |
+| Single-winner freeze rounds |              30/30 |              30/30 |
+
+The matching fingerprint and semantic assertions confirm the selected lifecycle contract. Main-container wall time
+differed (`220 ms` versus `3,811 ms`) and remains an environment-sensitive observation, not a portable contract.
 
 ## Prototype and Evidence
 
