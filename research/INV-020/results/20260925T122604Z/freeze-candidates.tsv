@@ -1,0 +1,5 @@
+candidate	bounded	committed_at_freeze	late_committed	observation
+immediate	true	1	0	drops fully received queued work
+drain_fully_received_unbounded	false	4	0	cannot guarantee shutdown bound
+explicit_flush_close	false	4	0	crashed client can withhold handshake
+bounded_hybrid	true	3	0	closes admission and drains admitted work to deadline

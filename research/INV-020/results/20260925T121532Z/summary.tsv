@@ -1,0 +1,8 @@
+experiment	name	result	coverage
+E-020.1	normal_exit	pass	freeze once; committed=5; late rejected
+E-020.2	signal_shutdown_stages	pass	6/6 receive-to-ACK stages deterministic
+E-020.3	late_publisher	pass	1000/1000 rejected; final unchanged
+E-020.4	final_snapshot_failure	pass	3/3 failures explicit; prior Core state retained
+E-020.5	final_scrape	pass	3 modes x 7 request classes
+E-020.6	restart_new_epoch	pass	30/30 new registries empty
+E-020.7	kubernetes_job_cronjob	pass	4/4 API-independent lifecycle cases

@@ -1,6 +1,6 @@
 # Managed Aggregation Architecture Investigation
 
-> Status: Planned
+> Status: Completed
 > Purpose: Evaluate the architecture of the optional Managed Aggregation extension before ADRs and implementation
 > Scope: managed registry semantics, concurrent publishers, legacy-client viability, performance/resource limits, lifecycle and Core integration
 > Depends on: completed MetricShell Core investigation INV-001–INV-015, accepted ADR-001–ADR-015, Managed Aggregation requirements and draft specification
@@ -87,9 +87,12 @@ INV-020 validates the full lifecycle integration and must use the selected seman
 | INV-017 | [Concurrent Publishers and Ordering](managed-aggregation-architecture-research.md#inv-017)    | Completed   | `research/INV-017/` | [ADR-017](../06-architecture/adr/ADR-017.md) |
 | INV-018 | [Legacy Client and Transport Viability](managed-aggregation-architecture-research.md#inv-018) | Completed   | `research/INV-018/` | [ADR-018](../06-architecture/adr/ADR-018.md) |
 | INV-019 | [Performance and Resource Limits](managed-aggregation-architecture-research.md#inv-019)       | Completed   | `research/INV-019/` | [ADR-019](../06-architecture/adr/ADR-019.md) |
-| INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Planned     | `research/INV-020/` | ADR-020 / lifecycle specification update     |
+| INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Completed   | `research/INV-020/` | [ADR-020](../06-architecture/adr/ADR-020.md) |
 
 ADR numbering is provisional until each investigation proves that a separate decision record is warranted. Multiple investigations may feed one ADR, and one investigation may produce multiple ADRs if independent decisions require it.
+
+The Managed Aggregation research sequence INV-016–INV-020 is complete. ADR-016 through ADR-020 record the accepted
+semantic, concurrency, transport, materialization/resource and lifecycle decisions.
 
 ## 6. Cross-Investigation Invariants
 

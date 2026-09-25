@@ -1,0 +1,7 @@
+stage	client_outcome	mutation_in_final
+partial_frame	rejected	0
+received_not_validated	rejected	0
+queued	accepted	1
+committing	accepted	1
+committed_before_ack	unknown	1
+acknowledged	accepted	1

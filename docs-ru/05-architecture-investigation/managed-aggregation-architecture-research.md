@@ -406,11 +406,12 @@ Deterministic freeze, bounded shutdown, acknowledgement clarity, Core lifecycle 
 
 ### Decision Output
 
-Lifecycle ADR, freeze/in-flight semantics, lifecycle spec updates и proof of composition with Core.
+[ADR-020](../06-architecture/adr/ADR-020.md) фиксирует lifecycle, freeze/in-flight semantics, final materialization и
+композицию с существующим lifecycle Core.
 
 ### Статус
 
-Planned.
+Завершено.
 
 ---
 [Обзор исследований](managed-aggregation-architecture-investigation.md) | [Индекс документации](../README.md)

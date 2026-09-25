@@ -1,6 +1,6 @@
 # Архитектурное исследование Managed Aggregation
 
-> Статус: запланировано
+> Статус: завершено
 > Назначение: исследовать архитектуру опционального расширения Managed Aggregation до принятия ADR и реализации
 > Scope: семантика managed registry, concurrent publishers, применимость legacy clients, performance/resource limits, lifecycle и интеграция с Core
 > Зависит от: завершённых INV-001–INV-015, принятых ADR-001–ADR-015, требований и черновой спецификации Managed Aggregation
@@ -87,9 +87,12 @@ INV-020 проверяет полную lifecycle-интеграцию и дол
 | INV-017 | [Concurrent Publishers and Ordering](managed-aggregation-architecture-research.md#inv-017)    | Завершено   | `research/INV-017/` | [ADR-017](../06-architecture/adr/ADR-017.md) |
 | INV-018 | [Legacy Client and Transport Viability](managed-aggregation-architecture-research.md#inv-018) | Завершено   | `research/INV-018/` | [ADR-018](../06-architecture/adr/ADR-018.md) |
 | INV-019 | [Performance and Resource Limits](managed-aggregation-architecture-research.md#inv-019)       | Завершено   | `research/INV-019/` | [ADR-019](../06-architecture/adr/ADR-019.md) |
-| INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Planned     | `research/INV-020/` | ADR-020 / lifecycle specification update     |
+| INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Завершено   | `research/INV-020/` | [ADR-020](../06-architecture/adr/ADR-020.md) |
 
 Нумерация ADR предварительная. Отдельное исследование не обязано порождать отдельный ADR: несколько INV могут дать один ADR, а один INV может привести к нескольким независимым решениям.
+
+Цепочка исследований Managed Aggregation INV-016–INV-020 завершена. ADR-016–ADR-020 фиксируют принятые решения по
+семантике, concurrency, transport, materialization/resources и lifecycle.
 
 ## 6. Сквозные инварианты исследований
 
