@@ -23,6 +23,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/httpingest"
 	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
@@ -76,6 +77,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
+		managedRegistry := bootstrapManagedRegistry(configuration.Mode)
 		if err := metrics.SetFinalWaitMode(selfmetric.FinalWaitMode(configuration.FinalWait.Mode)); err != nil {
 			return failLifecycle(machine, logger)
 		}
@@ -98,7 +100,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		debugView := func() []byte {
 			include, exclude := len(configuration.Exposition.Include), len(configuration.Exposition.Exclude)
-			content, marshalErr := json.Marshal(map[string]any{
+			debugConfiguration := map[string]any{
 				"mode":                   configuration.Mode,
 				"exposition_listen":      configuration.Exposition.Listen,
 				"max_response_bytes":     configuration.Exposition.ResponseBytes,
@@ -121,7 +123,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				"concurrent_ingestions":  configuration.ConcurrentIngestion,
 				"pending_ingestions":     configuration.PendingIngestion,
 				"required_nofile":        config.RequiredNoFile(configuration),
-			})
+			}
+			if managedRegistry != nil {
+				debugConfiguration["managed_generation"] = managedRegistry.Read().Generation
+			}
+			content, marshalErr := json.Marshal(debugConfiguration)
 			if marshalErr != nil {
 				return []byte("{}\n")
 			}
@@ -515,6 +521,13 @@ func startConfiguredIngestion(ctx context.Context, configuration config.Config, 
 		return func() error { return nil }, nil
 	}
 	return startIngestion(ctx, configuration, core)
+}
+
+func bootstrapManagedRegistry(mode config.Mode) *managed.Registry {
+	if mode != config.ModeManagedRegistry {
+		return nil
+	}
+	return managed.NewRegistry()
 }
 
 func ensurePrivateParent(path string) error {

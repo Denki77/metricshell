@@ -16,6 +16,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 )
 
@@ -29,6 +30,25 @@ func TestManagedModeDoesNotStartSnapshotIngestion(t *testing.T) {
 	}
 	if err := stop(); err != nil {
 		t.Fatalf("stop() error = %v", err)
+	}
+}
+
+func TestManagedModeBootstrapsOneFreshRegistry(t *testing.T) {
+	t.Parallel()
+
+	if registry := bootstrapManagedRegistry(config.ModeSnapshot); registry != nil {
+		t.Fatal("snapshot mode constructed managed registry")
+	}
+	first := bootstrapManagedRegistry(config.ModeManagedRegistry)
+	if first == nil || first.Read().Generation != 0 || len(first.Read().Families) != 0 {
+		t.Fatalf("managed bootstrap = %+v", first)
+	}
+	if _, err := first.Declare(managed.Descriptor{Name: "jobs", Type: managed.Counter}); err != nil {
+		t.Fatal(err)
+	}
+	second := bootstrapManagedRegistry(config.ModeManagedRegistry)
+	if second == first || second.Read().Generation != 0 || len(second.Read().Families) != 0 {
+		t.Fatal("managed bootstrap reused a previous execution epoch")
 	}
 }
 
