@@ -1,0 +1,4 @@
+case	installed	prior_core_value	outcome
+conversion_failure	false	7	metric_shell_failure
+validation_failure	false	7	metric_shell_failure
+install_failure	false	7	metric_shell_failure

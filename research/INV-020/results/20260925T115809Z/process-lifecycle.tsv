@@ -1,0 +1,4 @@
+case	expected_exit	actual_exit	result
+natural	17	17	pass
+signal	143	143	pass
+kubernetes_job_shape	17	17	pass

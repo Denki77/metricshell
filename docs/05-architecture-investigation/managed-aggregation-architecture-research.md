@@ -483,7 +483,7 @@ Lifecycle ADR, freeze/in-flight semantics, lifecycle specification updates and p
 
 ### Status
 
-Planned.
+In progress.
 
 ---
 [Investigation overview](managed-aggregation-architecture-investigation.md) | [Documentation index](../README.md)
