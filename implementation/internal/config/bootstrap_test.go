@@ -108,6 +108,23 @@ func TestParseManagedQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestParseManagedFrameSize(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-max-frame-bytes=4KiB", "--", "program"}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Managed.FrameBytes != 4<<10 {
+		t.Fatalf("frame bytes = %d", configuration.Managed.FrameBytes)
+	}
+	for _, option := range []string{"512B", "65KiB"} {
+		if _, err := Parse([]string{"--mode=managed-registry", "--managed-max-frame-bytes=" + option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("frame size %s accepted", option)
+		}
+	}
+}
+
 func TestParseShutdownPrecedence(t *testing.T) {
 	t.Parallel()
 

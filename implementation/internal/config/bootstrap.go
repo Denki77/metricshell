@@ -48,6 +48,7 @@ type Config struct {
 
 type ManagedConfig struct {
 	QueueCapacity int
+	FrameBytes    int
 }
 
 type LogConfig struct {
@@ -86,6 +87,7 @@ type HTTPConfig struct {
 var options = map[string]string{
 	"--mode":                          "mode",
 	"--managed-queue-capacity":        "managed_queue_capacity",
+	"--managed-max-frame-bytes":       "managed_frame_bytes",
 	"--shutdown-total-grace":          "total_grace",
 	"--workload-shutdown-timeout":     "workload_timeout",
 	"--shutdown-reserve":              "reserve",
@@ -207,11 +209,17 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 }
 
 func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig, error) {
-	configuration := ManagedConfig{QueueCapacity: 64}
-	value := ""
-	explicit := false
+	configuration := ManagedConfig{QueueCapacity: 64, FrameBytes: 8 << 10}
+	values := map[string]string{}
 	if lookupEnv != nil {
-		value, explicit = lookupEnv("METRICSHELL_MANAGED_QUEUE_CAPACITY")
+		for environment, property := range map[string]string{
+			"METRICSHELL_MANAGED_QUEUE_CAPACITY":  "managed_queue_capacity",
+			"METRICSHELL_MANAGED_MAX_FRAME_BYTES": "managed_frame_bytes",
+		} {
+			if value, exists := lookupEnv(environment); exists {
+				values[property] = value
+			}
+		}
 	}
 	for index := 0; index < len(args); index++ {
 		name, candidate, hasValue := strings.Cut(args[index], "=")
@@ -226,22 +234,34 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 			}
 			candidate = args[index]
 		}
-		if property == "managed_queue_capacity" {
-			value, explicit = candidate, true
+		if property == "managed_queue_capacity" || property == "managed_frame_bytes" {
+			values[property] = candidate
 		}
 	}
-	if explicit {
+	if len(values) != 0 {
 		if mode != ModeManagedRegistry {
-			return ManagedConfig{}, fmt.Errorf("managed queue capacity requires managed-registry mode")
+			return ManagedConfig{}, fmt.Errorf("managed options require managed-registry mode")
 		}
+	}
+	if value, exists := values["managed_queue_capacity"]; exists {
 		parsed, parseErr := parseCount(value)
 		if parseErr != nil {
 			return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
 		}
 		configuration.QueueCapacity = parsed
 	}
+	if value, exists := values["managed_frame_bytes"]; exists {
+		parsed, parseErr := parseBytes(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed frame size")
+		}
+		configuration.FrameBytes = parsed
+	}
 	if configuration.QueueCapacity < 1 || configuration.QueueCapacity > 1024 {
 		return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
+	}
+	if configuration.FrameBytes < 1<<10 || configuration.FrameBytes > 64<<10 {
+		return ManagedConfig{}, fmt.Errorf("invalid managed frame size")
 	}
 	return configuration, nil
 }
@@ -349,7 +369,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			}
 			value = args[index]
 		}
-		if property != "mode" && property != "managed_queue_capacity" {
+		if property != "mode" && property != "managed_queue_capacity" && property != "managed_frame_bytes" {
 			values[property] = value
 			explicit[property] = true
 		}

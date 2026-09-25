@@ -31,6 +31,9 @@ a detached view of exactly one generation. No persistence, replay or disconnect-
 ISSUE-MA-004 routes managed mutations through one bounded owner goroutine. Admission is non-blocking and produces an
 explicit overload result when the configured queue is full; success is returned only after the owner commits and
 assigns the registry-wide commit order.
+ISSUE-MA-005 defines protocol version 1 as one bounded NDJSON operation frame and one JSON response. Protocol parsing
+maps declarations and mutations into the managed domain, rejects incomplete/oversized/malformed/multi-frame input
+before admission, and derives success exclusively from the owner's committed result.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -177,6 +180,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/kubeexamples`: Kubernetes Job, CronJob, lifecycle and Prometheus example verification.
 - `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop,
   generation/commit accounting and detached views.
+- `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
