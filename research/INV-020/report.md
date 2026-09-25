@@ -4,15 +4,17 @@ Status: in progress
 
 Run date: 2026-09-25
 
-macOS reference run: `results/20260925T115809Z`
+macOS reference run: `results/20260925T122604Z`
 
 Reference environment: Docker Desktop 29.8.0, LinuxKit 7.0.12, linux/aarch64, 2-CPU container limit, 256 MiB memory limit
 
 Result: 54/54 portable assertions passed; E-020.1–E-020.7 and all listed additional local benchmarks completed
 
-Ubuntu confirmation: pending
+Ubuntu confirmation run: `results/20260925T121532Z`
 
-Decision: provisional only; ADR-020 must wait for matching-fingerprint Ubuntu evidence
+Confirmation environment: Docker Desktop 27.4.0, LinuxKit 6.10.14, linux/x86_64, 2-CPU container limit, 256 MiB memory limit
+
+Decision: evidence complete; status remains in progress until ADR-020 is prepared and accepted
 
 ## Goal and Evidence Rule
 
@@ -20,8 +22,8 @@ INV-020 connects ADR-016 registry semantics, ADR-017 commit/ACK ordering, ADR-01
 immutable generation materialization to the accepted Core lifecycle. Assertions establish portable safety properties.
 Timing and container-start observations are environment-sensitive and are not promises.
 
-The reference run used portable source/runner fingerprint
-`a372c7a39f099bdcf9c3c597de66b1d557f581113bd26b48ba7d360d2f03df3b`.
+Both runs used portable source/runner fingerprint
+`bbdde683d7c54d83ed82181634b639297d68e41ba2fb15ca4f350b5eaf36264f`.
 
 ## Candidate Freeze Boundaries
 
@@ -111,7 +113,7 @@ The current result directory is the only retained INV-020 result set; there are 
 
 ## Provisional Lifecycle Contract and Acceptable Values
 
-Pending Ubuntu confirmation, the evidence supports:
+The matching-fingerprint evidence supports:
 
 - freeze policy: bounded hybrid;
 - closure order: stop new connections/admission first, then resolve already admitted work;
@@ -135,7 +137,7 @@ Pending Ubuntu confirmation, the evidence supports:
 The portable fingerprint is:
 
 ```text
-a372c7a39f099bdcf9c3c597de66b1d557f581113bd26b48ba7d360d2f03df3b
+bbdde683d7c54d83ed82181634b639297d68e41ba2fb15ca4f350b5eaf36264f
 ```
 
 `export-stand.sh` packages the exact source, runner, verifier and expected fingerprint. On Ubuntu, unpack it, run
@@ -146,20 +148,19 @@ fingerprint must match exactly. Timings and architecture-specific image IDs are 
 
 The stand is intentionally contract-focused. It does not substitute for production Unix parsing, the production owner
 queue, production Core validation/install or a real HTTP server/control plane. The Job/CronJob matrix does not prove
-Prometheus discovered or persisted a sample. Docker Desktop/LinuxKit ARM64 is the only current environment; therefore
-the research cannot close yet.
+Prometheus discovered or persisted a sample. Both tested hosts use Docker Desktop/LinuxKit; native-kernel Ubuntu,
+containerd and CRI-O remain outside the current evidence.
 
-After Ubuntu confirmation, repeat on native Linux with production modules, pinned CPU and at least 30 process-level
+Repeat on native Linux with production modules, pinned CPU and at least 30 process-level
 repetitions. Exercise maximum cardinality, queue saturation, slow partial sockets, ACK disconnects, CPU throttling,
 cgroup memory pressure, slow/cancelled scrapers and randomized concurrent exit/signal races under the race detector.
 Measure queue residence and final materialization/install distributions against an explicitly configured reserve.
 
 ## Provisional Conclusion
 
-The macOS reference evidence supports the bounded hybrid freeze boundary and composes it with Core without changing
-Core semantics. It rejects unbounded full drain and a mandatory client handshake; immediate freeze remains a bounded
-fallback but loses already admitted complete work. All application state becomes immutable before final-wait entry,
-while self-metrics and Core-defined eligible scrape counting may continue.
+Matching-fingerprint macOS ARM64 and Ubuntu x86_64 evidence supports the bounded hybrid freeze boundary and composes it
+with Core without changing Core semantics. It rejects unbounded full drain and a mandatory client handshake; immediate
+freeze remains a bounded fallback but loses already admitted complete work. All application state becomes immutable
+before final-wait entry, while self-metrics and Core-defined eligible scrape counting may continue.
 
-INV-020 remains **in progress**. Final acceptance, ADR-020 and normative specification changes require a
-matching-fingerprint Ubuntu run.
+INV-020 remains **in progress** until ADR-020 is prepared and accepted, as required by the investigation workflow.

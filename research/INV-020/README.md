@@ -2,9 +2,9 @@
 
 **Status:** in progress
 
-**macOS reference run:** `results/20260925T115809Z`
+**macOS reference run:** `results/20260925T122604Z`
 
-**Ubuntu confirmation:** pending; the portable stand is ready
+**Ubuntu confirmation:** `results/20260925T121532Z` — confirmed
 
 **Report:** [report.md](report.md)
 
@@ -15,13 +15,14 @@ the existing Core final-scrape lifecycle?
 
 ## Current Result
 
-The macOS-host Docker Desktop/LinuxKit ARM64 run passed 54/54 portable assertions, all E-020.1–E-020.7 summaries and
-three process-level lifecycle checks. All four freeze candidates and all six receive-to-ACK shutdown stages were
-executed. The evidence provisionally selects a bounded hybrid: close admission first, allow only already admitted work
-to reach commit within the remaining finalization budget, then freeze and install exactly one complete generation.
+The matching-fingerprint macOS-host Docker Desktop/LinuxKit ARM64 and Ubuntu-host Docker Desktop/LinuxKit x86_64 runs
+each passed 54/54 portable assertions, all E-020.1–E-020.7 summaries and three process-level lifecycle checks. All four
+freeze candidates and all six receive-to-ACK shutdown stages were executed. The evidence provisionally selects a
+bounded hybrid: close admission first, allow only already admitted work to reach commit within the remaining
+finalization budget, then freeze and install exactly one complete generation.
 
-The research remains **in progress** until the same fingerprint is executed on Ubuntu and the results are compared. No
-ADR is created by this package yet.
+Ubuntu confirmation is complete. The research remains **in progress** until ADR-020 is prepared and accepted; no ADR
+is created by this package yet.
 
 ## Prototype and Evidence
 
@@ -69,7 +70,7 @@ cd /tmp/inv020-stand
 Expected portable source/runner fingerprint:
 
 ```text
-a372c7a39f099bdcf9c3c597de66b1d557f581113bd26b48ba7d360d2f03df3b
+bbdde683d7c54d83ed82181634b639297d68e41ba2fb15ca4f350b5eaf36264f
 ```
 
 The fingerprint covers the Dockerfile, Go source, module file, runner, exporter and verifier. Image IDs legitimately
@@ -81,14 +82,14 @@ differ by architecture and are provenance, not portable identity.
 - Core validation/install and the managed Unix transport are represented at their contract boundaries; they are not
   imported from production code.
 - The Job/CronJob matrix verifies API-independent container lifecycle semantics, not a live Kubernetes control plane.
-- The current evidence is Docker Desktop/LinuxKit ARM64 only; Ubuntu x86_64 confirmation is still required.
+- Both environments use Docker Desktop/LinuxKit; a native Ubuntu kernel remains unverified.
 - Microsecond sleep timings expose scheduler granularity and must not be used as deadline or latency guarantees.
 - The 250 ms post-exit case proves bounded behavior, not a production default.
 
 ## Better Follow-up Benchmarking
 
-After the required Ubuntu confirmation, stronger capacity evidence should use a native Ubuntu kernel with pinned CPUs,
-fixed governor and at least 30 full process repetitions. Integrate the production Unix parser, bounded owner queue,
+Stronger capacity evidence should use a native Ubuntu kernel with pinned CPUs, fixed governor and at least 30 full
+process repetitions. Integrate the production Unix parser, bounded owner queue,
 Core validator/atomic installer and HTTP server; timestamp close-admission, last commit, freeze, install and final-wait
 entry. Add CPU throttling, maximum-cardinality snapshots, slow/aborting scrapers, socket backlog saturation and cgroup
 memory pressure. Run race detection and multi-hour randomized exit/signal/ACK-loss schedules. These improve sizing and
