@@ -308,19 +308,32 @@ Assertions: reconnect needs no registry reconstruction; new MetricShell epoch st
 
 #### E-018.6 — Transport comparison
 
-Compare dependency availability, client code size, security boundary, framing robustness, debugging and performance observations.
+Compare dependency availability, client code size, same-container locality, filesystem/network security boundary,
+permissions, exposure, framing robustness, debugging, startup/failure behavior and operational complexity. Use a
+persistent in-container generator for Unix and HTTP at 1, 8, 32 and 128 clients; record operations/sec, ACK p50/p95/p99
+and errors as environment-sensitive observations. Keep per-operation Compose exec timings classified separately as an
+end-to-end short-lived helper observation.
+
+The transport prototype must distinguish accepted, transport, protocol and rejected outcomes for PHP 5.4. A bounded
+frame and explicit version are required research candidates, but the exact production bound belongs to INV-019. Safe
+pre-submit startup retry must be separated from unknown-outcome retry after a possible accepted write. Final ACK commit,
+deduplication and idempotency semantics remain INV-017 scope.
 
 ### Evaluation Criteria
 
-Client simplicity, PHP 5.4 viability, shell viability, dependency count, deterministic errors, local security and operational clarity.
+Client simplicity, PHP 5.4 viability, shell viability, dependency count, deterministic errors, same-workload locality,
+local security, network exposure, framing clarity, startup behavior and operational complexity. Performance observations
+are secondary evidence rather than the transport-selection criterion.
 
 ### Decision Output
 
-Selected managed-operation transport/protocol direction and reference legacy-client contract.
+[ADR-018](../06-architecture/adr/ADR-018.md) selects the initial local managed-operation transport, versioned bounded
+protocol direction and stateless legacy-client contract. Exact successful-ACK semantics remain an INV-017 dependency;
+numeric resource limits remain INV-019 scope.
 
 ### Status
 
-Planned.
+Completed.
 
 ---
 

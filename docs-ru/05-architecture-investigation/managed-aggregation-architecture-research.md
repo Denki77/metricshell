@@ -262,19 +262,32 @@ Reconnect без registry reconstruction; new epoch empty.
 
 #### E-018.6 — Transport comparison
 
-Dependencies, client LOC, security, framing robustness, debugging, performance observations.
+Сравнить dependencies, client LOC, same-container locality, filesystem/network security boundary, permissions, exposure,
+framing robustness, debugging, startup/failure behavior и operational complexity. Persistent in-container generator
+должен проверить Unix и HTTP при 1, 8, 32 и 128 clients и сохранить operations/sec, ACK p50/p95/p99 и errors как
+environment-sensitive observations. Timings с Compose exec на каждую операцию классифицируются отдельно как end-to-end
+short-lived helper observation.
+
+PHP 5.4 transport prototype должен различать accepted, transport, protocol и rejected outcomes. Bounded frame и explicit
+version обязательны как research candidates, но точный production bound относится к INV-019. Safe pre-submit startup
+retry отделяется от unknown-outcome retry после возможного принятия операции. Final ACK commit, deduplication и
+idempotency semantics остаются scope INV-017.
 
 ### Критерии оценки
 
-Client simplicity, PHP 5.4/shell viability, dependency count, deterministic errors, local security, operational clarity.
+Client simplicity, PHP 5.4/shell viability, dependency count, deterministic errors, same-workload locality, local
+security, network exposure, framing clarity, startup behavior и operational complexity. Performance observations —
+secondary evidence, а не критерий выбора transport.
 
 ### Decision Output
 
-Selected transport/protocol direction и reference legacy-client contract.
+[ADR-018](../06-architecture/adr/ADR-018.md) выбирает initial local managed-operation transport, направление versioned
+bounded protocol и stateless legacy-client contract. Точная successful-ACK semantics остаётся зависимостью INV-017;
+numeric resource limits остаются scope INV-019.
 
 ### Статус
 
-Planned.
+Завершено.
 
 ---
 

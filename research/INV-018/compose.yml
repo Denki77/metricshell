@@ -1,0 +1,18 @@
+services:
+  server:
+    build: ./prototype
+    image: metricshell-inv018:prototype
+    command: ["server", "--unix=/run/metricshell/managed.sock", "--http=:8080"]
+    user: "0:0"
+    volumes: ["runtime:/run/metricshell"]
+    networks: [bench]
+  php54:
+    build: ./clients
+    image: metricshell-inv018:php54
+    platform: linux/amd64
+    entrypoint: ["php"]
+    volumes: ["runtime:/run/metricshell"]
+    networks: [bench]
+    profiles: [tools]
+volumes: {runtime: {}}
+networks: {bench: {}}

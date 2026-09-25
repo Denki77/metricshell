@@ -17,3 +17,4 @@
 - [ADR-015 — Bounded complete-snapshot architecture с event-driven reconciliation](ADR-015.md)
 - [ADR-016 — Семантическая модель Managed Registry](ADR-016.md)
 - [ADR-017 — Сериализация мутаций Managed Registry через одного bounded owner](ADR-017.md)
+- [ADR-018 — Локальный transport Managed Aggregation и protocol legacy-клиентов](ADR-018.md)

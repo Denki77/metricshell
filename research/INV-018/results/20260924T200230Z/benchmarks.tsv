@@ -1,0 +1,7 @@
+transport	clients	operations	elapsed_ms	ops_per_second	errors
+unix	1	100	17316.460	5.8	0
+unix	8	96	5007.949	19.2	0
+unix	32	96	4435.060	21.6	0
+http	1	100	17586.561	5.7	0
+http	8	96	4962.196	19.3	0
+http	32	96	4116.724	23.3	0

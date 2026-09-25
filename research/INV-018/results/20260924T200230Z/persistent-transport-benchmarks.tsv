@@ -1,0 +1,13 @@
+transport	profile	clients	operations	elapsed_ms	ops_per_second	ack_p50_ms	ack_p95_ms	ack_p99_ms	errors	ending_goroutines
+unix	connection-per-operation	1	200	56.159	3561.3	0.267	0.418	0.592	0	1
+unix	connection-per-operation	8	1600	179.783	8899.6	0.679	2.206	3.202	0	1
+unix	connection-per-operation	32	6400	558.535	11458.5	2.048	6.973	9.474	0	1
+unix	connection-per-operation	128	25600	3013.898	8494.0	11.341	40.698	59.736	0	1
+http	connection-per-operation	1	200	103.118	1939.5	0.495	0.667	0.949	0	1
+http	connection-per-operation	8	1600	255.349	6265.9	0.898	3.068	5.539	0	1
+http	connection-per-operation	32	6400	612.232	10453.6	2.495	6.596	8.558	0	1
+http	connection-per-operation	128	25600	2516.724	10172.0	10.105	29.991	41.320	0	1
+http	reused-connection	1	200	56.085	3566.0	0.271	0.376	0.676	0	1
+http	reused-connection	8	1600	94.461	16938.3	0.335	1.294	2.171	0	1
+http	reused-connection	32	6400	404.156	15835.5	1.384	5.511	7.479	0	1
+http	reused-connection	128	25600	1704.743	15016.9	6.325	22.294	31.206	0	1

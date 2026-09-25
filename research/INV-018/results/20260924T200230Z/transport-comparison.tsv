@@ -1,0 +1,3 @@
+transport	dependency	framing	local_boundary	debuggability
+unix	POSIX socket in Go/PHP streams	newline JSON, 64KiB bound	filesystem permissions	less visible without helper
+http	HTTP client or raw TCP	HTTP Content-Length, 64KiB bound	loopback/network namespace	curl/wget friendly
