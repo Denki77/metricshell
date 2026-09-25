@@ -345,11 +345,12 @@ Memory bounded; behavior соответствует INV-017; positively acknowle
 
 ### Decision Output
 
-Snapshot strategy, managed limits, overload behavior, benchmark baseline, resource-limit spec updates.
+[ADR-019](../06-architecture/adr/ADR-019.md) фиксирует snapshot materialization, bounded resource controls и overload
+boundaries. Точные production numeric defaults и maxima остаются отложенными.
 
 ### Статус
 
-Planned.
+Завершено.
 
 ---
 

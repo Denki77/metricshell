@@ -404,11 +404,12 @@ Correctness, bounded memory, sustainable throughput, tail latency, snapshot cons
 
 ### Decision Output
 
-Snapshot materialization strategy, managed limits, overload behavior, benchmark baseline and resource-limit specification updates.
+[ADR-019](../06-architecture/adr/ADR-019.md) records snapshot materialization, bounded resource-control and overload
+boundaries. Exact production numeric defaults and maxima remain deferred.
 
 ### Status
 
-Planned.
+Completed.
 
 ---
 

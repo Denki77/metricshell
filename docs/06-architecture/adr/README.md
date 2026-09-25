@@ -18,3 +18,4 @@
 - [ADR-016 — Managed Registry Semantic Model](ADR-016.md)
 - [ADR-017 — Serialize Managed Registry Mutations through One Bounded Owner](ADR-017.md)
 - [ADR-018 — Managed Aggregation Local Transport and Legacy Client Protocol](ADR-018.md)
+- [ADR-019 — Managed Registry Snapshot Materialization and Resource-Control Boundaries](ADR-019.md)

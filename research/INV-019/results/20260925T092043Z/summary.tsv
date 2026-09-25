@@ -1,0 +1,8 @@
+experiment	case	result	detail
+E-019.1	operation_throughput	pass	100/1000/10000 series; 1/10/100 publishers
+E-019.2	cardinality_scaling	pass	100..20000 series plus 20001 rejection
+E-019.3	histogram_cost	pass	1/10/50/100 buckets; 101 rejected
+E-019.4	snapshot_strategies	pass	all four strategies; split phase timings
+E-019.5	concurrent_scrape	pass	full linked body; immutable generation cache; concurrent and slow readers
+E-019.6	backpressure	pass	exact capacity; visible rejection
+E-019.7	controlled_exhaustion	pass	policy bounds in prototype; cgroup and FD in runner

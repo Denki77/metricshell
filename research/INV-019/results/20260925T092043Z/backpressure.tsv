@@ -1,0 +1,5 @@
+capacity	attempted	accepted	rejected	max_depth
+1	10000	1	9999	1
+16	10000	16	9984	16
+64	10000	64	9936	64
+1024	10000	1024	8976	1024
