@@ -81,13 +81,13 @@ INV-020 проверяет полную lifecycle-интеграцию и дол
 
 ## 5. Tracking исследований
 
-| ID      | Тема                                                                                          | Статус      | Evidence            | Решение                                      |
-|---------|-----------------------------------------------------------------------------------------------|-------------|---------------------|----------------------------------------------|
-| INV-016 | [Managed Registry Semantics](managed-aggregation-architecture-research.md#inv-016)            | Завершено   | `research/INV-016/` | [ADR-016](../06-architecture/adr/ADR-016.md) |
-| INV-017 | [Concurrent Publishers and Ordering](managed-aggregation-architecture-research.md#inv-017)    | In progress | `research/INV-017/` | ADR-017 либо specification update            |
-| INV-018 | [Legacy Client and Transport Viability](managed-aggregation-architecture-research.md#inv-018) | Planned     | `research/INV-018/` | ADR-018 либо rejected-alternative record     |
-| INV-019 | [Performance and Resource Limits](managed-aggregation-architecture-research.md#inv-019)       | Planned     | `research/INV-019/` | ADR-019 / benchmark и limit specification    |
-| INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Planned     | `research/INV-020/` | ADR-020 / lifecycle specification update     |
+| ID      | Тема                                                                                          | Статус    | Evidence            | Решение                                      |
+|---------|-----------------------------------------------------------------------------------------------|-----------|---------------------|----------------------------------------------|
+| INV-016 | [Managed Registry Semantics](managed-aggregation-architecture-research.md#inv-016)            | Завершено | `research/INV-016/` | [ADR-016](../06-architecture/adr/ADR-016.md) |
+| INV-017 | [Concurrent Publishers and Ordering](managed-aggregation-architecture-research.md#inv-017)    | Завершено | `research/INV-017/` | [ADR-017](../06-architecture/adr/ADR-017.md) |
+| INV-018 | [Legacy Client and Transport Viability](managed-aggregation-architecture-research.md#inv-018) | Planned   | `research/INV-018/` | ADR-018 либо rejected-alternative record     |
+| INV-019 | [Performance and Resource Limits](managed-aggregation-architecture-research.md#inv-019)       | Planned   | `research/INV-019/` | ADR-019 / benchmark и limit specification    |
+| INV-020 | [Lifecycle and Core Integration](managed-aggregation-architecture-research.md#inv-020)        | Planned   | `research/INV-020/` | ADR-020 / lifecycle specification update     |
 
 Нумерация ADR предварительная. Отдельное исследование не обязано порождать отдельный ADR: несколько INV могут дать один ADR, а один INV может привести к нескольким независимым решениям.
 

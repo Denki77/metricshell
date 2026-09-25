@@ -1,6 +1,6 @@
 # INV-017 Report — Concurrent Publishers and Ordering
 
-Status: in progress
+Status: completed
 
 Run date: 2026-09-24
 
@@ -10,11 +10,15 @@ Reference evidence: `results/20260924T194912Z/reference`
 
 Extended evidence: `results/20260924T194912Z/extended`
 
-Ubuntu confirmation run: pending
+Ubuntu confirmation run: `results/20260924T195921Z`
 
-Environment: Docker Desktop 29.8.0, LinuxKit 7.0.12, linux/aarch64, 6 CPUs, 8.32 GB daemon memory
+Reference environment: Docker Desktop 29.8.0, LinuxKit 7.0.12, linux/aarch64, 6 CPUs, 8.32 GB daemon memory
 
-Result: reference 136/136 and extended 311/311 assertions passed; all five candidates retained in the evidence
+Confirmation environment: Docker Desktop 27.4.0, LinuxKit 6.10.14, linux/x86_64, 6 CPUs, 8.06 GB daemon memory
+
+Result: both environments passed reference 136/136, extended 311/311 and race detector PASS/0 reported races
+
+Decision: [ADR-017](../../docs/06-architecture/adr/ADR-017.md)
 
 ## Goal and Evidence Rule
 
@@ -22,14 +26,15 @@ INV-017 tests concurrent mutation, ordering, declaration races, incomplete deliv
 the ADR-016 managed-registry semantic boundary. Assertions are portable correctness evidence. Throughput, latency,
 fairness sample counts and overload acceptance counts are environment-sensitive observations.
 
-The investigation remains in progress until an Ubuntu run with the exact benchmark fingerprint is retained and the
-decision is recorded. No ADR is created by this reference run alone.
+The macOS and Ubuntu runs share the exact benchmark fingerprint. Portable assertions select the architecture through
+ADR-017; throughput, latency, snapshot sample counts and scheduler-sensitive fairness observations remain
+environment-specific measurements.
 
 ## Candidates
 
 | Candidate              | Prototype synchronization                        | Main property tested                  | Current disposition               |
 |------------------------|--------------------------------------------------|---------------------------------------|-----------------------------------|
-| Serialized loop        | one owner, bounded channel                       | direct commit order and backpressure  | provisional preference            |
+| Serialized loop        | one owner, bounded channel                       | direct commit order and backpressure  | selected                          |
 | Global lock            | one mutex around mutable state                   | simplest shared-state baseline        | viable fallback                   |
 | Sharded locks          | 16 counter shards plus metadata lock             | reduced counter contention            | reject as tested: mixed snapshots |
 | Atomics + family locks | atomic counter/gauge, histogram/descriptor locks | family-local synchronization          | reject as tested: mixed snapshots |
@@ -90,8 +95,8 @@ cannot infer that outcome without a receipt; this is the required unknown-outcom
 - With a publisher-scoped operation key retained in a dedupe table, replay returns the stored outcome and applies once.
 - If ACK is lost and no reusable key is available, the result is explicitly unknown; automatic blind retry is unsafe.
 
-Provisionally require unique publisher/session identity plus monotonically unique operation ID for retryable mutations.
-Retention limits and reconnect/session semantics remain protocol/resource work for INV-018/019.
+Retryable mutations require stable publisher/session identity plus operation identity sufficient for deduplication.
+Wire representation, ID format/width, retention limits and reconnect/session semantics remain INV-018/019 scope.
 
 ### E-017.7 — Backpressure
 
@@ -149,7 +154,7 @@ explicitly out of scope.
 
 The overload burst retained the negative evidence: 64 of 32,000 offers were admitted, minimum per publisher was 0,
 maximum was 64 and Jain index was `0.031250`. Consequently the research does not add a scheduler solely to improve that
-observation. The provisional contract is:
+observation. The selected contract is:
 
 > MetricShell guarantees bounded admission and deterministic processing of accepted mutations. MetricShell does not
 > guarantee equal admission share between concurrent publishers under overload. A publisher may receive overload
@@ -158,7 +163,7 @@ observation. The provisional contract is:
 Consequences: memory does not grow without bound; acceptance/rejection is visible; accepted operations retain commit
 semantics; starvation and equal share are not service guarantees. Jain index remains an observation, not a requirement.
 
-## Acceptable Values and Provisional Policies
+## Acceptable Values and Policies
 
 - Correctness envelope demonstrated: 1–128 concurrent publishers and 1,000 operations per publisher.
 - Reference bounded queue: 64 entries; demonstrated capacities: 1, 16, 64 and 1,024. No production default is selected.
@@ -172,8 +177,8 @@ semantics; starvation and equal share are not service guarantees. Jain index rem
 - Overload: bounded queue with explicit visible rejection; optional blocking requires a deadline. Equal-share admission
   and starvation protection are not guaranteed by current requirements.
 
-These are provisional until portable confirmation and ADR review. The 1–128 range is tested coverage, not a promise to
-support exactly 128 connections or reject 129.
+The 1–128 range is tested coverage, not a promise to support exactly 128 connections or reject 129. Queue capacity 64
+is a research setting, not a production default.
 
 ## Stand Fingerprint and Ubuntu Procedure
 
@@ -206,14 +211,29 @@ AMD64 images contain different machine code; source/runner fingerprint equality 
 - Test idempotency-table eviction, publisher restart/session rollover, key collision and memory bounds before selecting a
   retention window.
 
-## Provisional Conclusion
+## Portable Confirmation
 
-The evidence supports the initial hypothesis that a bounded single-owner mutation loop is sufficient and easiest to
-reason about. It naturally supplies a registry-wide commit order, per-connection FIFO when the reader enqueues in order,
-atomic histogram mutation, registry-wide snapshot linearizability and an explicit overload boundary. The no-fairness
-contract closes the shared-queue trade-off without inventing a product requirement. The tested sharded and atomic-family
-snapshot designs are rejected because they emitted mixed generations. Global-lock and copy-on-write remain viable
-fallbacks; performance/resource selection remains subject to INV-019.
+| Evidence                                     |   macOS/LinuxKit ARM64 | Ubuntu/LinuxKit x86_64 | Portable result        |
+|----------------------------------------------|-----------------------:|-----------------------:|------------------------|
+| Fingerprint                                  |       `22bc1820…92697` |       `22bc1820…92697` | exact match            |
+| Reference assertions                         |                136/136 |                136/136 | match                  |
+| Extended assertions                          |                311/311 |                311/311 | match                  |
+| Race detector                                |               PASS / 0 |               PASS / 0 | match                  |
+| Serialized/global-lock/COW mixed generations |                      0 |                      0 | linearizable as tested |
+| Sharded/atomic-family mixed generations      |               observed |               observed | rejected as tested     |
+| Overload accepted/min/max/Jain               | 64 / 0 / 64 / 0.031250 | 64 / 0 / 64 / 0.031250 | same negative witness  |
 
-Status remains **in progress**. Ubuntu confirmation and ADR review are required before this becomes an architecture
-decision.
+Snapshot sample counts and performance distributions differed across environments, as expected. They are observations,
+not portable acceptance criteria, and do not affect the selected correctness model.
+
+## Conclusion
+
+The matching-fingerprint evidence selects a bounded single-owner serialized mutation loop. It supplies one
+registry-wide commit order, per-connection FIFO into the owner, atomic histogram mutation, registry-wide snapshot
+linearizability and an explicit overload boundary. Selection is based on correctness and proof simplicity, not measured
+throughput. The no-fairness contract closes the shared-queue trade-off without inventing a product requirement. The
+tested sharded and atomic-family snapshot designs are rejected because they emitted mixed generations; this does not
+claim every possible sharded/atomic design is impossible. Global-lock and copy-on-write remain viable but unselected
+alternatives. Performance/resource limits remain INV-019 scope.
+
+INV-017 is **completed** and its decision is recorded by ADR-017.

@@ -75,10 +75,10 @@ INV-016 does not change Core; signed-histogram support is separate future scope.
 
 ## Follow-up Status
 
-[INV-017](../INV-017/README.md) is now in progress. Its matching-fingerprint macOS/LinuxKit reference run covers all
-five concurrency candidates and E-017.1–E-017.9, including registry-wide snapshot linearizability and the explicit
-overload fairness contract; Ubuntu confirmation and ADR review remain pending. This does not change the completed
-INV-016 semantic decision.
+[INV-017](../INV-017/README.md) is completed. Matching-fingerprint macOS/LinuxKit and Ubuntu/LinuxKit runs cover all five
+concurrency candidates and E-017.1–E-017.9, including registry-wide snapshot linearizability and the explicit overload
+fairness contract. Its decision is recorded in [ADR-017](../../docs/06-architecture/adr/ADR-017.md). This does not change
+the completed INV-016 semantic decision.
 
 ## Running the Prototype
 

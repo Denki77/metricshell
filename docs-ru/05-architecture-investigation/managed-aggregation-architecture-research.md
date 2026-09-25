@@ -191,17 +191,32 @@ Incomplete frame не меняет registry; broken connection не повреж
 
 Memory bounded; overload behavior deterministic; exposition остаётся operational.
 
+#### E-017.8 — Registry-wide snapshot linearizability
+
+Применить связанные cross-family mutations с известным commit order при concurrent чтении complete snapshots.
+
+Assertions: каждый complete snapshot соответствует одному committed registry generation; family-local consistency
+недостаточна, если snapshot смешивает state разных generations.
+
+#### E-017.9 — Admission fairness contract
+
+Проверить Managed Aggregation FR/NFR и измерить admission каждого publisher при bounded overload.
+
+Assertions: policy остаётся bounded и observable. Equal-share/starvation-protection guarantee не выводится без
+принятого product requirement; отсутствие гарантии фиксируется явно.
+
 ### Критерии оценки
 
 Correctness, determinism, bounded memory, throughput, tail latency, failure recovery, PHP/shell compatibility.
 
 ### Decision Output
 
-Concurrency model, linearization contract, idempotency policy, backpressure policy.
+[ADR-017](../06-architecture/adr/ADR-017.md) фиксирует concurrency model, ordering/linearization contract, границы ACK и
+idempotency, а также policy backpressure/fairness.
 
 ### Статус
 
-In progress.
+Завершено.
 
 ---
 

@@ -1,6 +1,6 @@
 # INV-017 — Concurrent Publishers and Ordering
 
-**Status:** in progress
+**Status:** completed
 
 **Run:** `results/20260924T194912Z`
 
@@ -8,9 +8,11 @@
 
 **Extended evidence:** `results/20260924T194912Z/extended`
 
-**Ubuntu confirmation:** pending
+**Ubuntu confirmation:** `results/20260924T195921Z` — confirmed
 
 **Report:** [report.md](report.md)
+
+**Decision:** [ADR-017](../../docs/06-architecture/adr/ADR-017.md)
 
 ## Question
 
@@ -19,16 +21,27 @@ duplicate/unknown-outcome behavior?
 
 ## Current Result
 
-The macOS Docker Desktop/LinuxKit ARM64 reference run passed 136/136 assertions and the extended 10,000-operation,
-10-repetition run passed 311/311 across all five candidates and E-017.1–E-017.9. Linked cross-family mutations showed
+The macOS Docker Desktop/LinuxKit ARM64 and Ubuntu Docker Desktop/LinuxKit x86_64 runs each passed 136/136 reference
+assertions, 311/311 extended assertions and the race detector with zero reported races. Both used fingerprint
+`22bc1820e394d9e7331be2857ca2298376b0d410ce52728833f1ca2f04792697`. Linked cross-family mutations showed
 that the tested sharded and atomic-family candidates can return mixed-generation complete snapshots; serialized,
-global-lock and copy-on-write candidates returned one committed registry generation. The evidence provisionally favors
-a single-owner serialized mutation loop with a bounded queue. The decision is not final until the same benchmark
-fingerprint passes on Ubuntu and an ADR is reviewed.
+global-lock and copy-on-write candidates returned one committed registry generation. ADR-017 selects a bounded
+single-owner serialized mutation loop for correctness and proof simplicity, not because it won the throughput benchmark.
 
 Requirements mandate bounded, observable overload but do not mandate equal admission share or starvation protection.
 The stand therefore retains the negative fairness evidence and documents an explicit no-fairness guarantee rather than
 adding an unrequested scheduler.
+
+## Decision Summary
+
+- Accepted mutations have one registry-wide commit order; per-connection receive order is preserved into the owner.
+- A complete managed snapshot corresponds to one registry-wide committed state.
+- Success ACK means committed, not merely received, parsed or queued.
+- Admission is bounded and overload rejection is observable; no production queue capacity is selected.
+- Equal admission share and starvation protection under overload are not guaranteed.
+- Lost ACK after possible commit is an unknown outcome without stable publisher/session plus operation identity.
+- Histogram observation updates count, sum and applicable cumulative buckets as one mutation.
+- First accepted descriptor wins; compatible repeats succeed and conflicts reject without mutation.
 
 ## Run the Prototype
 
@@ -90,5 +103,5 @@ containers. This keeps the command valid when Docker Desktop or a remote-context
 - Linked counter/gauge markers are a synthetic witness for mixed registry generations, not a proposed client operation.
 - Timings include goroutine scheduling inside one container and are not portable limits.
 - Queue capacity 64 is a reference setting, not a production default. Production sizing needs INV-019 workload/SLA data.
-- The run does not replace Ubuntu confirmation, race/sanitizer runs, native-Linux kernel coverage or end-to-end legacy
-  clients. Those gaps are explicit in the report.
+- The run does not replace sanitizer runs, native non-LinuxKit kernel coverage or end-to-end legacy clients. Those gaps
+  are explicit in the report and belong to later investigations where applicable.

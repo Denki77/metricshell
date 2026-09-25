@@ -245,11 +245,12 @@ Correctness, determinism, bounded memory, throughput, tail latency, fairness, fa
 
 ### Decision Output
 
-Concurrency model, ordering/linearization contract, idempotency policy and backpressure policy.
+[ADR-017](../06-architecture/adr/ADR-017.md) records the concurrency model, ordering/linearization contract,
+acknowledgement and idempotency boundaries, and backpressure/fairness policy.
 
 ### Status
 
-In progress.
+Completed.
 
 ---
 
