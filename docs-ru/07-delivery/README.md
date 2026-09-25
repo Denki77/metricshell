@@ -15,4 +15,4 @@ Issue готова к разработке, только если содержи
 
 - [Трассировка requirements к ADR/specifications](01-traceability/requirements-research-adr-traceability.md)
 - [EPIC-001: MetricShell Core](02-epics/EPIC-001-core.md)
-- [ISSUE-001](03-issues/ISSUE-001/README.md)…[ISSUE-037](03-issues/ISSUE-037/README.md)
+- [ISSUE-001](03-issues/ISSUE-001.md)…[ISSUE-037](03-issues/ISSUE-037.md)

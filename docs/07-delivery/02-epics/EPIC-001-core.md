@@ -85,12 +85,12 @@ Supervisor foundation and PID 1
 
 **Goal:** deliver a minimally correct runtime that safely starts and owns a workload as PID 1.
 
-- [ISSUE-001. Bootstrap the production Go module and command](../03-issues/ISSUE-001/README.md)
-- [ISSUE-002. PID 1 entrypoint and workload command parsing](../03-issues/ISSUE-002/README.md)
-- [ISSUE-003. Owned process group/session](../03-issues/ISSUE-003/README.md)
-- [ISSUE-004. Signal forwarding](../03-issues/ISSUE-004/README.md)
-- [ISSUE-005. Child reaping and orphan handling](../03-issues/ISSUE-005/README.md)
-- [ISSUE-006. Workload result preservation](../03-issues/ISSUE-006/README.md)
+- [ISSUE-001. Bootstrap the production Go module and command](../03-issues/ISSUE-001.md)
+- [ISSUE-002. PID 1 entrypoint and workload command parsing](../03-issues/ISSUE-002.md)
+- [ISSUE-003. Owned process group/session](../03-issues/ISSUE-003.md)
+- [ISSUE-004. Signal forwarding](../03-issues/ISSUE-004.md)
+- [ISSUE-005. Child reaping and orphan handling](../03-issues/ISSUE-005.md)
+- [ISSUE-006. Workload result preservation](../03-issues/ISSUE-006.md)
 
 **Wave 1 exit gate:** MetricShell can replace a basic container entrypoint and correctly perform PID 1 duties even with
 metrics ingestion disabled.
@@ -99,10 +99,10 @@ metrics ingestion disabled.
 
 Lifecycle and shutdown coordination
 
-- [ISSUE-007. Runtime lifecycle state machine](../03-issues/ISSUE-007/README.md)
-- [ISSUE-008. Shutdown budget model](../03-issues/ISSUE-008/README.md)
-- [ISSUE-009. Termination escalation](../03-issues/ISSUE-009/README.md)
-- [ISSUE-010. Health and readiness contract](../03-issues/ISSUE-010/README.md)
+- [ISSUE-007. Runtime lifecycle state machine](../03-issues/ISSUE-007.md)
+- [ISSUE-008. Shutdown budget model](../03-issues/ISSUE-008.md)
+- [ISSUE-009. Termination escalation](../03-issues/ISSUE-009.md)
+- [ISSUE-010. Health and readiness contract](../03-issues/ISSUE-010.md)
 
 **Wave 2 exit gate:** lifecycle and shutdown behavior are deterministic and bounded before transport work begins.
 
@@ -110,11 +110,11 @@ Lifecycle and shutdown coordination
 
 Metric state core
 
-- [ISSUE-011. Canonical publication model](../03-issues/ISSUE-011/README.md)
-- [ISSUE-012. Whole-candidate parser and validator](../03-issues/ISSUE-012/README.md)
-- [ISSUE-013. Atomic last-valid state holder](../03-issues/ISSUE-013/README.md)
-- [ISSUE-014. Initial zero-series state](../03-issues/ISSUE-014/README.md)
-- [ISSUE-015. Separate self-metrics domain](../03-issues/ISSUE-015/README.md)
+- [ISSUE-011. Canonical publication model](../03-issues/ISSUE-011.md)
+- [ISSUE-012. Whole-candidate parser and validator](../03-issues/ISSUE-012.md)
+- [ISSUE-013. Atomic last-valid state holder](../03-issues/ISSUE-013.md)
+- [ISSUE-014. Initial zero-series state](../03-issues/ISSUE-014.md)
+- [ISSUE-015. Separate self-metrics domain](../03-issues/ISSUE-015.md)
 
 **Wave 3 exit gate:** ADR-004 is implemented independently of transport.
 
@@ -122,13 +122,13 @@ Metric state core
 
 Transport contract and adapters
 
-- [ISSUE-016. Common transport-independent ingestion interface](../03-issues/ISSUE-016/README.md)
-- [ISSUE-017. File publication protocol](../03-issues/ISSUE-017/README.md)
-- [ISSUE-018. Unix socket framed protocol](../03-issues/ISSUE-018/README.md)
-- [ISSUE-019. Official client writer serialization](../03-issues/ISSUE-019/README.md)
-- [ISSUE-020. Local push HTTP adapter](../03-issues/ISSUE-020/README.md)
-- [ISSUE-021. Enforce mmap as non-primary](../03-issues/ISSUE-021/README.md)
-- [ISSUE-022. Cross-adapter conformance suite](../03-issues/ISSUE-022/README.md)
+- [ISSUE-016. Common transport-independent ingestion interface](../03-issues/ISSUE-016.md)
+- [ISSUE-017. File publication protocol](../03-issues/ISSUE-017.md)
+- [ISSUE-018. Unix socket framed protocol](../03-issues/ISSUE-018.md)
+- [ISSUE-019. Official client writer serialization](../03-issues/ISSUE-019.md)
+- [ISSUE-020. Local push HTTP adapter](../03-issues/ISSUE-020.md)
+- [ISSUE-021. Enforce mmap as non-primary](../03-issues/ISSUE-021.md)
+- [ISSUE-022. Cross-adapter conformance suite](../03-issues/ISSUE-022.md)
 
 **Wave 4 exit gate:** all three promised integration methods use the same state core and semantics.
 
@@ -136,12 +136,12 @@ Transport contract and adapters
 
 Exposition and final metrics
 
-- [ISSUE-023. Prometheus exposition server](../03-issues/ISSUE-023/README.md)
-- [ISSUE-024. Response pre-encoding and bounds](../03-issues/ISSUE-024/README.md)
-- [ISSUE-025. Finalization ingestion barrier](../03-issues/ISSUE-025/README.md)
-- [ISSUE-026. Final scrape state machine](../03-issues/ISSUE-026/README.md)
-- [ISSUE-027. Complete-response counting and drain](../03-issues/ISSUE-027/README.md)
-- [ISSUE-028. Final-wait observability](../03-issues/ISSUE-028/README.md)
+- [ISSUE-023. Prometheus exposition server](../03-issues/ISSUE-023.md)
+- [ISSUE-024. Response pre-encoding and bounds](../03-issues/ISSUE-024.md)
+- [ISSUE-025. Finalization ingestion barrier](../03-issues/ISSUE-025.md)
+- [ISSUE-026. Final scrape state machine](../03-issues/ISSUE-026.md)
+- [ISSUE-027. Complete-response counting and drain](../03-issues/ISSUE-027.md)
+- [ISSUE-028. Final-wait observability](../03-issues/ISSUE-028.md)
 
 **Wave 5 exit gate:** MetricShell exposes a frozen final snapshot after workload exit and terminates within budget.
 
@@ -149,15 +149,15 @@ Exposition and final metrics
 
 Kubernetes, distribution, hardening, and release evidence
 
-- [ISSUE-029. Kubernetes Job integration](../03-issues/ISSUE-029/README.md)
-- [ISSUE-030. Kubernetes lifecycle controls](../03-issues/ISSUE-030/README.md)
-- [ISSUE-031. Multi-replica Prometheus integration test](../03-issues/ISSUE-031/README.md)
-- [ISSUE-032. Static multi-architecture release artifacts](../03-issues/ISSUE-032/README.md)
-- [ISSUE-033. Container hardening defaults](../03-issues/ISSUE-033/README.md)
-- [ISSUE-034. Configurable capacity and timeout limits](../03-issues/ISSUE-034/README.md)
-- [ISSUE-035. Fault, soak, and race suite](../03-issues/ISSUE-035/README.md)
-- [ISSUE-036. Controlled release benchmark suite](../03-issues/ISSUE-036/README.md)
-- [ISSUE-037. Release supply-chain pipeline](../03-issues/ISSUE-037/README.md)
+- [ISSUE-029. Kubernetes Job integration](../03-issues/ISSUE-029.md)
+- [ISSUE-030. Kubernetes lifecycle controls](../03-issues/ISSUE-030.md)
+- [ISSUE-031. Multi-replica Prometheus integration test](../03-issues/ISSUE-031.md)
+- [ISSUE-032. Static multi-architecture release artifacts](../03-issues/ISSUE-032.md)
+- [ISSUE-033. Container hardening defaults](../03-issues/ISSUE-033.md)
+- [ISSUE-034. Configurable capacity and timeout limits](../03-issues/ISSUE-034.md)
+- [ISSUE-035. Fault, soak, and race suite](../03-issues/ISSUE-035.md)
+- [ISSUE-036. Controlled release benchmark suite](../03-issues/ISSUE-036.md)
+- [ISSUE-037. Release supply-chain pipeline](../03-issues/ISSUE-037.md)
 
 **Wave 6 exit gate:** the release candidate is ready for a production pilot with auditable operational bounds.
 
