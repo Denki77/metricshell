@@ -1,0 +1,6 @@
+candidate	linked_mutations	snapshots	mixed_generations	registry_wide_linearizable
+serialized	100000	82007	0	true
+global_mutex	100000	255209	0	true
+sharded	100000	116209	87293	false
+atomic_family	100000	802483	748978	false
+copy_on_write	100000	1067	0	true

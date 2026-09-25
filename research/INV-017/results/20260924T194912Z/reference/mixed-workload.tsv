@@ -1,0 +1,6 @@
+candidate	publishers	operations	elapsed_ns	valid
+serialized	32	9600	5266542	true
+global_mutex	32	9600	1338875	true
+sharded	32	9600	1388541	true
+atomic_family	32	9600	973292	true
+copy_on_write	32	9600	1274959	true

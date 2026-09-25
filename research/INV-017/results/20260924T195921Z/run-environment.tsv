@@ -1,0 +1,4 @@
+key	value
+environment_id	linux-linux-x86_64
+host_os	linux
+docker_platform	linux-x86_64

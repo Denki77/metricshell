@@ -16,3 +16,4 @@
 - [ADR-014 — Enforce Local Non-root Operation and Whole-candidate Resource Bounds](ADR-014.md)
 - [ADR-015 — Use Bounded Complete-snapshot Architecture with Event-driven Reconciliation](ADR-015.md)
 - [ADR-016 — Managed Registry Semantic Model](ADR-016.md)
+- [ADR-017 — Serialize Managed Registry Mutations through One Bounded Owner](ADR-017.md)

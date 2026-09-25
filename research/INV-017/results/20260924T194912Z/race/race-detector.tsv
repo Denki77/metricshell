@@ -1,0 +1,2 @@
+command	result	reported_races
+go run -race ./cmd/inv017 --out=/tmp/results --ops=100 --repetitions=1	pass	0

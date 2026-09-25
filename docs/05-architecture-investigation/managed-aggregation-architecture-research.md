@@ -224,17 +224,33 @@ Overload the consumer.
 
 Assertions: memory stays bounded; reject/block behavior is deterministic; accepted registry state stays valid; exposition remains operational.
 
+#### E-017.8 — Registry-wide snapshot linearizability
+
+Apply linked cross-family mutations with a known commit order while complete snapshots are read concurrently. Compare
+all synchronization candidates.
+
+Assertions: every complete snapshot corresponds to one committed registry generation; a family-internally consistent
+snapshot is insufficient if it combines state from different generations.
+
+#### E-017.9 — Admission fairness contract
+
+Review Managed Aggregation FR/NFR requirements and measure per-publisher admission under bounded overload.
+
+Assertions: the selected policy remains bounded and observable. Do not infer an equal-share or starvation-protection
+guarantee unless an accepted requirement demands it; otherwise record the absence of that guarantee explicitly.
+
 ### Evaluation Criteria
 
 Correctness, determinism, bounded memory, throughput, tail latency, fairness, failure recovery, PHP/shell compatibility and acknowledgement clarity.
 
 ### Decision Output
 
-Concurrency model, ordering/linearization contract, idempotency policy and backpressure policy.
+[ADR-017](../06-architecture/adr/ADR-017.md) records the concurrency model, ordering/linearization contract,
+acknowledgement and idempotency boundaries, and backpressure/fairness policy.
 
 ### Status
 
-Planned.
+Completed.
 
 ---
 

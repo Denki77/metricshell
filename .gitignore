@@ -8,3 +8,7 @@ research/INV*/latest-*results.txt
 
 research/INV*/results/*/*
 !research/INV*/results/*/*.tsv
+
+!research/INV-017/results/*/*/
+research/INV-017/results/*/*/*
+!research/INV-017/results/*/*/*.tsv
