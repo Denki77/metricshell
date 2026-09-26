@@ -43,6 +43,9 @@ submission is never retried automatically.
 ISSUE-MA-008 bounds managed families, active series, labels, histogram buckets, batches and descriptor/label strings.
 Every policy-limit rejection is distinct from queue overload and protocol rejection and preserves committed state and
 generation.
+ISSUE-MA-009 materializes one complete registry generation into deterministic immutable Application Snapshot Protocol
+bytes. An unchanged generation reuses the cache, concurrent misses coalesce, issued reader bytes remain isolated, and
+a failed rebuild retains the preceding successful entry.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -190,6 +193,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop,
   generation/commit accounting and detached views.
 - `internal/managedclient`: stateless managed operation client, result taxonomy and shell-friendly command surface.
+- `internal/managedmaterialize`: generation-keyed immutable complete-snapshot encoding cache and reader ownership.
 - `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.
 - `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines and admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.

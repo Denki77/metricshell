@@ -1,6 +1,6 @@
 # ISSUE-MA-009. Generation-based immutable materialization
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -44,3 +44,17 @@ Linked cross-family consistency test; concurrent mutation/materialization; slow 
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented deterministic complete-generation encoding and a single-entry
+  immutable cache keyed by registry generation.
+- 2026-09-26: moved to `Testing`; added hit/miss/stale/failure/coalescing, slow-reader ownership and concurrent
+  linked-family consistency race tests and audited both implementation READMEs.
+- 2026-09-26: moved to `Done`; the full Docker format, vet, race, dependency, Darwin compile and Linux
+  multi-architecture build gate passed with snapshot regressions intact.
+
+## Verification evidence
+
+- `go test -race ./internal/managedmaterialize ./internal/managed` (inside the pinned Docker toolchain)
+- `cd implementation && make test`

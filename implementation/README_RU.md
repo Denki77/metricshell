@@ -27,6 +27,9 @@ ISSUE-MA-007 добавляет клиент без локального сос�
 ISSUE-MA-008 ограничивает managed families, active series, labels, histogram buckets, batches и строки
 descriptor/label. Policy-limit rejection отличается от queue overload и protocol rejection и сохраняет committed state
 и generation.
+ISSUE-MA-009 материализует одну полную registry generation в детерминированные immutable bytes протокола Application
+Snapshot. Неизменившаяся generation переиспользует cache, concurrent misses объединяются, выданные reader bytes
+изолированы, а неуспешный rebuild сохраняет предыдущую успешную entry.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий
@@ -173,6 +176,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop и
   generation/commit accounting.
 - `internal/managedclient`: stateless managed-operation client, result taxonomy и shell-friendly command surface.
+- `internal/managedmaterialize`: generation-keyed immutable cache полного snapshot encoding и reader ownership.
 - `internal/managedprotocol`: versioned bounded NDJSON framing и отображение domain/result.
 - `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines и admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing и Unix listener с mode 0660.
