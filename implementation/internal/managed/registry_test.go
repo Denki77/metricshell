@@ -116,6 +116,27 @@ func TestRegistryRejectsGenerationOverflowBeforeMutation(t *testing.T) {
 	}
 }
 
+func TestRegistryFreezeIsSingleWinnerAndImmutable(t *testing.T) {
+	t.Parallel()
+
+	registry := NewRegistry()
+	assertGeneration(t, commitResult(registry.Declare(Descriptor{Name: "depth", Type: Gauge})), 1)
+
+	first, firstWinner := registry.Freeze()
+	second, secondWinner := registry.Freeze()
+	if !firstWinner || secondWinner || first.Generation != 1 || !reflect.DeepEqual(second, first) || !registry.Frozen() {
+		t.Fatalf("first=%+v winner=%v second=%+v winner=%v frozen=%v", first, firstWinner, second, secondWinner, registry.Frozen())
+	}
+
+	generation, err := registry.Apply(Operation{Kind: GaugeSet, Name: "depth", Value: 42})
+	if reason, ok := RejectionReason(err); !ok || reason != ReasonLate || generation != first.Generation {
+		t.Fatalf("late mutation generation=%d reason=%q error=%v", generation, reason, err)
+	}
+	if after := registry.Read(); !reflect.DeepEqual(after, first) {
+		t.Fatalf("late mutation changed frozen registry: before=%+v after=%+v", first, after)
+	}
+}
+
 type commit struct {
 	generation uint64
 	err        error

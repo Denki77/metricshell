@@ -52,6 +52,9 @@ an unchanged managed generation is not installed twice.
 ISSUE-MA-011 closes managed socket and owner admission as the first finalization action. Only work admitted before that
 barrier may drain, and only within the existing finalization or shutdown context; no managed-specific drain timeout is
 added.
+ISSUE-MA-012 freezes the drained managed registry exactly once, rejects every later publisher as `late`, and makes one
+final materialization/install attempt through Core before its existing freeze and final-wait policy. A failed final
+candidate is not retried and cannot replace the previously active Core snapshot.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -201,6 +204,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/managedclient`: stateless managed operation client, result taxonomy and shell-friendly command surface.
 - `internal/managedmaterialize`: generation-keyed immutable complete-snapshot encoding cache and reader ownership.
 - `internal/managedbridge`: complete managed-candidate handoff to the existing Core validation and atomic install path.
+- `internal/managedfinalize`: single-winner registry freeze and exactly-once final managed install coordination.
 - `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.
 - `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines and admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.

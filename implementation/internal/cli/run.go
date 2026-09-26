@@ -24,7 +24,10 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/managed"
+	"github.com/Denki77/metricshell/implementation/internal/managedbridge"
 	"github.com/Denki77/metricshell/implementation/internal/managedclient"
+	"github.com/Denki77/metricshell/implementation/internal/managedfinalize"
+	"github.com/Denki77/metricshell/implementation/internal/managedmaterialize"
 	"github.com/Denki77/metricshell/implementation/internal/managedserver"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
@@ -114,6 +117,21 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			ingestion.MultiObserver{metricsObserver, diagnosticObserver})
 		if coreErr != nil {
 			return rejectConfiguration(machine, metrics, logger, coreErr)
+		}
+		var managedFinalizer *managedfinalize.Finalizer
+		if managedRegistry != nil {
+			cache, cacheErr := managedmaterialize.New(managedRegistry, nil)
+			if cacheErr != nil {
+				return rejectConfiguration(machine, metrics, logger, cacheErr)
+			}
+			bridge, bridgeErr := managedbridge.New(cache, core)
+			if bridgeErr != nil {
+				return rejectConfiguration(machine, metrics, logger, bridgeErr)
+			}
+			managedFinalizer, bridgeErr = managedfinalize.New(managedRegistry, bridge)
+			if bridgeErr != nil {
+				return rejectConfiguration(machine, metrics, logger, bridgeErr)
+			}
 		}
 		debugView := func() []byte {
 			include, exclude := len(configuration.Exposition.Include), len(configuration.Exposition.Exclude)
@@ -310,6 +328,13 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			freezeContext, cancelFreeze := finalizationContext(configuration, shutdownPlan, now())
 			ingestionControl.CloseAdmission()
 			_ = ingestionControl.Drain(freezeContext)
+			if managedFinalizer != nil {
+				managedResult, managedErr := managedFinalizer.FreezeAndInstall(freezeContext)
+				if managedErr != nil || managedResult.Install.Core.Outcome != ingestion.Accepted {
+					cancelFreeze()
+					return failLifecycle(machine, logger)
+				}
+			}
 			final := core.CloseAndFreeze(freezeContext)
 			cancelFreeze()
 			metrics.SetActiveSnapshot(final)

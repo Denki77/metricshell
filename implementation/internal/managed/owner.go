@@ -76,7 +76,7 @@ func (owner *Owner) Submit(ctx context.Context, mutation Mutation) Result {
 	owner.mu.RLock()
 	if owner.closed {
 		owner.mu.RUnlock()
-		return Result{Outcome: OutcomeClosed, Generation: owner.registry.Read().Generation}
+		return Result{Outcome: OutcomeClosed, Generation: owner.registry.Read().Generation, Reason: ReasonLate}
 	}
 	select {
 	case owner.queue <- request:

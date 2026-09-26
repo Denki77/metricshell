@@ -11,6 +11,7 @@ type Registry struct {
 	mu         sync.RWMutex
 	generation uint64
 	model      *Model
+	frozen     bool
 }
 
 func NewRegistry() *Registry {
@@ -28,6 +29,9 @@ func NewRegistryWithLimits(limits Limits) (*Registry, error) {
 func (registry *Registry) Declare(descriptor Descriptor) (uint64, error) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
+	if registry.frozen {
+		return registry.generation, reject(ReasonLate)
+	}
 
 	_, existed := registry.model.families[descriptor.Name]
 	if !existed && registry.generation == ^uint64(0) {
@@ -45,6 +49,9 @@ func (registry *Registry) Declare(descriptor Descriptor) (uint64, error) {
 func (registry *Registry) Apply(operation Operation) (uint64, error) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
+	if registry.frozen {
+		return registry.generation, reject(ReasonLate)
+	}
 
 	if registry.generation == ^uint64(0) {
 		return registry.generation, reject(ReasonOverflow)
@@ -59,6 +66,9 @@ func (registry *Registry) Apply(operation Operation) (uint64, error) {
 func (registry *Registry) ApplyBatch(operations []Operation) (uint64, error) {
 	registry.mu.Lock()
 	defer registry.mu.Unlock()
+	if registry.frozen {
+		return registry.generation, reject(ReasonLate)
+	}
 
 	if registry.generation == ^uint64(0) {
 		return registry.generation, reject(ReasonOverflow)
@@ -75,4 +85,18 @@ func (registry *Registry) Read() Snapshot {
 	defer registry.mu.RUnlock()
 
 	return Snapshot{Generation: registry.generation, Families: registry.model.Families()}
+}
+
+func (registry *Registry) Freeze() (Snapshot, bool) {
+	registry.mu.Lock()
+	defer registry.mu.Unlock()
+	winner := !registry.frozen
+	registry.frozen = true
+	return Snapshot{Generation: registry.generation, Families: registry.model.Families()}, winner
+}
+
+func (registry *Registry) Frozen() bool {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	return registry.frozen
 }

@@ -42,6 +42,7 @@ const (
 	ReasonNameLimit          Reason = "name_limit"
 	ReasonValueLimit         Reason = "label_value_limit"
 	ReasonHelpLimit          Reason = "help_limit"
+	ReasonLate               Reason = "late"
 )
 
 type SemanticError struct {

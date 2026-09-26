@@ -124,6 +124,12 @@ partial frames and complete-but-not-admitted operations cannot mutate the regist
 only within the same finalization context or remaining ADR-003 shutdown reserve; there is no second managed drain
 timeout.
 
+After that drain, one logical winner freezes the managed registry and selects its generation as authoritative. Every
+post-freeze declaration or mutation is rejected as late. Exactly one complete candidate is materialized and offered to
+Core; conversion, validation or installation failure is not retried and preserves the preceding active Core snapshot.
+Core is then frozen through the existing barrier, and natural exits use the unchanged immediate, duration or scrapes
+final-wait policy. Shutdown-triggered exits retain the existing immediate-finalization behavior.
+
 ## Probe and endpoint semantics
 
 | State             |                                 health |   readiness | metrics                            |

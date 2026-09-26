@@ -35,6 +35,9 @@ ISSUE-MA-010 устанавливает materialized managed generations чер�
 неизменившаяся managed generation не устанавливается повторно.
 ISSUE-MA-011 закрывает managed socket и owner admission первым действием finalization. Только работа, admitted до этой
 границы, может завершиться в существующем finalization/shutdown context; отдельный managed drain timeout не добавлен.
+ISSUE-MA-012 ровно один раз замораживает drained managed registry, отклоняет каждого позднего publisher как `late` и
+делает одну финальную попытку materialization/install через Core до существующих Core freeze и final-wait. Ошибка
+финального candidate не повторяется и не заменяет ранее активный Core snapshot.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий
@@ -183,6 +186,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/managedclient`: stateless managed-operation client, result taxonomy и shell-friendly command surface.
 - `internal/managedmaterialize`: generation-keyed immutable cache полного snapshot encoding и reader ownership.
 - `internal/managedbridge`: передача полного managed candidate в существующий Core validation/atomic install path.
+- `internal/managedfinalize`: single-winner freeze реестра и координация ровно одной финальной managed install.
 - `internal/managedprotocol`: versioned bounded NDJSON framing и отображение domain/result.
 - `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines и admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing и Unix listener с mode 0660.
