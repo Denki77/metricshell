@@ -24,6 +24,9 @@ Managed Aggregation Wave 1 добавляет явную границу влад
 ISSUE-MA-007 добавляет клиент без локального состояния для `metricshell managed` и эталонный PHP 5.4-клиент. Они
 различают accepted, rejected, overload, protocol, transport и unknown; unknown после полной отправки не повторяется
 автоматически.
+ISSUE-MA-008 ограничивает managed families, active series, labels, histogram buckets, batches и строки
+descriptor/label. Policy-limit rejection отличается от queue overload и protocol rejection и сохраняет committed state
+и generation.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий

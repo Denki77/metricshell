@@ -14,7 +14,15 @@ type Registry struct {
 }
 
 func NewRegistry() *Registry {
-	return &Registry{model: NewModel()}
+	registry, _ := NewRegistryWithLimits(DefaultLimits())
+	return registry
+}
+
+func NewRegistryWithLimits(limits Limits) (*Registry, error) {
+	if err := limits.Validate(); err != nil {
+		return nil, err
+	}
+	return &Registry{model: NewModelWithLimits(limits)}, nil
 }
 
 func (registry *Registry) Declare(descriptor Descriptor) (uint64, error) {

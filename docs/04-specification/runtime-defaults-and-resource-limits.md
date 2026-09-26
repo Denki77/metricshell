@@ -85,6 +85,15 @@ A candidate violating any limit is rejected atomically and cannot partially modi
 | `managed.connections`        | `METRICSHELL_MANAGED_MAX_CONNECTIONS`    |     `8` | `1`–`1024`     |
 | `managed.read_timeout`       | `METRICSHELL_MANAGED_READ_TIMEOUT`       |    `5s` | `100ms`–`1m`   |
 | `managed.write_timeout`      | `METRICSHELL_MANAGED_WRITE_TIMEOUT`      |    `5s` | `100ms`–`1m`   |
+| `managed.families`           | `METRICSHELL_MANAGED_MAX_FAMILIES`       |  `1024` | `1`–`100000`   |
+| `managed.series`             | `METRICSHELL_MANAGED_MAX_SERIES`         | `10000` | `1`–`100000`   |
+| `managed.labels`             | `METRICSHELL_MANAGED_MAX_LABELS`         |     `8` | `0`–`64`       |
+| `managed.buckets`            | `METRICSHELL_MANAGED_MAX_BUCKETS`        |    `64` | `1`–`1024`     |
+| `managed.batch_operations`   | `METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS` |  `64` | `1`–`1024`     |
+| `managed.metric_name_bytes`  | `METRICSHELL_MANAGED_MAX_METRIC_NAME_BYTES` | `256` | `1B`–`1KiB` |
+| `managed.label_name_bytes`   | `METRICSHELL_MANAGED_MAX_LABEL_NAME_BYTES` | `128` | `1B`–`1KiB` |
+| `managed.label_value_bytes`  | `METRICSHELL_MANAGED_MAX_LABEL_VALUE_BYTES` | `1KiB` | `1B`–`16KiB` |
+| `managed.help_bytes`         | `METRICSHELL_MANAGED_MAX_HELP_BYTES`     |  `4KiB` | `0`–`64KiB`    |
 | `socket.parts`               | `METRICSHELL_SOCKET_MAX_PARTS`           |   `256` |     `1`–`1024` |
 | `socket.connections`         | `METRICSHELL_SOCKET_MAX_CONNECTIONS`     |     `8` |       `1`–`64` |
 | `socket.transactions`        | `METRICSHELL_SOCKET_MAX_TRANSACTIONS`    |     `4` |       `1`–`32` |
@@ -108,6 +117,11 @@ Negative `payload_chars` means zero capacity. Startup requires
 `effective_socket_decoded_capacity >= limits.snapshot_bytes`. The default `8KiB × 256` configuration satisfies this
 invariant after worst-case MSP/1 overhead and unpadded base64url expansion. The assembled input remains bounded by
 `limits.decoded_input_bytes`, and its canonical form by `limits.snapshot_bytes`.
+
+Managed series, label and string defaults deliberately reuse the already accepted Core limits. Family, bucket and
+batch defaults are conservative product bounds selected independently of the INV-019 coverage endpoints; the tested
+20,000-series and 100-bucket values are not defaults. Every managed resource rejection occurs before committing the
+new family/series/bucket vector and preserves the complete registry generation.
 
 ## Local HTTP ingestion defaults
 

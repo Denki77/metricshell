@@ -62,6 +62,12 @@ The managed Unix endpoint is configured by `--managed-socket-path`, `--managed-s
 `METRICSHELL_` environment names. The path is absolute, its parent is private, mode uses four octal digits and grants
 no permissions to other users, and timeouts are bounded durations.
 
+Registry resources use `--managed-max-families`, `--managed-max-series`, `--managed-max-labels`,
+`--managed-max-buckets`, `--managed-max-batch-operations`, `--managed-max-metric-name-bytes`,
+`--managed-max-label-name-bytes`, `--managed-max-label-value-bytes`, and `--managed-max-help-bytes`, with corresponding
+uppercase `METRICSHELL_` environment names. These options are managed-only startup properties. Invalid values fail
+before workload start; runtime exhaustion is a semantic policy rejection and does not advance the registry generation.
+
 ingestion.transport is exactly one of file, unix, or http. Only the selected ingestion listener/watcher is activated.
 Explicit transport-specific options for an inactive transport are rejected to expose configuration mistakes.
 

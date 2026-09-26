@@ -40,6 +40,9 @@ removes only the socket inode created by the current execution.
 ISSUE-MA-007 adds a stateless managed client used by `metricshell managed` and a PHP 5.4 reference client. Both expose
 distinct accepted, rejected, overload, protocol, transport and unknown outcomes; an unknown result after complete
 submission is never retried automatically.
+ISSUE-MA-008 bounds managed families, active series, labels, histogram buckets, batches and descriptor/label strings.
+Every policy-limit rejection is distinct from queue overload and protocol rejection and preserves committed state and
+generation.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,

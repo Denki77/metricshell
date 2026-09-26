@@ -83,7 +83,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
-		managedRegistry := bootstrapManagedRegistry(configuration.Mode)
+		managedRegistry, registryErr := bootstrapManagedRegistry(configuration.Mode, configuration.Managed.Limits)
+		if registryErr != nil {
+			return rejectConfiguration(machine, metrics, logger, registryErr)
+		}
 		var managedOwner *managed.Owner
 		if managedRegistry != nil {
 			managedOwner, err = managed.NewOwner(managedRegistry, configuration.Managed.QueueCapacity)
@@ -548,11 +551,11 @@ func startConfiguredIngestion(ctx context.Context, configuration config.Config, 
 	return startIngestion(ctx, configuration, core)
 }
 
-func bootstrapManagedRegistry(mode config.Mode) *managed.Registry {
+func bootstrapManagedRegistry(mode config.Mode, limits managed.Limits) (*managed.Registry, error) {
 	if mode != config.ModeManagedRegistry {
-		return nil
+		return nil, nil
 	}
-	return managed.NewRegistry()
+	return managed.NewRegistryWithLimits(limits)
 }
 
 func ensurePrivateParent(path string) error {

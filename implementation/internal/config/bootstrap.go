@@ -11,6 +11,7 @@ import (
 	err "github.com/Denki77/metricshell/implementation/internal/error"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
 )
@@ -55,6 +56,7 @@ type ManagedConfig struct {
 	Connections   int
 	ReadTimeout   time.Duration
 	WriteTimeout  time.Duration
+	Limits        managed.Limits
 }
 
 type LogConfig struct {
@@ -99,6 +101,15 @@ var options = map[string]string{
 	"--managed-max-connections":       "managed_connections",
 	"--managed-read-timeout":          "managed_read_timeout",
 	"--managed-write-timeout":         "managed_write_timeout",
+	"--managed-max-families":          "managed_families",
+	"--managed-max-series":            "managed_series",
+	"--managed-max-labels":            "managed_labels",
+	"--managed-max-buckets":           "managed_buckets",
+	"--managed-max-batch-operations":  "managed_batch",
+	"--managed-max-metric-name-bytes": "managed_metric_name_bytes",
+	"--managed-max-label-name-bytes":  "managed_label_name_bytes",
+	"--managed-max-label-value-bytes": "managed_label_value_bytes",
+	"--managed-max-help-bytes":        "managed_help_bytes",
 	"--shutdown-total-grace":          "total_grace",
 	"--workload-shutdown-timeout":     "workload_timeout",
 	"--shutdown-reserve":              "reserve",
@@ -223,17 +234,27 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 	configuration := ManagedConfig{
 		QueueCapacity: 64, FrameBytes: 8 << 10, SocketPath: "/run/metricshell/managed.sock", SocketMode: 0o660,
 		Connections: 8, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
+		Limits: managed.DefaultLimits(),
 	}
 	values := map[string]string{}
 	if lookupEnv != nil {
 		for environment, property := range map[string]string{
-			"METRICSHELL_MANAGED_QUEUE_CAPACITY":  "managed_queue_capacity",
-			"METRICSHELL_MANAGED_MAX_FRAME_BYTES": "managed_frame_bytes",
-			"METRICSHELL_MANAGED_SOCKET_PATH":     "managed_socket_path",
-			"METRICSHELL_MANAGED_SOCKET_MODE":     "managed_socket_mode",
-			"METRICSHELL_MANAGED_MAX_CONNECTIONS": "managed_connections",
-			"METRICSHELL_MANAGED_READ_TIMEOUT":    "managed_read_timeout",
-			"METRICSHELL_MANAGED_WRITE_TIMEOUT":   "managed_write_timeout",
+			"METRICSHELL_MANAGED_QUEUE_CAPACITY":        "managed_queue_capacity",
+			"METRICSHELL_MANAGED_MAX_FRAME_BYTES":       "managed_frame_bytes",
+			"METRICSHELL_MANAGED_SOCKET_PATH":           "managed_socket_path",
+			"METRICSHELL_MANAGED_SOCKET_MODE":           "managed_socket_mode",
+			"METRICSHELL_MANAGED_MAX_CONNECTIONS":       "managed_connections",
+			"METRICSHELL_MANAGED_READ_TIMEOUT":          "managed_read_timeout",
+			"METRICSHELL_MANAGED_WRITE_TIMEOUT":         "managed_write_timeout",
+			"METRICSHELL_MANAGED_MAX_FAMILIES":          "managed_families",
+			"METRICSHELL_MANAGED_MAX_SERIES":            "managed_series",
+			"METRICSHELL_MANAGED_MAX_LABELS":            "managed_labels",
+			"METRICSHELL_MANAGED_MAX_BUCKETS":           "managed_buckets",
+			"METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS":  "managed_batch",
+			"METRICSHELL_MANAGED_MAX_METRIC_NAME_BYTES": "managed_metric_name_bytes",
+			"METRICSHELL_MANAGED_MAX_LABEL_NAME_BYTES":  "managed_label_name_bytes",
+			"METRICSHELL_MANAGED_MAX_LABEL_VALUE_BYTES": "managed_label_value_bytes",
+			"METRICSHELL_MANAGED_MAX_HELP_BYTES":        "managed_help_bytes",
 		} {
 			if value, exists := lookupEnv(environment); exists {
 				values[property] = value
@@ -307,6 +328,36 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 		}
 		configuration.WriteTimeout = parsed
 	}
+	counts := map[string]*int{
+		"managed_families":          &configuration.Limits.Families,
+		"managed_series":            &configuration.Limits.Series,
+		"managed_labels":            &configuration.Limits.Labels,
+		"managed_buckets":           &configuration.Limits.Buckets,
+		"managed_batch":             &configuration.Limits.Batch,
+		"managed_metric_name_bytes": &configuration.Limits.MetricNameBytes,
+		"managed_label_name_bytes":  &configuration.Limits.LabelNameBytes,
+		"managed_label_value_bytes": &configuration.Limits.LabelValueBytes,
+		"managed_help_bytes":        &configuration.Limits.HelpBytes,
+	}
+	for property, target := range counts {
+		value, exists := values[property]
+		if !exists {
+			continue
+		}
+		var parsed int
+		var parseErr error
+		if property == "managed_labels" || property == "managed_help_bytes" {
+			parsed, parseErr = parseNonNegativeCount(value)
+		} else if strings.HasSuffix(property, "_bytes") {
+			parsed, parseErr = parseBytes(value)
+		} else {
+			parsed, parseErr = parseCount(value)
+		}
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed resource limit")
+		}
+		*target = parsed
+	}
 	if configuration.QueueCapacity < 1 || configuration.QueueCapacity > 1024 {
 		return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
 	}
@@ -317,6 +368,9 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 		configuration.Connections < 1 || configuration.Connections > 1024 || configuration.ReadTimeout < 100*time.Millisecond || configuration.ReadTimeout > time.Minute ||
 		configuration.WriteTimeout < 100*time.Millisecond || configuration.WriteTimeout > time.Minute {
 		return ManagedConfig{}, fmt.Errorf("invalid managed socket configuration")
+	}
+	if configuration.Limits.Validate() != nil {
+		return ManagedConfig{}, fmt.Errorf("invalid managed resource limits")
 	}
 	return configuration, nil
 }

@@ -34,6 +34,14 @@ const (
 	ReasonInvalidNumber      Reason = "invalid_number"
 	ReasonOverflow           Reason = "overflow"
 	ReasonUnsupported        Reason = "unsupported_operation"
+	ReasonFamilyLimit        Reason = "family_limit"
+	ReasonSeriesLimit        Reason = "series_limit"
+	ReasonLabelLimit         Reason = "label_limit"
+	ReasonBucketLimit        Reason = "bucket_limit"
+	ReasonBatchLimit         Reason = "batch_limit"
+	ReasonNameLimit          Reason = "name_limit"
+	ReasonValueLimit         Reason = "label_value_limit"
+	ReasonHelpLimit          Reason = "help_limit"
 )
 
 type SemanticError struct {
@@ -89,13 +97,52 @@ type Family struct {
 	Series     map[string]Series
 }
 
-type Model struct {
-	families map[string]*Family
+type Limits struct {
+	Families        int
+	Series          int
+	Labels          int
+	Buckets         int
+	Batch           int
+	MetricNameBytes int
+	LabelNameBytes  int
+	LabelValueBytes int
+	HelpBytes       int
 }
 
-func NewModel() *Model { return &Model{families: make(map[string]*Family)} }
+func DefaultLimits() Limits {
+	return Limits{
+		Families: 1024, Series: 10_000, Labels: 8, Buckets: 64, Batch: 64,
+		MetricNameBytes: 256, LabelNameBytes: 128, LabelValueBytes: 1 << 10, HelpBytes: 4 << 10,
+	}
+}
+
+func (limits Limits) Validate() error {
+	if limits.Families < 1 || limits.Families > 100_000 || limits.Series < 1 || limits.Series > 100_000 ||
+		limits.Labels < 0 || limits.Labels > 64 || limits.Buckets < 1 || limits.Buckets > 1024 ||
+		limits.Batch < 1 || limits.Batch > 1024 || limits.MetricNameBytes < 1 || limits.MetricNameBytes > 1024 ||
+		limits.LabelNameBytes < 1 || limits.LabelNameBytes > 1024 || limits.LabelValueBytes < 1 || limits.LabelValueBytes > 16<<10 ||
+		limits.HelpBytes < 0 || limits.HelpBytes > 64<<10 {
+		return reject(ReasonInvalidNumber)
+	}
+	return nil
+}
+
+type Model struct {
+	families     map[string]*Family
+	limits       Limits
+	activeSeries int
+}
+
+func NewModel() *Model { return NewModelWithLimits(DefaultLimits()) }
+
+func NewModelWithLimits(limits Limits) *Model {
+	return &Model{families: make(map[string]*Family), limits: limits}
+}
 
 func (model *Model) Declare(input Descriptor) error {
+	if err := model.validateDescriptorLimits(input); err != nil {
+		return err
+	}
 	descriptor, err := canonicalDescriptor(input)
 	if err != nil {
 		return err
@@ -105,6 +152,9 @@ func (model *Model) Declare(input Descriptor) error {
 			return nil
 		}
 		return reject(ReasonDescriptorConflict)
+	}
+	if len(model.families) >= model.limits.Families {
+		return reject(ReasonFamilyLimit)
 	}
 	for _, family := range model.families {
 		if namesOverlap(derivedNames(family.Descriptor), derivedNames(descriptor)) {
@@ -121,12 +171,16 @@ func (model *Model) Apply(operation Operation) error {
 		return err
 	}
 	model.families = next.families
+	model.activeSeries = next.activeSeries
 	return nil
 }
 
 func (model *Model) ApplyBatch(operations []Operation) error {
 	if len(operations) == 0 {
 		return reject(ReasonUnsupported)
+	}
+	if len(operations) > model.limits.Batch {
+		return reject(ReasonBatchLimit)
 	}
 	next := model.clone()
 	for _, operation := range operations {
@@ -135,6 +189,7 @@ func (model *Model) ApplyBatch(operations []Operation) error {
 		}
 	}
 	model.families = next.families
+	model.activeSeries = next.activeSeries
 	return nil
 }
 
@@ -147,6 +202,20 @@ func (model *Model) Families() map[string]Family {
 }
 
 func (model *Model) apply(operation Operation) error {
+	if len(operation.Name) > model.limits.MetricNameBytes {
+		return reject(ReasonNameLimit)
+	}
+	if len(operation.Labels) > model.limits.Labels {
+		return reject(ReasonLabelLimit)
+	}
+	for name, value := range operation.Labels {
+		if len(name) > model.limits.LabelNameBytes {
+			return reject(ReasonNameLimit)
+		}
+		if len(value) > model.limits.LabelValueBytes {
+			return reject(ReasonValueLimit)
+		}
+	}
 	family := model.families[operation.Name]
 	if family == nil {
 		return reject(ReasonUndeclared)
@@ -156,6 +225,9 @@ func (model *Model) apply(operation Operation) error {
 		return err
 	}
 	series, exists := family.Series[key]
+	if !exists && model.activeSeries >= model.limits.Series {
+		return reject(ReasonSeriesLimit)
+	}
 	switch operation.Kind {
 	case CounterInitialize:
 		if family.Descriptor.Type != Counter {
@@ -168,6 +240,7 @@ func (model *Model) apply(operation Operation) error {
 			return reject(ReasonInvalidNumber)
 		}
 		family.Series[key] = Series{Labels: labels, Value: operation.Value}
+		model.activeSeries++
 	case CounterAdd:
 		if family.Descriptor.Type != Counter {
 			return reject(ReasonWrongType)
@@ -181,6 +254,7 @@ func (model *Model) apply(operation Operation) error {
 		}
 		if !exists {
 			series.Labels = labels
+			model.activeSeries++
 		}
 		series.Value = next
 		family.Series[key] = series
@@ -190,6 +264,7 @@ func (model *Model) apply(operation Operation) error {
 		}
 		if !exists {
 			series.Labels = labels
+			model.activeSeries++
 		}
 		series.Value = operation.Value
 		family.Series[key] = series
@@ -206,6 +281,7 @@ func (model *Model) apply(operation Operation) error {
 		if !exists {
 			series.Labels = labels
 			series.BucketCounts = make([]uint64, len(family.Descriptor.Buckets))
+			model.activeSeries++
 		}
 		for index, boundary := range family.Descriptor.Buckets {
 			if operation.Value <= boundary && series.BucketCounts[index] == ^uint64(0) {
@@ -222,6 +298,27 @@ func (model *Model) apply(operation Operation) error {
 		family.Series[key] = series
 	default:
 		return reject(ReasonUnsupported)
+	}
+	return nil
+}
+
+func (model *Model) validateDescriptorLimits(descriptor Descriptor) error {
+	if len(descriptor.Name) > model.limits.MetricNameBytes {
+		return reject(ReasonNameLimit)
+	}
+	if len(descriptor.Help) > model.limits.HelpBytes {
+		return reject(ReasonHelpLimit)
+	}
+	if len(descriptor.Labels) > model.limits.Labels {
+		return reject(ReasonLabelLimit)
+	}
+	if len(descriptor.Buckets) > model.limits.Buckets {
+		return reject(ReasonBucketLimit)
+	}
+	for _, label := range descriptor.Labels {
+		if len(label) > model.limits.LabelNameBytes {
+			return reject(ReasonNameLimit)
+		}
 	}
 	return nil
 }
@@ -356,7 +453,8 @@ func sameDescriptor(left, right Descriptor) bool {
 }
 
 func (model *Model) clone() *Model {
-	next := NewModel()
+	next := NewModelWithLimits(model.limits)
+	next.activeSeries = model.activeSeries
 	for name, family := range model.families {
 		cloned := cloneFamily(*family)
 		next.families[name] = &cloned
