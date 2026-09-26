@@ -24,6 +24,7 @@ ARG REVISION=unknown
 RUN test -z "$(gofmt -l .)"
 RUN go vet ./...
 RUN go test -race -count=1 ./...
+RUN GOOS=darwin GOARCH=arm64 go test -c -o /tmp/cli-darwin.test ./internal/cli
 RUN go test -count=1 ./internal/dependencyboundary -run '^TestProductionDependencyBoundary$'
 RUN version="$(cat /project/VERSION)" && \
     test -n "${version}" && \
