@@ -18,6 +18,13 @@ Kubernetes Job/CronJob examples, lifecycle controls и multi-replica Prometheus 
 добавляют static multi-architecture release artifacts, container hardening defaults, configurable capacity/time limits,
 fault/soak/race gates, controlled release benchmarks и signed supply-chain evidence.
 
+Managed Aggregation Wave 1 добавляет явную границу владения: snapshot остаётся режимом по умолчанию, а
+`--mode=managed-registry` выбирает отдельный managed bootstrap. ISSUE-MA-002–ISSUE-MA-006 реализуют семантику метрик,
+реестр одного запуска, ограниченный цикл с единственным владельцем, NDJSON protocol v1 и приватный Unix-сокет.
+ISSUE-MA-007 добавляет клиент без локального состояния для `metricshell managed` и эталонный PHP 5.4-клиент. Они
+различают accepted, rejected, overload, protocol, transport и unknown; unknown после полной отправки не повторяется
+автоматически.
+
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий
 `ingestion.Core`, направляет выбранный transport `file`, `unix` или `http` через него и финализируется через
@@ -160,6 +167,11 @@ metricshell version=0.1.2 revision=0123456
 - `internal/httpingest`: loopback-only POST adapter с независимыми wire/decoded limits и exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation и Linux directory-inotify recovery.
 - `internal/kubeexamples`: проверка Kubernetes Job, CronJob, lifecycle и Prometheus examples.
+- `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop и
+  generation/commit accounting.
+- `internal/managedclient`: stateless managed-operation client, result taxonomy и shell-friendly command surface.
+- `internal/managedprotocol`: versioned bounded NDJSON framing и отображение domain/result.
+- `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines и admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing и Unix listener с mode 0660.
 - `internal/lifecycle`: synchronized public runtime state и transitions.
 - `internal/probe`: bounded HTTP health/readiness responses, зависящие только от lifecycle state.
@@ -171,6 +183,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/supplychain`: signed release evidence, SBOM, provenance и vulnerability verification.
 - `internal/workload`: запуск в управляемой process group, signal forwarding, subreaper adoption и child reaping.
 - `internal/testfixture`: бинарники только для real-container acceptance, fault, release и supply-chain tests.
+- `examples/clients/php54`: PHP 5.4 managed-operation reference client без зависимостей и документация.
 - `internal/dependencyboundary`: проверки production/research, public API, primitives, modules и licenses boundaries.
 - `../VERSION`: общая версия проекта на уровне репозитория.
 

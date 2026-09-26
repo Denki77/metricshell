@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 ARG GO_IMAGE=golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
+ARG PHP54_IMAGE=devilbox/php-fpm-5.4@sha256:0060e0fc7f3f89d88b54fcac5a9767f4df02880c23415d3dba8ced497c296b12
 ARG REPO_URI=github.com/Denki77/metricshell
 
 FROM ${GO_IMAGE} AS source
@@ -13,6 +14,10 @@ COPY ["implementation/cmd", "./cmd"]
 COPY ["implementation/examples", "./examples"]
 COPY ["implementation/internal", "./internal"]
 COPY ["VERSION", "/project/VERSION"]
+
+FROM ${PHP54_IMAGE} AS php54-client
+COPY ["implementation/examples/clients/php54/metricshell.php", "/clients/metricshell.php"]
+ENTRYPOINT ["php", "/clients/metricshell.php"]
 
 FROM source AS test
 ARG REVISION=unknown
@@ -115,6 +120,8 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/final-scrape-fixture ./internal/testfixture/finalscrape && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/faultsuite-fixture ./internal/testfixture/faultsuite
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/managed-client-fixture ./internal/testfixture/managedclient
 
 FROM scratch AS integration
 ENV METRICSHELL_FINAL_WAIT_MODE=immediate
@@ -128,6 +135,7 @@ COPY --from=integration-build /out/termination-fixture /termination-fixture
 COPY --from=integration-build /out/probe-fixture /probe-fixture
 COPY --from=integration-build /out/final-scrape-fixture /final-scrape-fixture
 COPY --from=integration-build /out/faultsuite-fixture /faultsuite-fixture
+COPY --from=integration-build /out/managed-client-fixture /managed-client-fixture
 ENTRYPOINT ["/metricshell"]
 
 FROM scratch AS runtime

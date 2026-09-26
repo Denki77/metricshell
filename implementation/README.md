@@ -37,6 +37,9 @@ before admission, and derives success exclusively from the owner's committed res
 ISSUE-MA-006 binds the managed protocol to a private Unix stream socket before workload startup. Connection count,
 frame size, read/write deadlines and filesystem mode are bounded; admission can close independently, and cleanup
 removes only the socket inode created by the current execution.
+ISSUE-MA-007 adds a stateless managed client used by `metricshell managed` and a PHP 5.4 reference client. Both expose
+distinct accepted, rejected, overload, protocol, transport and unknown outcomes; an unknown result after complete
+submission is never retried automatically.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -183,6 +186,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/kubeexamples`: Kubernetes Job, CronJob, lifecycle and Prometheus example verification.
 - `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop,
   generation/commit accounting and detached views.
+- `internal/managedclient`: stateless managed operation client, result taxonomy and shell-friendly command surface.
 - `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.
 - `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines and admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
@@ -196,6 +200,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/supplychain`: signed release evidence, SBOM, provenance and vulnerability verification.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance, fault, release and supply-chain tests.
+- `examples/clients/php54`: dependency-free PHP 5.4 managed-operation reference client and usage documentation.
 - `internal/dependencyboundary`: production/research, public-API, primitive, module and license boundary checks.
 - `../VERSION`: repository-wide project version.
 

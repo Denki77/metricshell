@@ -8,6 +8,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -19,6 +20,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/managed"
+	"github.com/Denki77/metricshell/implementation/internal/managedclient"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 )
 
@@ -81,6 +83,16 @@ func TestRunVersion(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunDispatchesManagedClientBeforeRuntimeBootstrap(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"managed", "counter-add", "jobs", "invalid"}, nil, &stdout, &stderr, buildinfo.Info{}, time.Now)
+	if code != managedclient.ExitLocal || stdout.Len() != 0 || strings.Contains(stderr.String(), "runtime.initializing") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 

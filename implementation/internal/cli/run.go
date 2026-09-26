@@ -24,6 +24,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/managed"
+	"github.com/Denki77/metricshell/implementation/internal/managedclient"
 	"github.com/Denki77/metricshell/implementation/internal/managedserver"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
@@ -36,12 +37,16 @@ import (
 const usage = `Usage:
   metricshell --version
   metricshell --help
+  metricshell managed [--socket=PATH] [--timeout=DURATION] OPERATION ...
   metricshell [options] -- executable [argument ...]
 
 `
 
 // Run executes the command line interface with the given arguments and returns the exit code.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buildinfo.Info, now func() time.Time) int {
+	if len(args) > 0 && args[0] == "managed" {
+		return managedclient.RunCLI(args[1:], stdout, stderr, os.LookupEnv)
+	}
 	logger := diagnostic.New(stderr, now)
 
 	if len(args) == 1 {
