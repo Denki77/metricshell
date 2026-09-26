@@ -125,6 +125,30 @@ func TestParseManagedFrameSize(t *testing.T) {
 	}
 }
 
+func TestParseManagedSocketConfiguration(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{
+		"--mode=managed-registry", "--managed-socket-path=/tmp/managed.sock", "--managed-socket-mode=0620",
+		"--managed-max-connections=12", "--managed-read-timeout=2s", "--managed-write-timeout=3s", "--", "program",
+	}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	managed := configuration.Managed
+	if managed.SocketPath != "/tmp/managed.sock" || managed.SocketMode != 0o620 || managed.Connections != 12 || managed.ReadTimeout != 2*time.Second || managed.WriteTimeout != 3*time.Second {
+		t.Fatalf("managed socket = %+v", managed)
+	}
+	for _, option := range []string{
+		"--managed-socket-path=relative.sock", "--managed-socket-mode=0666", "--managed-socket-mode=660",
+		"--managed-max-connections=0", "--managed-read-timeout=0", "--managed-write-timeout=61s",
+	} {
+		if _, err := Parse([]string{"--mode=managed-registry", option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("option %s accepted", option)
+		}
+	}
+}
+
 func TestParseShutdownPrecedence(t *testing.T) {
 	t.Parallel()
 

@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +50,11 @@ type Config struct {
 type ManagedConfig struct {
 	QueueCapacity int
 	FrameBytes    int
+	SocketPath    string
+	SocketMode    uint32
+	Connections   int
+	ReadTimeout   time.Duration
+	WriteTimeout  time.Duration
 }
 
 type LogConfig struct {
@@ -88,6 +94,11 @@ var options = map[string]string{
 	"--mode":                          "mode",
 	"--managed-queue-capacity":        "managed_queue_capacity",
 	"--managed-max-frame-bytes":       "managed_frame_bytes",
+	"--managed-socket-path":           "managed_socket_path",
+	"--managed-socket-mode":           "managed_socket_mode",
+	"--managed-max-connections":       "managed_connections",
+	"--managed-read-timeout":          "managed_read_timeout",
+	"--managed-write-timeout":         "managed_write_timeout",
 	"--shutdown-total-grace":          "total_grace",
 	"--workload-shutdown-timeout":     "workload_timeout",
 	"--shutdown-reserve":              "reserve",
@@ -209,12 +220,20 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 }
 
 func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig, error) {
-	configuration := ManagedConfig{QueueCapacity: 64, FrameBytes: 8 << 10}
+	configuration := ManagedConfig{
+		QueueCapacity: 64, FrameBytes: 8 << 10, SocketPath: "/run/metricshell/managed.sock", SocketMode: 0o660,
+		Connections: 8, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
+	}
 	values := map[string]string{}
 	if lookupEnv != nil {
 		for environment, property := range map[string]string{
 			"METRICSHELL_MANAGED_QUEUE_CAPACITY":  "managed_queue_capacity",
 			"METRICSHELL_MANAGED_MAX_FRAME_BYTES": "managed_frame_bytes",
+			"METRICSHELL_MANAGED_SOCKET_PATH":     "managed_socket_path",
+			"METRICSHELL_MANAGED_SOCKET_MODE":     "managed_socket_mode",
+			"METRICSHELL_MANAGED_MAX_CONNECTIONS": "managed_connections",
+			"METRICSHELL_MANAGED_READ_TIMEOUT":    "managed_read_timeout",
+			"METRICSHELL_MANAGED_WRITE_TIMEOUT":   "managed_write_timeout",
 		} {
 			if value, exists := lookupEnv(environment); exists {
 				values[property] = value
@@ -234,7 +253,7 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 			}
 			candidate = args[index]
 		}
-		if property == "managed_queue_capacity" || property == "managed_frame_bytes" {
+		if strings.HasPrefix(property, "managed_") {
 			values[property] = candidate
 		}
 	}
@@ -257,11 +276,47 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 		}
 		configuration.FrameBytes = parsed
 	}
+	if value, exists := values["managed_socket_path"]; exists {
+		configuration.SocketPath = value
+	}
+	if value, exists := values["managed_socket_mode"]; exists {
+		parsed, parseErr := strconv.ParseUint(value, 8, 32)
+		if parseErr != nil || len(value) != 4 || value[0] != '0' {
+			return ManagedConfig{}, fmt.Errorf("invalid managed socket mode")
+		}
+		configuration.SocketMode = uint32(parsed)
+	}
+	if value, exists := values["managed_connections"]; exists {
+		parsed, parseErr := parseCount(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed connection limit")
+		}
+		configuration.Connections = parsed
+	}
+	if value, exists := values["managed_read_timeout"]; exists {
+		parsed, parseErr := parseDuration(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed read timeout")
+		}
+		configuration.ReadTimeout = parsed
+	}
+	if value, exists := values["managed_write_timeout"]; exists {
+		parsed, parseErr := parseDuration(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed write timeout")
+		}
+		configuration.WriteTimeout = parsed
+	}
 	if configuration.QueueCapacity < 1 || configuration.QueueCapacity > 1024 {
 		return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
 	}
 	if configuration.FrameBytes < 1<<10 || configuration.FrameBytes > 64<<10 {
 		return ManagedConfig{}, fmt.Errorf("invalid managed frame size")
+	}
+	if !filepath.IsAbs(configuration.SocketPath) || configuration.SocketMode&0o600 != 0o600 || configuration.SocketMode&0o117 != 0 || configuration.SocketMode > 0o660 ||
+		configuration.Connections < 1 || configuration.Connections > 1024 || configuration.ReadTimeout < 100*time.Millisecond || configuration.ReadTimeout > time.Minute ||
+		configuration.WriteTimeout < 100*time.Millisecond || configuration.WriteTimeout > time.Minute {
+		return ManagedConfig{}, fmt.Errorf("invalid managed socket configuration")
 	}
 	return configuration, nil
 }
@@ -369,7 +424,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			}
 			value = args[index]
 		}
-		if property != "mode" && property != "managed_queue_capacity" && property != "managed_frame_bytes" {
+		if property != "mode" && !strings.HasPrefix(property, "managed_") {
 			values[property] = value
 			explicit[property] = true
 		}
@@ -463,6 +518,9 @@ func RequiredNoFile(configuration Config) int {
 	}
 	if configuration.Mode == ModeSnapshot && configuration.IngestionTransport == "unix" {
 		required += configuration.Socket.Connections
+	}
+	if configuration.Mode == ModeManagedRegistry {
+		required += configuration.Managed.Connections
 	}
 	return required
 }

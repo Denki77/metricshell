@@ -57,6 +57,11 @@ Managed mode adds `--managed-queue-capacity` / `METRICSHELL_MANAGED_QUEUE_CAPACI
 `--managed-max-frame-bytes` / `METRICSHELL_MANAGED_MAX_FRAME_BYTES`. They are valid only with `managed-registry` and
 configure the bounded single-owner admission queue and NDJSON request frame.
 
+The managed Unix endpoint is configured by `--managed-socket-path`, `--managed-socket-mode`,
+`--managed-max-connections`, `--managed-read-timeout`, and `--managed-write-timeout` with corresponding uppercase
+`METRICSHELL_` environment names. The path is absolute, its parent is private, mode uses four octal digits and grants
+no permissions to other users, and timeouts are bounded durations.
+
 ingestion.transport is exactly one of file, unix, or http. Only the selected ingestion listener/watcher is activated.
 Explicit transport-specific options for an inactive transport are rejected to expose configuration mistakes.
 

@@ -6,6 +6,8 @@ import (
 	"context"
 	"encoding/json"
 	"net"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
@@ -23,8 +25,20 @@ import (
 func TestManagedModeDoesNotStartSnapshotIngestion(t *testing.T) {
 	t.Parallel()
 
-	configuration := config.Config{Mode: config.ModeManagedRegistry, IngestionTransport: "invalid"}
-	stop, err := startConfiguredIngestion(context.Background(), configuration, nil)
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.Config{Mode: config.ModeManagedRegistry, IngestionTransport: "invalid", Managed: config.ManagedConfig{
+		SocketPath: filepath.Join(directory, "managed.sock"), SocketMode: 0o600, Connections: 1, FrameBytes: 1024,
+		ReadTimeout: time.Second, WriteTimeout: time.Second,
+	}}
+	owner, err := managed.NewOwner(managed.NewRegistry(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	stop, err := startConfiguredIngestion(context.Background(), configuration, nil, owner)
 	if err != nil {
 		t.Fatalf("startConfiguredIngestion() error = %v", err)
 	}

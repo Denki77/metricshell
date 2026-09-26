@@ -34,6 +34,9 @@ assigns the registry-wide commit order.
 ISSUE-MA-005 defines protocol version 1 as one bounded NDJSON operation frame and one JSON response. Protocol parsing
 maps declarations and mutations into the managed domain, rejects incomplete/oversized/malformed/multi-frame input
 before admission, and derives success exclusively from the owner's committed result.
+ISSUE-MA-006 binds the managed protocol to a private Unix stream socket before workload startup. Connection count,
+frame size, read/write deadlines and filesystem mode are bounded; admission can close independently, and cleanup
+removes only the socket inode created by the current execution.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -181,6 +184,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop,
   generation/commit accounting and detached views.
 - `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.
+- `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines and admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.

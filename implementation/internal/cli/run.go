@@ -24,6 +24,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
 	"github.com/Denki77/metricshell/implementation/internal/managed"
+	"github.com/Denki77/metricshell/implementation/internal/managedserver"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
@@ -166,7 +167,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		server.Start()
 		ingestionContext, stopIngestion := context.WithCancel(context.Background())
-		stopSelectedIngestion, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core)
+		stopSelectedIngestion, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core, managedOwner)
 		if ingestionErr != nil {
 			stopIngestion()
 			_ = server.Close()
@@ -525,9 +526,19 @@ func startIngestion(ctx context.Context, configuration config.Config, core *inge
 	}
 }
 
-func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core) (func() error, error) {
+func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core, owner *managed.Owner) (func() error, error) {
 	if configuration.Mode == config.ModeManagedRegistry {
-		return func() error { return nil }, nil
+		managedConfiguration := managedserver.Config{
+			Path: configuration.Managed.SocketPath, Mode: os.FileMode(configuration.Managed.SocketMode),
+			Connections: configuration.Managed.Connections, FrameBytes: configuration.Managed.FrameBytes,
+			ReadTimeout: configuration.Managed.ReadTimeout, WriteTimeout: configuration.Managed.WriteTimeout,
+		}
+		server, err := managedserver.Listen(managedConfiguration, owner)
+		if err != nil {
+			return nil, err
+		}
+		go func() { _ = server.Serve(ctx) }()
+		return server.Close, nil
 	}
 	return startIngestion(ctx, configuration, core)
 }
