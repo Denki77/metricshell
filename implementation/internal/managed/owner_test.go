@@ -6,6 +6,7 @@ import (
 	"math"
 	"sync"
 	"testing"
+	"time"
 )
 
 func TestOwnerConcurrentMutationMatrix(t *testing.T) {
@@ -133,4 +134,34 @@ func TestOwnerQueueCapacityIsExact(t *testing.T) {
 	if got := registry.Read(); got.Generation != 0 {
 		t.Fatalf("overload changed generation: %+v", got)
 	}
+}
+
+func TestOwnerAdmissionClosureAndBoundedDrain(t *testing.T) {
+	registry := NewRegistry()
+	start := make(chan struct{})
+	owner, err := newOwner(registry, 1, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	result := make(chan Result, 1)
+	go func() { result <- owner.Submit(context.Background(), Mutation{}) }()
+	for owner.State().Depth != 1 {
+	}
+	owner.CloseAdmission()
+	if got := owner.Submit(context.Background(), Mutation{}); got.Outcome != OutcomeClosed {
+		t.Fatalf("late submit = %+v", got)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), time.Millisecond)
+	defer cancel()
+	if owner.Drain(ctx) {
+		t.Fatal("blocked admitted work drained before budget expiry")
+	}
+	close(start)
+	if got := <-result; got.Outcome != OutcomeRejected {
+		t.Fatalf("admitted result = %+v", got)
+	}
+	if !owner.Drain(context.Background()) {
+		t.Fatal("completed owner did not drain")
+	}
+	owner.Close()
 }

@@ -81,7 +81,12 @@ func (owner *Owner) Submit(ctx context.Context, mutation Mutation) Result {
 	select {
 	case owner.queue <- request:
 		owner.mu.RUnlock()
-		return <-request.result
+		select {
+		case result := <-request.result:
+			return result
+		case <-ctx.Done():
+			return Result{Outcome: OutcomeCancelled, Generation: owner.registry.Read().Generation}
+		}
 	default:
 		owner.mu.RUnlock()
 		return Result{Outcome: OutcomeOverloaded, Generation: owner.registry.Read().Generation}
@@ -95,13 +100,26 @@ func (owner *Owner) State() OwnerState {
 }
 
 func (owner *Owner) Close() {
+	owner.CloseAdmission()
+	<-owner.done
+}
+
+func (owner *Owner) CloseAdmission() {
 	owner.mu.Lock()
 	if !owner.closed {
 		owner.closed = true
 		close(owner.queue)
 	}
 	owner.mu.Unlock()
-	<-owner.done
+}
+
+func (owner *Owner) Drain(ctx context.Context) bool {
+	select {
+	case <-owner.done:
+		return true
+	case <-ctx.Done():
+		return false
+	}
 }
 
 func (owner *Owner) run() {

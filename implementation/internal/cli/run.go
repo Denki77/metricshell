@@ -175,7 +175,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		server.Start()
 		ingestionContext, stopIngestion := context.WithCancel(context.Background())
-		stopSelectedIngestion, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core, managedOwner)
+		ingestionControl, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core, managedOwner)
 		if ingestionErr != nil {
 			stopIngestion()
 			_ = server.Close()
@@ -187,7 +187,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		defer func() {
 			stopIngestion()
-			_ = stopSelectedIngestion()
+			_ = ingestionControl.Close()
 		}()
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), configuration.Exposition.WriteTimeout)
@@ -223,6 +223,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.WorkloadExited); err != nil {
 					return err
 				}
+				ingestionControl.CloseAdmission()
 				if err := metrics.SetWorkload(0, false); err != nil {
 					return err
 				}
@@ -253,6 +254,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.TerminationAfterSpawn); err != nil {
 					return err
 				}
+				ingestionControl.CloseAdmission()
 				if err := metrics.SetGauge(selfmetric.ShutdownActive, nil, 1); err != nil {
 					return err
 				}
@@ -306,6 +308,8 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		if result.Started && machine.State() == lifecycle.Finalizing {
 			freezeContext, cancelFreeze := finalizationContext(configuration, shutdownPlan, now())
+			ingestionControl.CloseAdmission()
+			_ = ingestionControl.Drain(freezeContext)
 			final := core.CloseAndFreeze(freezeContext)
 			cancelFreeze()
 			metrics.SetActiveSnapshot(final)
@@ -534,7 +538,17 @@ func startIngestion(ctx context.Context, configuration config.Config, core *inge
 	}
 }
 
-func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core, owner *managed.Owner) (func() error, error) {
+type configuredIngestion struct {
+	close          func() error
+	closeAdmission func()
+	drain          func(context.Context) bool
+}
+
+func (control *configuredIngestion) Close() error                   { return control.close() }
+func (control *configuredIngestion) CloseAdmission()                { control.closeAdmission() }
+func (control *configuredIngestion) Drain(ctx context.Context) bool { return control.drain(ctx) }
+
+func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core, owner *managed.Owner) (*configuredIngestion, error) {
 	if configuration.Mode == config.ModeManagedRegistry {
 		managedConfiguration := managedserver.Config{
 			Path: configuration.Managed.SocketPath, Mode: os.FileMode(configuration.Managed.SocketMode),
@@ -546,9 +560,19 @@ func startConfiguredIngestion(ctx context.Context, configuration config.Config, 
 			return nil, err
 		}
 		go func() { _ = server.Serve(ctx) }()
-		return server.Close, nil
+		return &configuredIngestion{
+			close:          server.Close,
+			closeAdmission: func() { server.CloseAdmission(); owner.CloseAdmission() },
+			drain: func(drainContext context.Context) bool {
+				return server.Drain(drainContext) && owner.Drain(drainContext)
+			},
+		}, nil
 	}
-	return startIngestion(ctx, configuration, core)
+	stop, err := startIngestion(ctx, configuration, core)
+	if err != nil {
+		return nil, err
+	}
+	return &configuredIngestion{close: stop, closeAdmission: func() {}, drain: func(context.Context) bool { return true }}, nil
 }
 
 func bootstrapManagedRegistry(mode config.Mode, limits managed.Limits) (*managed.Registry, error) {

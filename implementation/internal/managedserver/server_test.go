@@ -102,6 +102,38 @@ func TestUnixServerAdmissionClosureAndCleanup(t *testing.T) {
 	}
 }
 
+func TestUnixServerBoundedConnectionDrain(t *testing.T) {
+	server, _, socket, cancel := startServer(t, 1)
+	defer cancel()
+	connection, err := net.Dial("unix", socket)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	if _, err := connection.Write([]byte(`{"version":1`)); err != nil {
+		t.Fatal(err)
+	}
+	deadline := time.Now().Add(time.Second)
+	for len(server.connections) != 1 && time.Now().Before(deadline) {
+		time.Sleep(time.Millisecond)
+	}
+	if len(server.connections) != 1 {
+		t.Fatal("connection was not admitted before closure")
+	}
+	server.CloseAdmission()
+	ctx, stop := context.WithTimeout(context.Background(), time.Millisecond)
+	if server.Drain(ctx) {
+		t.Fatal("partial connection drained before its bounded read completed")
+	}
+	stop()
+	_ = connection.Close()
+	ctx, stop = context.WithTimeout(context.Background(), time.Second)
+	defer stop()
+	if !server.Drain(ctx) {
+		t.Fatal("closed partial connection did not drain")
+	}
+}
+
 func TestUnixServerRejectsUnsafePathsAndConfiguration(t *testing.T) {
 	directory := t.TempDir()
 	path := filepath.Join(directory, "managed.sock")

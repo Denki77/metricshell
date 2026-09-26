@@ -33,6 +33,8 @@ Snapshot. Неизменившаяся generation переиспользует c
 ISSUE-MA-010 устанавливает materialized managed generations через тот же Core parser, admission barrier, atomic holder
 и exposition source, что и snapshot transports. Ошибка conversion или Core validation сохраняет prior active state;
 неизменившаяся managed generation не устанавливается повторно.
+ISSUE-MA-011 закрывает managed socket и owner admission первым действием finalization. Только работа, admitted до этой
+границы, может завершиться в существующем finalization/shutdown context; отдельный managed drain timeout не добавлен.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий

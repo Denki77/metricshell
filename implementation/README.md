@@ -49,6 +49,9 @@ a failed rebuild retains the preceding successful entry.
 ISSUE-MA-010 installs materialized managed generations through the same Core parser, admission barrier, atomic holder
 and exposition source as snapshot transports. Failed conversion or Core validation preserves the prior active state;
 an unchanged managed generation is not installed twice.
+ISSUE-MA-011 closes managed socket and owner admission as the first finalization action. Only work admitted before that
+barrier may drain, and only within the existing finalization or shutdown context; no managed-specific drain timeout is
+added.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,

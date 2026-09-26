@@ -40,10 +40,12 @@ type Server struct {
 	listener      *net.UnixListener
 	identity      os.FileInfo
 	connections   chan struct{}
+	admissionMu   sync.Mutex
 	admitting     atomic.Bool
 	closed        atomic.Bool
 	wait          sync.WaitGroup
 	closeOnce     sync.Once
+	admissionOnce sync.Once
 }
 
 func Listen(configuration Config, submitter managedprotocol.Submitter) (*Server, error) {
@@ -91,24 +93,63 @@ func (server *Server) Serve(ctx context.Context) error {
 			}
 			return err
 		}
+		server.admissionMu.Lock()
+		if !server.admitting.Load() {
+			server.admissionMu.Unlock()
+			server.rejectClosed(connection)
+			_ = connection.Close()
+			continue
+		}
 		select {
 		case server.connections <- struct{}{}:
 			server.wait.Add(1)
+			server.admissionMu.Unlock()
 			go server.serveConnection(ctx, connection)
 		default:
+			server.admissionMu.Unlock()
 			_ = writeResponse(connection, server.configuration.WriteTimeout, managedprotocol.Response{Version: managedprotocol.Version, Outcome: managed.OutcomeOverloaded})
 			_ = connection.Close()
 		}
 	}
 }
 
-func (server *Server) CloseAdmission() { server.admitting.Store(false) }
+func (server *Server) rejectClosed(connection net.Conn) {
+	if err := connection.SetReadDeadline(time.Now().Add(server.configuration.ReadTimeout)); err == nil {
+		_, _ = managedprotocol.ReadFrame(connection, server.configuration.FrameBytes)
+	}
+	_ = writeResponse(connection, server.configuration.WriteTimeout, managedprotocol.Response{
+		Version: managedprotocol.Version,
+		Outcome: managed.OutcomeClosed,
+	})
+}
+
+func (server *Server) CloseAdmission() {
+	server.admissionOnce.Do(func() {
+		server.admissionMu.Lock()
+		server.admitting.Store(false)
+		server.admissionMu.Unlock()
+	})
+}
+
+func (server *Server) Drain(ctx context.Context) bool {
+	done := make(chan struct{})
+	go func() {
+		server.wait.Wait()
+		close(done)
+	}()
+	select {
+	case <-done:
+		return true
+	case <-ctx.Done():
+		return false
+	}
+}
 
 func (server *Server) Close() error {
 	var closeErr error
 	server.closeOnce.Do(func() {
 		server.closed.Store(true)
-		server.admitting.Store(false)
+		server.CloseAdmission()
 		closeErr = server.listener.Close()
 		server.wait.Wait()
 		if current, err := os.Lstat(server.configuration.Path); err == nil && os.SameFile(server.identity, current) {
@@ -126,10 +167,6 @@ func (server *Server) serveConnection(ctx context.Context, connection *net.UnixC
 		<-server.connections
 		server.wait.Done()
 	}()
-	if !server.admitting.Load() {
-		_ = writeResponse(connection, server.configuration.WriteTimeout, managedprotocol.Response{Version: managedprotocol.Version, Outcome: managed.OutcomeClosed})
-		return
-	}
 	if err := connection.SetReadDeadline(time.Now().Add(server.configuration.ReadTimeout)); err != nil {
 		return
 	}

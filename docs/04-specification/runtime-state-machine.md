@@ -119,6 +119,11 @@ finalization budget. If accepted, it becomes the final generation; otherwise the
 frozen.
 Candidates not admitted before closure receive frozen.
 
+In managed-registry mode this boundary closes both the Unix operation endpoint and owner queue. New connections,
+partial frames and complete-but-not-admitted operations cannot mutate the registry. Already admitted operations drain
+only within the same finalization context or remaining ADR-003 shutdown reserve; there is no second managed drain
+timeout.
+
 ## Probe and endpoint semantics
 
 | State             |                                 health |   readiness | metrics                            |
