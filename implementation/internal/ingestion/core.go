@@ -14,9 +14,10 @@ import (
 type Transport string
 
 const (
-	File Transport = "file"
-	Unix Transport = "unix"
-	HTTP Transport = "http"
+	File    Transport = "file"
+	Unix    Transport = "unix"
+	HTTP    Transport = "http"
+	Managed Transport = "managed"
 )
 
 var Transports = [...]Transport{File, Unix, HTTP}
@@ -242,6 +243,9 @@ func (core *Core) freeze() {
 }
 
 func validTransport(transport Transport) bool {
+	if transport == Managed {
+		return true
+	}
 	for _, candidate := range Transports {
 		if candidate == transport {
 			return true

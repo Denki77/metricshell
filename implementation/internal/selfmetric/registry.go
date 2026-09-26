@@ -90,7 +90,7 @@ var (
 	Signals               = [...]string{"TERM", "INT", "HUP", "QUIT", "KILL"}
 	SignalTargets         = [...]string{SignalTargetProcess, SignalTargetProcessGroup}
 	ChildKinds            = [...]string{"direct", "adopted"}
-	Transports            = [...]string{"file", "unix", "http"}
+	Transports            = [...]string{"file", "unix", "http", "managed"}
 	PublicationOutcomes   = [...]string{"accepted", "rejected", "busy", "timeout", "internal_error"}
 	FileTriggers          = [...]string{"startup", "event", "periodic", "overflow", "watch_reinstall"}
 	FileOutcomes          = [...]string{"accepted", "unchanged", "absent", "invalid", "error"}
