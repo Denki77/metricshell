@@ -111,6 +111,11 @@ Consumers обязаны игнорировать неизвестные fields.
 | `runtime.failed`              | error     | `reason`, `error_code`                                                        | Unrecoverable failure.              |
 | `runtime.terminated`          | info      | `exit_code`, `duration_ms`                                                    | Последний MetricShell record.       |
 | `logging.suppression_summary` | warn      | `suppressed_event`, `suppressed_count`, `window_ms`; optional `reason`        | Summary rate-limited records.       |
+| `managed.operation`           | debug     | `outcome`, `snapshot_generation`; bounded `reason` при rejection              | Каждый owner-visible result.        |
+| `managed.protocol_rejected`   | warn      | bounded protocol `reason`                                                     | Каждый rejected protocol frame.     |
+| `managed.materialized`        | debug     | `outcome`                                                                     | Каждый final materialization result.|
+| `managed.frozen`              | info      | `outcome`, `snapshot_generation`                                              | Logical managed freeze attempt.     |
+| `managed.final_installed`     | info      | `outcome`, `snapshot_generation`                                              | Результат final Core candidate.     |
 
 High-frequency success events имеют debug level; rejection и lifecycle boundaries видны на normal levels.
 

@@ -46,9 +46,24 @@ type Server struct {
 	wait          sync.WaitGroup
 	closeOnce     sync.Once
 	admissionOnce sync.Once
+	observer      Observer
 }
 
+type Observer interface {
+	ProtocolRejected(managedprotocol.Code)
+	Connection(int)
+}
+
+type noopObserver struct{}
+
+func (noopObserver) ProtocolRejected(managedprotocol.Code) {}
+func (noopObserver) Connection(int)                        {}
+
 func Listen(configuration Config, submitter managedprotocol.Submitter) (*Server, error) {
+	return ListenWithObserver(configuration, submitter, nil)
+}
+
+func ListenWithObserver(configuration Config, submitter managedprotocol.Submitter, observer Observer) (*Server, error) {
 	if err := configuration.Validate(); err != nil || submitter == nil {
 		if err != nil {
 			return nil, err
@@ -72,9 +87,12 @@ func Listen(configuration Config, submitter managedprotocol.Submitter) (*Server,
 		cleanup()
 		return nil, err
 	}
+	if observer == nil {
+		observer = noopObserver{}
+	}
 	server := &Server{
 		configuration: configuration, submitter: submitter, listener: listener, identity: identity,
-		connections: make(chan struct{}, configuration.Connections),
+		connections: make(chan struct{}, configuration.Connections), observer: observer,
 	}
 	server.admitting.Store(true)
 	return server, nil
@@ -102,6 +120,7 @@ func (server *Server) Serve(ctx context.Context) error {
 		}
 		select {
 		case server.connections <- struct{}{}:
+			server.observer.Connection(1)
 			server.wait.Add(1)
 			server.admissionMu.Unlock()
 			go server.serveConnection(ctx, connection)
@@ -165,6 +184,7 @@ func (server *Server) serveConnection(ctx context.Context, connection *net.UnixC
 	defer func() {
 		_ = connection.Close()
 		<-server.connections
+		server.observer.Connection(-1)
 		server.wait.Done()
 	}()
 	if err := connection.SetReadDeadline(time.Now().Add(server.configuration.ReadTimeout)); err != nil {
@@ -173,6 +193,7 @@ func (server *Server) serveConnection(ctx context.Context, connection *net.UnixC
 	frame, err := managedprotocol.ReadFrame(connection, server.configuration.FrameBytes)
 	if err != nil {
 		if code, ok := managedprotocol.ErrorCode(err); ok {
+			server.observer.ProtocolRejected(code)
 			_ = writeResponse(connection, server.configuration.WriteTimeout, managedprotocol.Response{Version: managedprotocol.Version, Outcome: "protocol", Reason: string(code)})
 		}
 		return
@@ -181,7 +202,7 @@ func (server *Server) serveConnection(ctx context.Context, connection *net.UnixC
 		_ = writeResponse(connection, server.configuration.WriteTimeout, managedprotocol.Response{Version: managedprotocol.Version, Outcome: managed.OutcomeClosed})
 		return
 	}
-	response := managedprotocol.Handle(ctx, server.submitter, frame, server.configuration.FrameBytes)
+	response := managedprotocol.HandleObserved(ctx, server.submitter, frame, server.configuration.FrameBytes, server.observer)
 	_ = writeResponse(connection, server.configuration.WriteTimeout, response)
 }
 

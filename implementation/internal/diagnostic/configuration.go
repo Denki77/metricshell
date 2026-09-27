@@ -56,6 +56,45 @@ func (logger *Logger) WriteEndpointBound(component, state string) error {
 	})
 }
 
+func (logger *Logger) WriteManagedOperation(outcome, class string, generation uint64, state string) error {
+	record := record{
+		Level: "debug", Event: "managed.operation", Component: "managed", State: state,
+		Message: "managed operation completed", Outcome: outcome, Generation: &generation,
+	}
+	if outcome != "committed" && class != "semantic" {
+		record.Reason = class
+	}
+	return logger.write(record)
+}
+
+func (logger *Logger) WriteManagedProtocolRejected(code, state string) error {
+	return logger.write(record{
+		Level: "warn", Event: "managed.protocol_rejected", Component: "managed", State: state,
+		Message: "managed protocol frame rejected", Reason: code,
+	})
+}
+
+func (logger *Logger) WriteManagedMaterialized(outcome, state string) error {
+	return logger.write(record{
+		Level: "debug", Event: "managed.materialized", Component: "managed", State: state,
+		Message: "managed generation materialization completed", Outcome: outcome,
+	})
+}
+
+func (logger *Logger) WriteManagedFrozen(outcome string, generation uint64, state string) error {
+	return logger.write(record{
+		Level: "info", Event: "managed.frozen", Component: "managed", State: state,
+		Message: "managed registry frozen", Outcome: outcome, Generation: &generation,
+	})
+}
+
+func (logger *Logger) WriteManagedFinalInstalled(outcome string, generation uint64, state string) error {
+	return logger.write(record{
+		Level: "info", Event: "managed.final_installed", Component: "managed", State: state,
+		Message: "managed final candidate completed", Outcome: outcome, Generation: &generation,
+	})
+}
+
 func (logger *Logger) WriteEndpointBindFailed(component, state string) error {
 	return logger.write(record{
 		Level: "error", Event: "endpoint.bind_failed", Component: component, State: state,

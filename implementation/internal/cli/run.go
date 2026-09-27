@@ -28,6 +28,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/managedclient"
 	"github.com/Denki77/metricshell/implementation/internal/managedfinalize"
 	"github.com/Denki77/metricshell/implementation/internal/managedmaterialize"
+	"github.com/Denki77/metricshell/implementation/internal/managedobserve"
 	"github.com/Denki77/metricshell/implementation/internal/managedserver"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
@@ -98,6 +99,11 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			}
 			defer managedOwner.Close()
 		}
+		var managedObserver *managedobserve.Observer
+		if managedRegistry != nil {
+			managedObserver = managedobserve.New(metrics, logger, managedRegistry, managedOwner, func() string { return string(machine.State()) })
+			managedObserver.Initialize()
+		}
 		if err := metrics.SetFinalWaitMode(selfmetric.FinalWaitMode(configuration.FinalWait.Mode)); err != nil {
 			return failLifecycle(machine, logger)
 		}
@@ -128,7 +134,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			if bridgeErr != nil {
 				return rejectConfiguration(machine, metrics, logger, bridgeErr)
 			}
-			managedFinalizer, bridgeErr = managedfinalize.New(managedRegistry, bridge)
+			managedFinalizer, bridgeErr = managedfinalize.NewObserved(managedRegistry, bridge, managedObserver)
 			if bridgeErr != nil {
 				return rejectConfiguration(machine, metrics, logger, bridgeErr)
 			}
@@ -193,7 +199,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		server.Start()
 		ingestionContext, stopIngestion := context.WithCancel(context.Background())
-		ingestionControl, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core, managedOwner)
+		ingestionControl, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core, managedOwner, managedObserver)
 		if ingestionErr != nil {
 			stopIngestion()
 			_ = server.Close()
@@ -573,14 +579,20 @@ func (control *configuredIngestion) Close() error                   { return con
 func (control *configuredIngestion) CloseAdmission()                { control.closeAdmission() }
 func (control *configuredIngestion) Drain(ctx context.Context) bool { return control.drain(ctx) }
 
-func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core, owner *managed.Owner) (*configuredIngestion, error) {
+func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core, owner *managed.Owner, observer *managedobserve.Observer) (*configuredIngestion, error) {
 	if configuration.Mode == config.ModeManagedRegistry {
 		managedConfiguration := managedserver.Config{
 			Path: configuration.Managed.SocketPath, Mode: os.FileMode(configuration.Managed.SocketMode),
 			Connections: configuration.Managed.Connections, FrameBytes: configuration.Managed.FrameBytes,
 			ReadTimeout: configuration.Managed.ReadTimeout, WriteTimeout: configuration.Managed.WriteTimeout,
 		}
-		server, err := managedserver.Listen(managedConfiguration, owner)
+		var server *managedserver.Server
+		var err error
+		if observer == nil {
+			server, err = managedserver.Listen(managedConfiguration, owner)
+		} else {
+			server, err = managedserver.ListenWithObserver(managedConfiguration, observer, observer)
+		}
 		if err != nil {
 			return nil, err
 		}

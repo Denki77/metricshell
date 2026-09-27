@@ -1,6 +1,6 @@
 # ISSUE-MA-013. Managed self-metrics and structured diagnostics
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -43,3 +43,17 @@ Metric registry golden tests; bounded-label audit; log schema/enums; rejection/l
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-27: moved to `In Progress`; introduced closed managed metric registries and redacted structured events for
+  owner results, protocol rejection, resource state, materialization, freeze and final Core installation.
+- 2026-09-27: moved to `Testing`; added fixed-cardinality, state-projection and application-data redaction tests and
+  synchronized EN/RU observability specifications plus implementation READMEs.
+- 2026-09-27: moved to `Done`; the full Docker format, vet, race, dependency, Darwin compile and Linux
+  multi-architecture build gate passed with snapshot-mode regressions intact.
+
+## Verification evidence
+
+- `go test -race ./internal/managedobserve ./internal/managedfinalize ./internal/managedserver ./internal/managedprotocol ./internal/cli ./internal/selfmetric`
+- `cd implementation && make test IMAGE=metricshell-ma013`

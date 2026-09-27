@@ -38,6 +38,9 @@ ISSUE-MA-011 закрывает managed socket и owner admission первым �
 ISSUE-MA-012 ровно один раз замораживает drained managed registry, отклоняет каждого позднего publisher как `late` и
 делает одну финальную попытку materialization/install через Core до существующих Core freeze и final-wait. Ошибка
 финального candidate не повторяется и не заменяет ранее активный Core snapshot.
+ISSUE-MA-013 добавляет self-metrics фиксированной кардинальности и structured events для operations, protocol, queue,
+registry, materialization, freeze и final install. Управляемые приложением names, labels, paths, payloads и client
+identity не попадают в observability labels или записи.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий
@@ -185,6 +188,7 @@ metricshell version=0.1.2 revision=0123456
   generation/commit accounting.
 - `internal/managedclient`: stateless managed-operation client, result taxonomy и shell-friendly command surface.
 - `internal/managedmaterialize`: generation-keyed immutable cache полного snapshot encoding и reader ownership.
+- `internal/managedobserve`: bounded-проекция managed self-metrics и редактированные lifecycle diagnostics.
 - `internal/managedbridge`: передача полного managed candidate в существующий Core validation/atomic install path.
 - `internal/managedfinalize`: single-winner freeze реестра и координация ровно одной финальной managed install.
 - `internal/managedprotocol`: versioned bounded NDJSON framing и отображение domain/result.

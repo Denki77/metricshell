@@ -40,7 +40,7 @@ func TestManagedModeDoesNotStartSnapshotIngestion(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer owner.Close()
-	control, err := startConfiguredIngestion(context.Background(), configuration, nil, owner)
+	control, err := startConfiguredIngestion(context.Background(), configuration, nil, owner, nil)
 	if err != nil {
 		t.Fatalf("startConfiguredIngestion() error = %v", err)
 	}

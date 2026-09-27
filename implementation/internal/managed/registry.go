@@ -7,6 +7,13 @@ type Snapshot struct {
 	Families   map[string]Family
 }
 
+type RegistryState struct {
+	Generation uint64
+	Families   int
+	Series     int
+	Frozen     bool
+}
+
 type Registry struct {
 	mu         sync.RWMutex
 	generation uint64
@@ -99,4 +106,14 @@ func (registry *Registry) Frozen() bool {
 	registry.mu.RLock()
 	defer registry.mu.RUnlock()
 	return registry.frozen
+}
+
+func (registry *Registry) State() RegistryState {
+	registry.mu.RLock()
+	defer registry.mu.RUnlock()
+	state := RegistryState{Generation: registry.generation, Families: len(registry.model.families), Frozen: registry.frozen}
+	for _, family := range registry.model.families {
+		state.Series += len(family.Series)
+	}
+	return state
 }

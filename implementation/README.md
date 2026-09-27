@@ -55,6 +55,9 @@ added.
 ISSUE-MA-012 freezes the drained managed registry exactly once, rejects every later publisher as `late`, and makes one
 final materialization/install attempt through Core before its existing freeze and final-wait policy. A failed final
 candidate is not retried and cannot replace the previously active Core snapshot.
+ISSUE-MA-013 adds fixed-cardinality managed operation, protocol, queue, registry, materialization, freeze and final
+install self-metrics plus structured events. Application-controlled names, labels, paths, payloads and client identity
+never enter observability labels or records.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -203,6 +206,7 @@ metricshell version=0.1.2 revision=0123456
   generation/commit accounting and detached views.
 - `internal/managedclient`: stateless managed operation client, result taxonomy and shell-friendly command surface.
 - `internal/managedmaterialize`: generation-keyed immutable complete-snapshot encoding cache and reader ownership.
+- `internal/managedobserve`: bounded managed self-metric projection and redacted lifecycle diagnostics.
 - `internal/managedbridge`: complete managed-candidate handoff to the existing Core validation and atomic install path.
 - `internal/managedfinalize`: single-winner registry freeze and exactly-once final managed install coordination.
 - `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.

@@ -47,6 +47,10 @@ type Submitter interface {
 	Submit(context.Context, managed.Mutation) managed.Result
 }
 
+type RejectionObserver interface {
+	ProtocolRejected(Code)
+}
+
 type Response struct {
 	Version    int             `json:"version"`
 	Outcome    managed.Outcome `json:"outcome"`
@@ -109,9 +113,16 @@ func ParseFrame(frame []byte, maximum int) (managed.Mutation, error) {
 }
 
 func Handle(ctx context.Context, submitter Submitter, frame []byte, maximum int) Response {
+	return HandleObserved(ctx, submitter, frame, maximum, nil)
+}
+
+func HandleObserved(ctx context.Context, submitter Submitter, frame []byte, maximum int, observer RejectionObserver) Response {
 	mutation, err := ParseFrame(frame, maximum)
 	if err != nil {
 		code, _ := ErrorCode(err)
+		if observer != nil {
+			observer.ProtocolRejected(code)
+		}
 		return Response{Version: Version, Outcome: "protocol", Reason: string(code)}
 	}
 	result := submitter.Submit(ctx, mutation)

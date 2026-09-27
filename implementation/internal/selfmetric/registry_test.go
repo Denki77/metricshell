@@ -29,6 +29,8 @@ func TestRegistryContainsCompleteBoundedSpecification(t *testing.T) {
 		ExpositionResponseBytes, FinalWaitActive, FinalWaitModeInfo, FinalWaitRequiredScrapes,
 		FinalWaitCompletedScrapes, FinalScrapeAttemptsTotal, FinalWaitCompletionsTotal, FinalWaitDeadline,
 		ShutdownActive, ShutdownDeadline, ShutdownPhaseDuration,
+		ManagedOperationsTotal, ManagedRejectionsTotal, ManagedProtocolTotal, ManagedQueueDepth, ManagedQueueCapacity,
+		ManagedFamilies, ManagedSeries, ManagedGeneration, ManagedMaterializations, ManagedFreezes, ManagedFinalInstalls,
 	}
 	if len(view.Families) != len(wantNames) {
 		t.Fatalf("families = %d, want %d", len(view.Families), len(wantNames))
@@ -43,14 +45,16 @@ func TestRegistryContainsCompleteBoundedSpecification(t *testing.T) {
 		}
 		series += len(family.Samples)
 	}
-	if series != 211 {
-		t.Fatalf("bounded cardinality = %d, want 211", series)
+	if series != 243 {
+		t.Fatalf("bounded cardinality = %d, want 243", series)
 	}
 	assertSeriesCount(t, view, RuntimeState, len(lifecycle.States))
 	assertSeriesCount(t, view, WorkloadSignalsTotal, len(Signals)*len(SignalTargets))
 	assertSeriesCount(t, view, SnapshotPublicationsTotal, len(Transports)*len(PublicationOutcomes))
 	assertSeriesCount(t, view, SnapshotRejectionsTotal, len(Transports)*len(applicationsnapshot.RejectionReasons))
 	assertSeriesCount(t, view, ShutdownPhaseDuration, len(ShutdownPhases))
+	assertSeriesCount(t, view, ManagedOperationsTotal, len(ManagedOutcomes))
+	assertSeriesCount(t, view, ManagedProtocolTotal, len(ManagedProtocolCodes))
 }
 
 func TestRuntimeStateAndFinalWaitModeAreExactOneHotVectors(t *testing.T) {
