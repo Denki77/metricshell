@@ -14,6 +14,9 @@ COPY ["implementation/cmd", "./cmd"]
 COPY ["implementation/examples", "./examples"]
 COPY ["implementation/internal", "./internal"]
 COPY ["VERSION", "/project/VERSION"]
+COPY ["README.md", "README_RU.md", "CHANGELOG.md", "CHANGELOG_RU.md", "/project/"]
+COPY ["docs", "/project/docs"]
+COPY ["docs-ru", "/project/docs-ru"]
 
 FROM ${PHP54_IMAGE} AS php54-client
 COPY ["implementation/examples/clients/php54/metricshell.php", "/clients/metricshell.php"]

@@ -1,6 +1,6 @@
 # ISSUE-MA-008. Resource controls Managed Aggregation
 
-**Статус:** Planned  
+**Статус:** Done
 **Готовность:** Code-ready
 
 **Эпик:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  

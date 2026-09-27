@@ -47,6 +47,8 @@ restart.
 ISSUE-MA-015 объединяет реальные PHP 5.4 и process E2E gates с повторяемой race/resource matrix и controlled
 owner/materialization benchmark. Raw results, точная конфигурация, revision и fingerprint Go OS/architecture/version
 сохраняются в `dist/managed-validation`; timing evidence не выбирает defaults или SLA.
+ISSUE-MA-016 публикует accepted bilingual Managed Aggregation contract, завершает configuration, lifecycle,
+observability, client и release documentation и превращает EN/RU option completeness в Docker-tested release gate.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий

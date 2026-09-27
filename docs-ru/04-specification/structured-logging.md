@@ -79,43 +79,43 @@ Consumers обязаны игнорировать неизвестные fields.
 
 ## Обязательный event registry
 
-| Event                         | Min level | Required fields                                                               | Когда                               |
-|-------------------------------|-----------|-------------------------------------------------------------------------------|-------------------------------------|
-| `runtime.initializing`        | info      | `pid`                                                                         | Один раз после logger init.         |
-| `runtime.state_changed`       | info      | `previous_state`, кроме initial transition                                    | Каждый public state transition.     |
-| `configuration.validated`     | info      | —                                                                             | До workload start, без secrets.     |
-| `configuration.rejected`      | error     | `reason`, `error_code`                                                        | Terminal invalid config.            |
-| `endpoint.bound`              | info      | `component`                                                                   | Required listener/socket создан.    |
-| `endpoint.bind_failed`        | error     | `component`, `reason`, `error_code`                                           | Bind failure.                       |
-| `workload.starting`           | info      | —                                                                             | Перед start attempt.                |
-| `workload.started`            | info      | `workload_pid`, `workload_pgid`                                               | После успешного start.              |
-| `workload.start_failed`       | error     | `reason`, `error_code`                                                        | Start failure.                      |
-| `workload.signal_forwarded`   | info      | `signal`, PID/PGID                                                            | Каждый forwarded signal.            |
-| `workload.signal_ignored`     | info      | `signal`, `reason`; PID/PGID, если target ранее был известен                  | Каждый не пересланный signal.       |
-| `workload.exited`             | info      | `exit_code`, `forced`                                                         | Только один раз после resolution.   |
-| `child.reaped`                | debug     | `kind`                                                                        | Reaped managed child.               |
-| `snapshot.accepted`           | debug     | `transport`, `snapshot_generation`, `snapshot_bytes`, `series`, `duration_ms` | После atomic installation.          |
-| `snapshot.rejected`           | warn      | `transport`, `reason`, `duration_ms`                                          | Каждый candidate rejection.         |
-| `ingestion.overloaded`        | warn      | `transport`, `outcome`                                                        | Queue/semaphore/connection refusal. |
-| `file.reconciled`             | debug     | `trigger`, `outcome`, `duration_ms`                                           | Reconciliation.                     |
-| `file.watch_recovered`        | warn      | `watch_event`                                                                 | Overflow/invalidation/reinstall.    |
-| `socket.transaction_expired`  | warn      | `reason`                                                                      | Multipart expiry.                   |
-| `exposition.failed`           | warn      | `outcome`, `http_status`                                                      | Encoding/limit/write failure.       |
-| `final_wait.started`          | info      | `mode`; `deadline` для duration/scrapes                                       | После freeze final snapshot.        |
-| `final_scrape.counted`        | debug     | `request_id`, `snapshot_generation`                                           | Eligible complete response counted. |
-| `final_scrape.not_counted`    | debug     | `request_id`, `outcome`                                                       | Ineligible/cancelled/failed.        |
-| `final_wait.completed`        | info      | `reason`, `duration_ms`                                                       | Только один terminal condition.     |
-| `shutdown.started`            | info      | `signal`, `deadline`, `remaining_ms`                                          | External termination.               |
-| `shutdown.forced`             | warn      | `signal`, PID/PGID                                                            | Grace expired.                      |
-| `shutdown.completed`          | info      | `duration_ms`, `exit_code`                                                    | Shutdown phases finished.           |
-| `runtime.failed`              | error     | `reason`, `error_code`                                                        | Unrecoverable failure.              |
-| `runtime.terminated`          | info      | `exit_code`, `duration_ms`                                                    | Последний MetricShell record.       |
-| `logging.suppression_summary` | warn      | `suppressed_event`, `suppressed_count`, `window_ms`; optional `reason`        | Summary rate-limited records.       |
-| `managed.operation`           | debug     | `outcome`, `snapshot_generation`; bounded `reason` при rejection              | Каждый owner-visible result.        |
-| `managed.protocol_rejected`   | warn      | bounded protocol `reason`                                                     | Каждый rejected protocol frame.     |
-| `managed.materialized`        | debug     | `outcome`                                                                     | Каждый final materialization result.|
-| `managed.frozen`              | info      | `outcome`, `snapshot_generation`                                              | Logical managed freeze attempt.     |
-| `managed.final_installed`     | info      | `outcome`, `snapshot_generation`                                              | Результат final Core candidate.     |
+| Event                         | Min level | Required fields                                                               | Когда                                |
+|-------------------------------|-----------|-------------------------------------------------------------------------------|--------------------------------------|
+| `runtime.initializing`        | info      | `pid`                                                                         | Один раз после logger init.          |
+| `runtime.state_changed`       | info      | `previous_state`, кроме initial transition                                    | Каждый public state transition.      |
+| `configuration.validated`     | info      | —                                                                             | До workload start, без secrets.      |
+| `configuration.rejected`      | error     | `reason`, `error_code`                                                        | Terminal invalid config.             |
+| `endpoint.bound`              | info      | `component`                                                                   | Required listener/socket создан.     |
+| `endpoint.bind_failed`        | error     | `component`, `reason`, `error_code`                                           | Bind failure.                        |
+| `workload.starting`           | info      | —                                                                             | Перед start attempt.                 |
+| `workload.started`            | info      | `workload_pid`, `workload_pgid`                                               | После успешного start.               |
+| `workload.start_failed`       | error     | `reason`, `error_code`                                                        | Start failure.                       |
+| `workload.signal_forwarded`   | info      | `signal`, PID/PGID                                                            | Каждый forwarded signal.             |
+| `workload.signal_ignored`     | info      | `signal`, `reason`; PID/PGID, если target ранее был известен                  | Каждый не пересланный signal.        |
+| `workload.exited`             | info      | `exit_code`, `forced`                                                         | Только один раз после resolution.    |
+| `child.reaped`                | debug     | `kind`                                                                        | Reaped managed child.                |
+| `snapshot.accepted`           | debug     | `transport`, `snapshot_generation`, `snapshot_bytes`, `series`, `duration_ms` | После atomic installation.           |
+| `snapshot.rejected`           | warn      | `transport`, `reason`, `duration_ms`                                          | Каждый candidate rejection.          |
+| `ingestion.overloaded`        | warn      | `transport`, `outcome`                                                        | Queue/semaphore/connection refusal.  |
+| `file.reconciled`             | debug     | `trigger`, `outcome`, `duration_ms`                                           | Reconciliation.                      |
+| `file.watch_recovered`        | warn      | `watch_event`                                                                 | Overflow/invalidation/reinstall.     |
+| `socket.transaction_expired`  | warn      | `reason`                                                                      | Multipart expiry.                    |
+| `exposition.failed`           | warn      | `outcome`, `http_status`                                                      | Encoding/limit/write failure.        |
+| `final_wait.started`          | info      | `mode`; `deadline` для duration/scrapes                                       | После freeze final snapshot.         |
+| `final_scrape.counted`        | debug     | `request_id`, `snapshot_generation`                                           | Eligible complete response counted.  |
+| `final_scrape.not_counted`    | debug     | `request_id`, `outcome`                                                       | Ineligible/cancelled/failed.         |
+| `final_wait.completed`        | info      | `reason`, `duration_ms`                                                       | Только один terminal condition.      |
+| `shutdown.started`            | info      | `signal`, `deadline`, `remaining_ms`                                          | External termination.                |
+| `shutdown.forced`             | warn      | `signal`, PID/PGID                                                            | Grace expired.                       |
+| `shutdown.completed`          | info      | `duration_ms`, `exit_code`                                                    | Shutdown phases finished.            |
+| `runtime.failed`              | error     | `reason`, `error_code`                                                        | Unrecoverable failure.               |
+| `runtime.terminated`          | info      | `exit_code`, `duration_ms`                                                    | Последний MetricShell record.        |
+| `logging.suppression_summary` | warn      | `suppressed_event`, `suppressed_count`, `window_ms`; optional `reason`        | Summary rate-limited records.        |
+| `managed.operation`           | debug     | `outcome`, `snapshot_generation`; bounded `reason` при rejection              | Каждый owner-visible result.         |
+| `managed.protocol_rejected`   | warn      | bounded protocol `reason`                                                     | Каждый rejected protocol frame.      |
+| `managed.materialized`        | debug     | `outcome`                                                                     | Каждый final materialization result. |
+| `managed.frozen`              | info      | `outcome`, `snapshot_generation`                                              | Logical managed freeze attempt.      |
+| `managed.final_installed`     | info      | `outcome`, `snapshot_generation`                                              | Результат final Core candidate.      |
 
 High-frequency success events имеют debug level; rejection и lifecycle boundaries видны на normal levels.
 

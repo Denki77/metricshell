@@ -63,6 +63,8 @@ protocol and semantic rejection, exact final exposition, final-scrape completion
 ISSUE-MA-015 combines the real PHP 5.4 and process E2E gates with a repeated race/resource matrix and controlled
 owner/materialization benchmark. It emits raw results, the exact configuration, revision and Go OS/architecture/version
 fingerprint under `dist/managed-validation`; timing evidence explicitly selects neither defaults nor an SLA.
+ISSUE-MA-016 promotes the accepted bilingual Managed Aggregation contract, completes configuration, lifecycle,
+observability, client and release documentation, and makes EN/RU option completeness a Docker-tested release gate.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,

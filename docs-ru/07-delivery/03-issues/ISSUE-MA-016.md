@@ -1,6 +1,6 @@
 # ISSUE-MA-016. Документация, examples и release readiness
 
-**Статус:** Planned  
+**Статус:** Done
 **Готовность:** Code-ready
 
 **Эпик:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  

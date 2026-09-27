@@ -62,6 +62,12 @@ Managed Unix endpoint настраивается параметрами `--manag
 переменными `METRICSHELL_`. Путь абсолютный, его parent directory приватный, mode задаётся четырьмя восьмеричными
 цифрами и не предоставляет прав other users, а timeouts являются ограниченными durations.
 
+Registry resources настраиваются через `--managed-max-families`, `--managed-max-series`, `--managed-max-labels`,
+`--managed-max-buckets`, `--managed-max-batch-operations`, `--managed-max-metric-name-bytes`,
+`--managed-max-label-name-bytes`, `--managed-max-label-value-bytes` и `--managed-max-help-bytes` с соответствующими
+uppercase переменными `METRICSHELL_`. Эти managed-only startup properties проверяются до workload start. Runtime
+exhaustion даёт semantic policy rejection и не меняет registry generation.
+
 ingestion.transport имеет только одно значение: file, unix или http. Активируется только выбранный ingestion
 listener/watcher. Явные transport-specific options неактивного transport отклоняются для обнаружения configuration
 mistakes.

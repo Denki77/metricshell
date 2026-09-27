@@ -21,9 +21,10 @@ HTTP-серверами. MetricShell выносит эту обязанност�
 
 ## Текущий статус
 
-Core реализован и готов к эксплуатации в complete-snapshot profile: publishers заменяют весь набор метрик целиком, а
-partial metric updates намеренно не входят в этот release. Проект всё ещё pre-1.0, поэтому публичный runtime contract
-может меняться между minor versions.
+Core и optional Managed Aggregation profile реализованы и production-validated. Snapshot mode остаётся default
+complete-replacement contract; `managed-registry` добавляет bounded local operations для counter, gauge и histogram
+через private Unix socket. Проект всё ещё pre-1.0, поэтому публичный runtime contract может меняться между minor
+versions.
 
 ## Быстрый старт
 
@@ -56,6 +57,7 @@ workload.
 - [Configuration](docs-ru/04-specification/configuration.md)
 - [Runtime state machine](docs-ru/04-specification/runtime-state-machine.md)
 - [Application snapshot protocol](docs-ru/04-specification/application-snapshot-protocol.md)
+- [Managed Aggregation](docs-ru/04-specification/managed-aggregation.md)
 - [Docker and Compose examples](docs-ru/04-specification/docker-compose-examples.md)
 - [Architecture decisions](docs-ru/06-architecture/adr/README.md)
 - [Architecture investigation](docs-ru/05-architecture-investigation/architecture-investigation.md)

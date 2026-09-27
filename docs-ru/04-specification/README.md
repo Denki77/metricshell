@@ -8,6 +8,7 @@
 
 - [Спецификация состояния времени выполнения](runtime-state-machine.md)
 - [Application snapshot protocol](application-snapshot-protocol.md)
+- [Спецификация Managed Aggregation](managed-aggregation.md)
 - [Спецификация configuration](configuration.md)
 - [Грамматика значений конфигурации](configuration-value-grammar.md)
 - [Спецификация фильтрации метрик](metrics-filtering.md)

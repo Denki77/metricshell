@@ -13,3 +13,4 @@ This part is about documentation of the implementation service named as MetricSh
 - [Complete arch investigations by CORE level](06-architecture/CORE_COMPLETION.md)
 - [Delivery plans, epics, and issues](07-delivery/README.md)
 - [Managed Aggregation scope extension and architecture investigation](05-architecture-investigation/managed-aggregation-architecture-investigation.md)
+- [Accepted Managed Aggregation specification](04-specification/managed-aggregation.md)

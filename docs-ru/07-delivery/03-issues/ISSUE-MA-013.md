@@ -1,6 +1,6 @@
 # ISSUE-MA-013. Managed self-metrics и structured diagnostics
 
-**Статус:** Planned  
+**Статус:** Done
 **Готовность:** Code-ready
 
 **Эпик:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  

@@ -1,5 +1,13 @@
 **
 !VERSION
+!README.md
+!README_RU.md
+!CHANGELOG.md
+!CHANGELOG_RU.md
+!docs/
+!docs/**
+!docs-ru/
+!docs-ru/**
 !implementation/
 !implementation/go.mod
 !implementation/cmd/

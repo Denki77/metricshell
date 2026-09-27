@@ -149,19 +149,19 @@ reason  = malformed | protocol_version | frame_limit | part_limit | duplicate_pa
 These families exist in both modes with a fixed zero-valued series set. Managed mode updates them; snapshot mode does
 not. No application metric name, label, socket path, payload, client identity or raw error is permitted in labels.
 
-| Metric                                           | Type    | Labels    | Semantics                                      |
-|--------------------------------------------------|---------|-----------|------------------------------------------------|
-| `metricshell_managed_operations_total`           | counter | `outcome` | Owner-visible operation result.                |
-| `metricshell_managed_rejections_total`           | counter | `class`   | Bounded rejection class.                       |
-| `metricshell_managed_protocol_rejections_total`  | counter | `code`    | Protocol-v1 rejection code.                    |
-| `metricshell_managed_queue_depth`                 | gauge   | none      | Current bounded owner queue depth.              |
-| `metricshell_managed_queue_capacity`              | gauge   | none      | Configured owner queue capacity.                |
-| `metricshell_managed_families`                    | gauge   | none      | Committed managed family count.                 |
-| `metricshell_managed_series`                      | gauge   | none      | Committed managed active-series count.          |
-| `metricshell_managed_generation`                  | gauge   | none      | Committed managed registry generation.          |
-| `metricshell_managed_materializations_total`      | counter | `outcome` | Build, cache-hit or conversion-error result.    |
-| `metricshell_managed_freezes_total`               | counter | `outcome` | Logical freeze winner or duplicate contender.   |
-| `metricshell_managed_final_installs_total`        | counter | `outcome` | Final Core candidate result.                    |
+| Metric                                          | Type    | Labels    | Semantics                                     |
+|-------------------------------------------------|---------|-----------|-----------------------------------------------|
+| `metricshell_managed_operations_total`          | counter | `outcome` | Owner-visible operation result.               |
+| `metricshell_managed_rejections_total`          | counter | `class`   | Bounded rejection class.                      |
+| `metricshell_managed_protocol_rejections_total` | counter | `code`    | Protocol-v1 rejection code.                   |
+| `metricshell_managed_queue_depth`               | gauge   | none      | Current bounded owner queue depth.            |
+| `metricshell_managed_queue_capacity`            | gauge   | none      | Configured owner queue capacity.              |
+| `metricshell_managed_families`                  | gauge   | none      | Committed managed family count.               |
+| `metricshell_managed_series`                    | gauge   | none      | Committed managed active-series count.        |
+| `metricshell_managed_generation`                | gauge   | none      | Committed managed registry generation.        |
+| `metricshell_managed_materializations_total`    | counter | `outcome` | Build, cache-hit or conversion-error result.  |
+| `metricshell_managed_freezes_total`             | counter | `outcome` | Logical freeze winner or duplicate contender. |
+| `metricshell_managed_final_installs_total`      | counter | `outcome` | Final Core candidate result.                  |
 
 Allowed registries are closed: operation `committed|rejected|overloaded|cancelled|closed`; rejection class
 `semantic|resource|overload|late|protocol`; materialization `built|cache_hit|error`; freeze `winner|duplicate`; final

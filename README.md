@@ -21,9 +21,10 @@ snapshots through bounded local transports, serves `/metrics`, and preserves fin
 
 ## Current status
 
-Core is implemented and ready for operational use in the complete-snapshot profile: publishers replace the whole metric
-set at once, and partial metric updates are intentionally not part of this release. The project is still pre-1.0, so the
-public runtime contract may change between minor versions.
+Core and the optional Managed Aggregation profile are implemented and production-validated. Snapshot mode remains the
+default complete-replacement contract; `managed-registry` adds bounded local counter, gauge and histogram operations
+through a private Unix socket. The project is still pre-1.0, so the public runtime contract may change between minor
+versions.
 
 ## Quick start
 
@@ -56,6 +57,7 @@ features are needed.
 - [Configuration](docs/04-specification/configuration.md)
 - [Runtime state machine](docs/04-specification/runtime-state-machine.md)
 - [Application snapshot protocol](docs/04-specification/application-snapshot-protocol.md)
+- [Managed Aggregation](docs/04-specification/managed-aggregation.md)
 - [Docker and Compose examples](docs/04-specification/docker-compose-examples.md)
 - [Architecture decisions](docs/06-architecture/adr/README.md)
 - [Architecture investigation](docs/05-architecture-investigation/architecture-investigation.md)

@@ -6,3 +6,13 @@ transport/connect failure, and `7` unknown.
 
 An `unknown` result means the complete request may have committed before the response was lost. Do not retry it blindly.
 Reconnect requires no local registry reconstruction.
+
+Accepted means that the registry mutation committed; Core installs the authoritative complete generation during
+finalization. A rejected operation preserves the committed registry and active Core state. Resource, semantic,
+overload, protocol and late responses are definite failures and must be handled by exit code. Only transport loss after
+complete submission is `unknown`, and blindly retrying it can apply a non-idempotent mutation twice.
+
+```sh
+php metricshell.php /run/metricshell/managed.sock 1 declare jobs counter "Jobs processed." worker
+php metricshell.php /run/metricshell/managed.sock 1 counter-add jobs 1 worker=batch
+```
