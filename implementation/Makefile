@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 build release
+.PHONY: all fmt test integration managed-e2e fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 build release
 
 all: ci
 
@@ -164,6 +164,29 @@ fault:
 	@code=0; docker run --rm --memory=32m -e METRICSHELL_INGESTION_TRANSPORT=http -e FAULTSUITE_MODE=oom $(IMAGE)-fault:local -- /faultsuite-fixture >/dev/null 2>&1 || code=$$?; \
 		test "$$code" -eq 137
 
+managed-e2e:
+	docker build --target integration --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE)-managed-e2e:local "$(PROJECT_ROOT)"
+	@network="metricshell-managed-e2e-$$$$"; volume="metricshell-managed-e2e-$$$$"; server=""; \
+		cleanup() { test -z "$$server" || docker rm -f "$$server" >/dev/null 2>&1 || true; docker network rm "$$network" >/dev/null 2>&1 || true; docker volume rm "$$volume" >/dev/null 2>&1 || true; }; \
+		trap cleanup EXIT INT TERM; docker network create "$$network" >/dev/null; docker volume create "$$volume" >/dev/null; \
+		server="$$(docker run -d --network "$$network" --network-alias metricshell -v "$$volume:/run/shared" \
+			-e METRICSHELL_MODE=managed-registry -e METRICSHELL_MANAGED_SOCKET_PATH=/run/shared/private/managed.sock \
+			-e METRICSHELL_MANAGED_MAX_CONNECTIONS=64 -e METRICSHELL_MANAGED_QUEUE_CAPACITY=64 \
+			-e METRICSHELL_FINAL_WAIT_MODE=scrapes -e METRICSHELL_FINAL_WAIT_TIMEOUT=10s -e METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES=2 \
+			$(IMAGE)-managed-e2e:local -- /managed-e2e-fixture)"; \
+		output="$$(docker run --rm --network "$$network" -e FIXTURE_EXPECT_METRIC='jobs_total 33' --entrypoint /final-scrape-fixture $(IMAGE)-managed-e2e:local)"; \
+		printf '%s\n' "$$output" | grep -F '"observed_final_metrics":true' >/dev/null; \
+		code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
+		test "$$code" -eq 0; printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_e2e"' | grep -F '"ack_loss_committed":true' >/dev/null; \
+		printf '%s\n' "$$logs" | grep -F '"event":"managed.frozen"' >/dev/null; printf '%s\n' "$$logs" | grep -F '"event":"managed.final_installed"' | grep -F '"outcome":"accepted"' >/dev/null
+	@volume="metricshell-managed-restart-$$$$"; server=""; \
+		cleanup() { test -z "$$server" || docker rm -f "$$server" >/dev/null 2>&1 || true; docker volume rm "$$volume" >/dev/null 2>&1 || true; true; }; \
+		trap cleanup EXIT INT TERM; docker volume create "$$volume" >/dev/null; \
+		for run in 1 2; do server="$$(docker run -d -v "$$volume:/run/shared" -e MANAGED_E2E_MODE=restart \
+			-e METRICSHELL_MODE=managed-registry -e METRICSHELL_MANAGED_SOCKET_PATH=/run/shared/private/managed.sock \
+			$(IMAGE)-managed-e2e:local -- /managed-e2e-fixture)"; code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
+			test "$$code" -eq 0; printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_restart"' | grep -F '"empty_epoch":true' >/dev/null; done
+
 benchmark:
 	docker build --target benchmark-artifacts --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist/benchmark" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
 
@@ -197,7 +220,7 @@ wave4: ci
 
 wave5: ci
 
-wave6: ci
+wave6: test integration managed-e2e fault benchmark supply-chain-ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg VERSION="$(VERSION)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"

@@ -58,6 +58,8 @@ candidate is not retried and cannot replace the previously active Core snapshot.
 ISSUE-MA-013 adds fixed-cardinality managed operation, protocol, queue, registry, materialization, freeze and final
 install self-metrics plus structured events. Application-controlled names, labels, paths, payloads and client identity
 never enter observability labels or records.
+ISSUE-MA-014 adds a production-container E2E gate with concurrent real Unix publishers, ACK-loss commit verification,
+protocol and semantic rejection, exact final exposition, final-scrape completion and two consecutive empty restarts.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -105,6 +107,13 @@ Run the Wave 5 exposition and final-wait exit gate:
 
 ```sh
 make wave5
+```
+
+Run the managed production-process E2E gate or the complete Wave 6 gate:
+
+```sh
+make managed-e2e
+make wave6
 ```
 
 Run the Wave 6 Kubernetes, hardening, release, benchmark and supply-chain exit gate:

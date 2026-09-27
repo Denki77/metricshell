@@ -41,6 +41,9 @@ ISSUE-MA-012 ровно один раз замораживает drained managed
 ISSUE-MA-013 добавляет self-metrics фиксированной кардинальности и structured events для operations, protocol, queue,
 registry, materialization, freeze и final install. Управляемые приложением names, labels, paths, payloads и client
 identity не попадают в observability labels или записи.
+ISSUE-MA-014 добавляет production-container E2E gate: concurrent реальные Unix publishers, проверку commit при ACK
+loss, protocol/semantic rejection, точную финальную exposition, final-scrape completion и два последовательных пустых
+restart.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий
@@ -88,6 +91,13 @@ make wave4
 
 ```sh
 make wave5
+```
+
+Запуск managed production-process E2E или полного gate Wave 6:
+
+```sh
+make managed-e2e
+make wave6
 ```
 
 Запуск exit gate Wave 6 для Kubernetes, hardening, release, benchmark и supply-chain:
