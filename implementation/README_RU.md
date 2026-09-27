@@ -44,6 +44,9 @@ identity не попадают в observability labels или записи.
 ISSUE-MA-014 добавляет production-container E2E gate: concurrent реальные Unix publishers, проверку commit при ACK
 loss, protocol/semantic rejection, точную финальную exposition, final-scrape completion и два последовательных пустых
 restart.
+ISSUE-MA-015 объединяет реальные PHP 5.4 и process E2E gates с повторяемой race/resource matrix и controlled
+owner/materialization benchmark. Raw results, точная конфигурация, revision и fingerprint Go OS/architecture/version
+сохраняются в `dist/managed-validation`; timing evidence не выбирает defaults или SLA.
 
 Complete accepted application snapshots заменяют по одной immutable generation; live self-metrics используют
 собственный fixed-cardinality state и не влияют на application identity. Production runtime создаёт один общий
@@ -98,6 +101,12 @@ make wave5
 ```sh
 make managed-e2e
 make wave6
+```
+
+Создание воспроизводимого managed production-validation evidence:
+
+```sh
+make managed-validation
 ```
 
 Запуск exit gate Wave 6 для Kubernetes, hardening, release, benchmark и supply-chain:

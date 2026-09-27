@@ -142,6 +142,19 @@ COPY --from=integration-build /out/managed-client-fixture /managed-client-fixtur
 COPY --from=integration-build /out/managed-e2e-fixture /managed-e2e-fixture
 ENTRYPOINT ["/metricshell"]
 
+FROM source AS managed-validation
+ARG REVISION=unknown
+RUN mkdir -p /validation && \
+    go test -race -count=10 ./internal/managedvalidation > /validation/raw-race-tests.txt && \
+    go test -run '^$$' -bench '^BenchmarkProductionOwnerAndMaterialization$$' -benchtime=20x -count=3 \
+      ./internal/managedvalidation > /validation/raw-benchmark.txt && \
+    go env -json GOOS GOARCH GOVERSION > /validation/go-environment.json && \
+    printf '{"schema_version":1,"revision":"%s","queue_capacity":64,"publishers":32,"benchmark_repetitions":3,"benchmark_iterations":20,"timing_selects_no_default_or_sla":true}\n' \
+      "${REVISION}" > /validation/metadata.json
+
+FROM scratch AS managed-validation-artifacts
+COPY --from=managed-validation /validation /validation
+
 FROM scratch AS runtime
 ARG VERSION=dev
 ARG REVISION=unknown

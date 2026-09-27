@@ -60,6 +60,9 @@ install self-metrics plus structured events. Application-controlled names, label
 never enter observability labels or records.
 ISSUE-MA-014 adds a production-container E2E gate with concurrent real Unix publishers, ACK-loss commit verification,
 protocol and semantic rejection, exact final exposition, final-scrape completion and two consecutive empty restarts.
+ISSUE-MA-015 combines the real PHP 5.4 and process E2E gates with a repeated race/resource matrix and controlled
+owner/materialization benchmark. It emits raw results, the exact configuration, revision and Go OS/architecture/version
+fingerprint under `dist/managed-validation`; timing evidence explicitly selects neither defaults nor an SLA.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -114,6 +117,12 @@ Run the managed production-process E2E gate or the complete Wave 6 gate:
 ```sh
 make managed-e2e
 make wave6
+```
+
+Generate the reproducible managed production-validation evidence:
+
+```sh
+make managed-validation
 ```
 
 Run the Wave 6 Kubernetes, hardening, release, benchmark and supply-chain exit gate:

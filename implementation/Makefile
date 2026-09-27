@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration managed-e2e fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 build release
+.PHONY: all fmt test integration managed-e2e managed-validation fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 wave7 build release
 
 all: ci
 
@@ -187,6 +187,14 @@ managed-e2e:
 			$(IMAGE)-managed-e2e:local -- /managed-e2e-fixture)"; code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
 			test "$$code" -eq 0; printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_restart"' | grep -F '"empty_epoch":true' >/dev/null; done
 
+managed-validation: integration managed-e2e
+	docker build --target managed-validation-artifacts --build-arg REVISION="$(REVISION)" \
+		--output type=local,dest="$(CURDIR)/dist/managed-validation" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
+	test -s "$(CURDIR)/dist/managed-validation/validation/raw-race-tests.txt"
+	test -s "$(CURDIR)/dist/managed-validation/validation/raw-benchmark.txt"
+	test -s "$(CURDIR)/dist/managed-validation/validation/go-environment.json"
+	test -s "$(CURDIR)/dist/managed-validation/validation/metadata.json"
+
 benchmark:
 	docker build --target benchmark-artifacts --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist/benchmark" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
 
@@ -221,6 +229,8 @@ wave4: ci
 wave5: ci
 
 wave6: test integration managed-e2e fault benchmark supply-chain-ci
+
+wave7: test managed-validation fault benchmark supply-chain-ci
 
 build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg VERSION="$(VERSION)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"
