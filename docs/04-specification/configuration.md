@@ -57,6 +57,10 @@ Managed mode adds `--managed-queue-capacity` / `METRICSHELL_MANAGED_QUEUE_CAPACI
 `--managed-max-frame-bytes` / `METRICSHELL_MANAGED_MAX_FRAME_BYTES`. They are valid only with `managed-registry` and
 configure the bounded single-owner admission queue and NDJSON request frame.
 
+`--managed-publication-interval` / `METRICSHELL_MANAGED_PUBLICATION_INTERVAL` configures the fixed bounded running
+publication cycle (`1s` default, `10ms`–`1m`). One cycle coalesces all newer committed generations into at most one
+complete Core candidate; it does not create a per-operation timer or queue.
+
 The managed Unix endpoint is configured by `--managed-socket-path`, `--managed-socket-mode`,
 `--managed-max-connections`, `--managed-read-timeout`, and `--managed-write-timeout` with corresponding uppercase
 `METRICSHELL_` environment names. The path is absolute, its parent is private, mode uses four octal digits and grants

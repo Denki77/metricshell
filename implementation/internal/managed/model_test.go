@@ -196,3 +196,39 @@ func assertReason(t *testing.T, err error, want Reason) {
 		t.Fatalf("reason = %q, %v; want %q", got, ok, want)
 	}
 }
+
+func TestPrometheusSpecialNumericValues(t *testing.T) {
+	tests := []struct {
+		name       string
+		descriptor Descriptor
+		operation  Operation
+		accepted   bool
+	}{
+		{"gauge NaN", Descriptor{Name: "metric", Type: Gauge}, Operation{Kind: GaugeSet, Name: "metric", Value: math.NaN()}, true},
+		{"gauge positive infinity", Descriptor{Name: "metric", Type: Gauge}, Operation{Kind: GaugeSet, Name: "metric", Value: math.Inf(1)}, true},
+		{"gauge negative infinity", Descriptor{Name: "metric", Type: Gauge}, Operation{Kind: GaugeSet, Name: "metric", Value: math.Inf(-1)}, true},
+		{"histogram positive infinity", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.Inf(1)}, true},
+		{"histogram NaN", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.NaN()}, false},
+		{"histogram negative infinity", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.Inf(-1)}, false},
+		{"counter positive infinity", Descriptor{Name: "metric", Type: Counter}, Operation{Kind: CounterAdd, Name: "metric", Value: math.Inf(1)}, false},
+		{"counter NaN", Descriptor{Name: "metric", Type: Counter}, Operation{Kind: CounterAdd, Name: "metric", Value: math.NaN()}, false},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			registry := NewRegistry()
+			if _, err := registry.Declare(test.descriptor); err != nil {
+				t.Fatal(err)
+			}
+			before := registry.Read().Generation
+			generation, err := registry.Apply(test.operation)
+			if test.accepted && err != nil {
+				t.Fatalf("special value rejected: %v", err)
+			}
+			if !test.accepted {
+				if reason, ok := RejectionReason(err); !ok || reason != ReasonInvalidNumber || generation != before {
+					t.Fatalf("generation=%d reason=%q err=%v", generation, reason, err)
+				}
+			}
+		})
+	}
+}

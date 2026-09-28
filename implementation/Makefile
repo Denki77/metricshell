@@ -172,12 +172,15 @@ managed-e2e:
 		server="$$(docker run -d --network "$$network" --network-alias metricshell -v "$$volume:/run/shared" \
 			-e METRICSHELL_MODE=managed-registry -e METRICSHELL_MANAGED_SOCKET_PATH=/run/shared/private/managed.sock \
 			-e METRICSHELL_MANAGED_MAX_CONNECTIONS=64 -e METRICSHELL_MANAGED_QUEUE_CAPACITY=64 \
+			-e METRICSHELL_MANAGED_PUBLICATION_INTERVAL=10ms \
+			-e MANAGED_E2E_EXIT=17 \
 			-e METRICSHELL_FINAL_WAIT_MODE=scrapes -e METRICSHELL_FINAL_WAIT_TIMEOUT=10s -e METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES=2 \
 			$(IMAGE)-managed-e2e:local -- /managed-e2e-fixture)"; \
 		output="$$(docker run --rm --network "$$network" -e FIXTURE_EXPECT_METRIC='jobs_total 33' --entrypoint /final-scrape-fixture $(IMAGE)-managed-e2e:local)"; \
 		printf '%s\n' "$$output" | grep -F '"observed_final_metrics":true' >/dev/null; \
 		code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
-		test "$$code" -eq 0; printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_e2e"' | grep -F '"ack_loss_committed":true' >/dev/null; \
+		test "$$code" -eq 17; printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_e2e"' | grep -F '"ack_loss_committed":true' >/dev/null; \
+		printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_live"' | grep -F '"workload_running":true' >/dev/null; \
 		printf '%s\n' "$$logs" | grep -F '"event":"managed.frozen"' >/dev/null; printf '%s\n' "$$logs" | grep -F '"event":"managed.final_installed"' | grep -F '"outcome":"accepted"' >/dev/null
 	@volume="metricshell-managed-restart-$$$$"; server=""; \
 		cleanup() { test -z "$$server" || docker rm -f "$$server" >/dev/null 2>&1 || true; docker volume rm "$$volume" >/dev/null 2>&1 || true; true; }; \
@@ -186,6 +189,18 @@ managed-e2e:
 			-e METRICSHELL_MODE=managed-registry -e METRICSHELL_MANAGED_SOCKET_PATH=/run/shared/private/managed.sock \
 			$(IMAGE)-managed-e2e:local -- /managed-e2e-fixture)"; code="$$(docker wait "$$server")"; logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; \
 			test "$$code" -eq 0; printf '%s\n' "$$logs" | grep -F '"event":"fixture.managed_restart"' | grep -F '"empty_epoch":true' >/dev/null; done
+	@volume="metricshell-managed-partial-$$$$"; server=""; \
+		cleanup() { test -z "$$server" || docker rm -f "$$server" >/dev/null 2>&1 || true; docker volume rm "$$volume" >/dev/null 2>&1 || true; }; \
+		trap cleanup EXIT INT TERM; docker volume create "$$volume" >/dev/null; \
+		server="$$(docker run -d -v "$$volume:/run/shared" -e MANAGED_E2E_MODE=partial-shutdown \
+			-e METRICSHELL_MODE=managed-registry -e METRICSHELL_MANAGED_SOCKET_PATH=/run/shared/private/managed.sock \
+			-e METRICSHELL_MANAGED_READ_TIMEOUT=1m -e METRICSHELL_SHUTDOWN_TOTAL_GRACE=1s \
+			-e METRICSHELL_WORKLOAD_SHUTDOWN_TIMEOUT=100ms -e METRICSHELL_SHUTDOWN_RESERVE=250ms \
+			$(IMAGE)-managed-e2e:local -- /managed-e2e-fixture)"; \
+		attempt=0; until docker logs "$$server" 2>&1 | grep -F '"event":"fixture.partial_ready"' >/dev/null; do attempt=$$((attempt + 1)); if test "$$attempt" -eq 50; then exit 1; fi; sleep 0.1; done; \
+		started=$$(date +%s); docker kill --signal TERM "$$server" >/dev/null || exit 1; code="$$(docker wait "$$server")"; elapsed=$$(( $$(date +%s) - started )); \
+		logs="$$(docker logs "$$server" 2>&1)"; docker rm "$$server" >/dev/null; server=""; test "$$code" -eq 137; test "$$elapsed" -le 3; \
+		printf '%s\n' "$$logs" | grep -F '"event":"managed.final_installed"' | grep -F '"outcome":"accepted"' >/dev/null
 
 managed-validation: integration managed-e2e
 	docker build --target managed-validation-artifacts --build-arg REVISION="$(REVISION)" \

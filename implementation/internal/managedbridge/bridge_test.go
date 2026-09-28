@@ -104,3 +104,45 @@ func TestBridgeSerializesConcurrentInstallForOneRegistryGeneration(t *testing.T)
 		t.Fatalf("Core generation=%d, want one atomic install", holder.Active().Generation())
 	}
 }
+
+func TestOversizedManagedCandidatePreservesPreviousCoreSnapshot(t *testing.T) {
+	baseline, err := snapshot.Parse([]byte(`{"schema_version":1,"families":[{"name":"baseline","help":"","type":"gauge","series":[{"labels":{},"value":"1"}]}]}`), snapshot.DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	holder := snapshot.NewHolder(baseline)
+	limits := snapshot.DefaultLimits()
+	limits.SnapshotBytes = len(baseline.Canonical())
+	core, _ := ingestion.New(holder, limits, 1, 0, nil)
+	registry := managed.NewRegistry()
+	if _, err := registry.Declare(managed.Descriptor{Name: "large_metric", Help: string(bytes.Repeat([]byte("x"), 256)), Type: managed.Gauge}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.Apply(managed.Operation{Kind: managed.GaugeSet, Name: "large_metric", Value: 2}); err != nil {
+		t.Fatal(err)
+	}
+	cache, _ := managedmaterialize.New(registry, nil)
+	bridge, _ := New(cache, core)
+	result, err := bridge.Install(context.Background())
+	if err != nil || result.Core.Outcome != ingestion.Rejected || result.Core.Reason != snapshot.ReasonPayloadLimit || result.Installed {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	if holder.Active().Generation() != 0 || !bytes.Equal(holder.Active().Validated().Canonical(), baseline.Canonical()) {
+		t.Fatal("oversized complete candidate partially replaced previous Core state")
+	}
+}
+
+func TestBridgeCoalescesRegistryGenerations(t *testing.T) {
+	registry := managed.NewRegistry()
+	_, _ = registry.Declare(managed.Descriptor{Name: "depth", Type: managed.Gauge})
+	_, _ = registry.Apply(managed.Operation{Kind: managed.GaugeSet, Name: "depth", Value: 1})
+	_, _ = registry.Apply(managed.Operation{Kind: managed.GaugeSet, Name: "depth", Value: 2})
+	cache, _ := managedmaterialize.New(registry, nil)
+	holder := snapshot.NewHolder(snapshot.Zero())
+	core, _ := ingestion.New(holder, snapshot.DefaultLimits(), 1, 0, nil)
+	bridge, _ := New(cache, core)
+	result, err := bridge.Install(context.Background())
+	if err != nil || !result.Installed || result.RegistryGeneration != 3 || holder.Active().Generation() != 1 {
+		t.Fatalf("coalesced install=%+v core_generation=%d err=%v", result, holder.Active().Generation(), err)
+	}
+}

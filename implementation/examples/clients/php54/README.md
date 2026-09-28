@@ -5,6 +5,9 @@ operation. Exit codes are `0` accepted, `2` local invocation, `3` rejected, `4` 
 transport/connect failure, and `7` unknown.
 
 An `unknown` result means the complete request may have committed before the response was lost. Do not retry it blindly.
+The same rule applies when a request context is cancelled after owner admission: MetricShell cannot prove whether the
+operation committed. Protocol v1 has no idempotency key or exactly-once retry semantics; in particular, blindly
+retrying `counter_add 1` can increment twice.
 Reconnect requires no local registry reconstruction.
 
 Accepted means that the registry mutation committed; Core installs the authoritative complete generation during

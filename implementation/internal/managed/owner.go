@@ -17,6 +17,7 @@ const (
 	OutcomeRejected   Outcome = "rejected"
 	OutcomeOverloaded Outcome = "overloaded"
 	OutcomeCancelled  Outcome = "cancelled"
+	OutcomeUnknown    Outcome = "unknown"
 	OutcomeClosed     Outcome = "closed"
 )
 
@@ -85,7 +86,7 @@ func (owner *Owner) Submit(ctx context.Context, mutation Mutation) Result {
 		case result := <-request.result:
 			return result
 		case <-ctx.Done():
-			return Result{Outcome: OutcomeCancelled, Generation: owner.registry.Read().Generation}
+			return Result{Outcome: OutcomeUnknown, Generation: owner.registry.Read().Generation}
 		}
 	default:
 		owner.mu.RUnlock()

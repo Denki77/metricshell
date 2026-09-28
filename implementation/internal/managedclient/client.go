@@ -76,6 +76,8 @@ func Send(ctx context.Context, configuration Config, frame []byte) Result {
 		result.Category = Rejected
 	case managed.OutcomeOverloaded:
 		result.Category = Overload
+	case managed.OutcomeUnknown:
+		result.Category = Unknown
 	case "protocol":
 		result.Category = Protocol
 	default:

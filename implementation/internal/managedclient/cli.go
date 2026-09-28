@@ -89,15 +89,17 @@ func parseCommand(args []string) (map[string]any, error) {
 	}
 	operation := strings.ReplaceAll(args[0], "-", "_")
 	if operation == "declare" {
-		if len(args) < 5 {
-			return nil, fmt.Errorf("usage: managed declare NAME TYPE HELP LABELS [BUCKET ...]")
+		if len(args) < 4 {
+			return nil, fmt.Errorf("usage: managed declare NAME TYPE HELP [LABELS [BUCKET ...]]")
 		}
 		labels := []string{}
-		if args[4] != "-" {
+		if len(args) > 4 && args[4] != "-" {
 			labels = strings.Split(args[4], ",")
 		}
-		buckets := make([]string, len(args)-5)
-		copy(buckets, args[5:])
+		buckets := []string{}
+		if len(args) > 5 {
+			buckets = append(buckets, args[5:]...)
+		}
 		return map[string]any{
 			"version": 1, "op": "declare", "name": args[1], "type": args[2], "help": args[3],
 			"label_names": labels, "buckets": buckets,

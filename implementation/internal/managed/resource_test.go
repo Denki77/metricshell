@@ -83,3 +83,57 @@ func TestDescriptorResourceLimitMatrix(t *testing.T) {
 		t.Fatal("invalid startup limit accepted")
 	}
 }
+
+func TestResourceLimitBoundariesPreserveExistingState(t *testing.T) {
+	limits := DefaultLimits()
+	limits.Families, limits.Series, limits.Buckets = 1, 1, 2
+	registry, err := NewRegistryWithLimits(limits)
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := Descriptor{Name: "latency", Type: Histogram, Labels: []string{"zone"}, Buckets: []float64{1, math.Inf(1)}}
+	if generation, err := registry.Declare(descriptor); err != nil || generation != 1 {
+		t.Fatalf("exact family/bucket limit: generation=%d err=%v", generation, err)
+	}
+	if generation, err := registry.Declare(descriptor); err != nil || generation != 1 {
+		t.Fatalf("identical declaration at family limit: generation=%d err=%v", generation, err)
+	}
+	if generation, err := registry.Apply(Operation{Kind: HistogramObserve, Name: "latency", Labels: map[string]string{"zone": "a"}, Value: 0.5}); err != nil || generation != 2 {
+		t.Fatalf("exact series limit: generation=%d err=%v", generation, err)
+	}
+	if generation, err := registry.Apply(Operation{Kind: HistogramObserve, Name: "latency", Labels: map[string]string{"zone": "a"}, Value: 0.75}); err != nil || generation != 3 {
+		t.Fatalf("existing series update at limit: generation=%d err=%v", generation, err)
+	}
+	for name, action := range map[string]func() (uint64, error){
+		"new family": func() (uint64, error) { return registry.Declare(Descriptor{Name: "other", Type: Gauge}) },
+		"new series": func() (uint64, error) {
+			return registry.Apply(Operation{Kind: HistogramObserve, Name: "latency", Labels: map[string]string{"zone": "b"}, Value: 1})
+		},
+	} {
+		t.Run(name, func(t *testing.T) {
+			generation, err := action()
+			if err == nil || generation != 3 || registry.Read().Generation != 3 {
+				t.Fatalf("generation=%d err=%v state=%d", generation, err, registry.Read().Generation)
+			}
+		})
+	}
+	for _, buckets := range []int{limits.Buckets - 1, limits.Buckets, limits.Buckets + 1} {
+		candidate := limits
+		candidate.Families = 2
+		bounded, _ := NewRegistryWithLimits(candidate)
+		values := make([]float64, buckets)
+		for index := range values {
+			values[index] = float64(index + 1)
+		}
+		if buckets > 0 {
+			values[buckets-1] = math.Inf(1)
+		}
+		generation, err := bounded.Declare(Descriptor{Name: "h", Type: Histogram, Buckets: values})
+		if buckets <= limits.Buckets && err != nil {
+			t.Fatalf("bucket count %d rejected: %v", buckets, err)
+		}
+		if buckets > limits.Buckets && (err == nil || generation != 0 || bounded.Read().Generation != 0) {
+			t.Fatalf("bucket count %d accepted or mutated: generation=%d err=%v", buckets, generation, err)
+		}
+	}
+}

@@ -45,8 +45,8 @@ func TestRegistryContainsCompleteBoundedSpecification(t *testing.T) {
 		}
 		series += len(family.Samples)
 	}
-	if series != 243 {
-		t.Fatalf("bounded cardinality = %d, want 243", series)
+	if series != 244 {
+		t.Fatalf("bounded cardinality = %d, want 244", series)
 	}
 	assertSeriesCount(t, view, RuntimeState, len(lifecycle.States))
 	assertSeriesCount(t, view, WorkloadSignalsTotal, len(Signals)*len(SignalTargets))

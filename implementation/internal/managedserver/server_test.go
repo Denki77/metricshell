@@ -121,16 +121,10 @@ func TestUnixServerBoundedConnectionDrain(t *testing.T) {
 		t.Fatal("connection was not admitted before closure")
 	}
 	server.CloseAdmission()
-	ctx, stop := context.WithTimeout(context.Background(), time.Millisecond)
-	if server.Drain(ctx) {
-		t.Fatal("partial connection drained before its bounded read completed")
-	}
-	stop()
-	_ = connection.Close()
-	ctx, stop = context.WithTimeout(context.Background(), time.Second)
+	ctx, stop := context.WithTimeout(context.Background(), 50*time.Millisecond)
 	defer stop()
 	if !server.Drain(ctx) {
-		t.Fatal("closed partial connection did not drain")
+		t.Fatal("partial connection exceeded the remaining shutdown budget")
 	}
 }
 

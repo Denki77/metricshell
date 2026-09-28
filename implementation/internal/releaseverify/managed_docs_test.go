@@ -31,14 +31,14 @@ func TestManagedReleaseDocumentationIsCompleteAndBilingual(t *testing.T) {
 		}
 	}
 	for _, path := range []string{"docs/04-specification/managed-aggregation.md", "docs-ru/04-specification/managed-aggregation.md"} {
-		for _, required := range []string{"Accepted normative specification", "ADR-016", "ADR-020", "managed-registry", "unknown", "late"} {
+		for _, required := range []string{"Accepted normative specification", "ADR-016", "ADR-020", "managed-registry", "unknown", "late", "publication_interval", "long-running", "snapshot-size"} {
 			if !strings.Contains(content[path], required) {
 				t.Errorf("%s misses %q", path, required)
 			}
 		}
 	}
 	managedOptions := []string{
-		"managed-queue-capacity", "managed-max-frame-bytes", "managed-socket-path", "managed-socket-mode",
+		"managed-queue-capacity", "managed-publication-interval", "managed-max-frame-bytes", "managed-socket-path", "managed-socket-mode",
 		"managed-max-connections", "managed-read-timeout", "managed-write-timeout", "managed-max-families",
 		"managed-max-series", "managed-max-labels", "managed-max-buckets", "managed-max-batch-operations",
 		"managed-max-metric-name-bytes", "managed-max-label-name-bytes", "managed-max-label-value-bytes", "managed-max-help-bytes",

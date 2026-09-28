@@ -115,7 +115,7 @@ var (
 	FinalWaitReasons           = [...]string{"immediate", "duration_elapsed", "required_scrapes", "timeout", "external_termination", "runtime_failure"}
 	ShutdownPhases             = [...]string{"workload_wait", "forced_termination", "finalization", "http_drain", "total"}
 	ShutdownBuckets            = [...]float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60}
-	ManagedOutcomes            = [...]string{"committed", "rejected", "overloaded", "cancelled", "closed"}
+	ManagedOutcomes            = [...]string{"committed", "rejected", "overloaded", "cancelled", "closed", "unknown"}
 	ManagedRejectClasses       = [...]string{"semantic", "resource", "overload", "late", "protocol"}
 	ManagedProtocolCodes       = [...]string{"empty_frame", "partial_frame", "frame_too_large", "multiple_frames", "malformed_json", "missing_version", "invalid_version", "unsupported_version", "invalid_request"}
 	ManagedMaterializeOutcomes = [...]string{"built", "cache_hit", "error"}

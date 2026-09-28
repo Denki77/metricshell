@@ -65,6 +65,9 @@ owner/materialization benchmark. It emits raw results, the exact configuration, 
 fingerprint under `dist/managed-validation`; timing evidence explicitly selects neither defaults nor an SLA.
 ISSUE-MA-016 promotes the accepted bilingual Managed Aggregation contract, completes configuration, lifecycle,
 observability, client and release documentation, and makes EN/RU option completeness a Docker-tested release gate.
+The PR #38 review closes the live-visibility gap with one bounded coalescing publisher (`1s` default), preserves final
+freeze as authoritative, maps cancellation after owner admission to `unknown`, and verifies non-zero exits, partial
+frames, special numeric values, limit boundaries and oversized Core candidates.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -227,6 +230,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/managedclient`: stateless managed operation client, result taxonomy and shell-friendly command surface.
 - `internal/managedmaterialize`: generation-keyed immutable complete-snapshot encoding cache and reader ownership.
 - `internal/managedobserve`: bounded managed self-metric projection and redacted lifecycle diagnostics.
+- `internal/managedpublish`: single-goroutine bounded periodic publication and finalization join barrier.
 - `internal/managedbridge`: complete managed-candidate handoff to the existing Core validation and atomic install path.
 - `internal/managedfinalize`: single-winner registry freeze and exactly-once final managed install coordination.
 - `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.

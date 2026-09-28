@@ -29,6 +29,7 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/managedfinalize"
 	"github.com/Denki77/metricshell/implementation/internal/managedmaterialize"
 	"github.com/Denki77/metricshell/implementation/internal/managedobserve"
+	"github.com/Denki77/metricshell/implementation/internal/managedpublish"
 	"github.com/Denki77/metricshell/implementation/internal/managedserver"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
@@ -125,6 +126,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			return rejectConfiguration(machine, metrics, logger, coreErr)
 		}
 		var managedFinalizer *managedfinalize.Finalizer
+		var managedPublisher *managedpublish.Publisher
 		if managedRegistry != nil {
 			cache, cacheErr := managedmaterialize.New(managedRegistry, nil)
 			if cacheErr != nil {
@@ -135,6 +137,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				return rejectConfiguration(machine, metrics, logger, bridgeErr)
 			}
 			managedFinalizer, bridgeErr = managedfinalize.NewObserved(managedRegistry, bridge, managedObserver)
+			if bridgeErr != nil {
+				return rejectConfiguration(machine, metrics, logger, bridgeErr)
+			}
+			managedPublisher, bridgeErr = managedpublish.New(bridge, configuration.Managed.PublishInterval, managedObserver)
 			if bridgeErr != nil {
 				return rejectConfiguration(machine, metrics, logger, bridgeErr)
 			}
@@ -168,6 +174,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			if managedRegistry != nil {
 				debugConfiguration["managed_generation"] = managedRegistry.Read().Generation
 				debugConfiguration["managed_queue_capacity"] = managedOwner.State().Capacity
+				debugConfiguration["managed_publication_interval"] = configuration.Managed.PublishInterval.String()
 			}
 			content, marshalErr := json.Marshal(debugConfiguration)
 			if marshalErr != nil {
@@ -234,6 +241,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 			Started: func(pid, processGroupID int) error {
 				if err := machine.TransitionEvent(lifecycle.WorkloadStarted); err != nil {
 					return err
+				}
+				if managedPublisher != nil {
+					managedPublisher.Start(ingestionContext)
 				}
 				if err := metrics.SetWorkload(pid, true); err != nil {
 					return err
@@ -333,6 +343,10 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		if result.Started && machine.State() == lifecycle.Finalizing {
 			freezeContext, cancelFreeze := finalizationContext(configuration, shutdownPlan, now())
 			ingestionControl.CloseAdmission()
+			if managedPublisher != nil && !managedPublisher.Stop(freezeContext) {
+				cancelFreeze()
+				return failLifecycle(machine, logger)
+			}
 			_ = ingestionControl.Drain(freezeContext)
 			if managedFinalizer != nil {
 				managedResult, managedErr := managedFinalizer.FreezeAndInstall(freezeContext)

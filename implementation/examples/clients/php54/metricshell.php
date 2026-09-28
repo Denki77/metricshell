@@ -31,6 +31,7 @@ function metricshell_managed_send($socket, $timeout, $request) {
     $outcome = $response['outcome'];
     if ($outcome === 'committed') $category = 'accepted';
     elseif ($outcome === 'rejected' || $outcome === 'closed' || $outcome === 'cancelled') $category = 'rejected';
+    elseif ($outcome === 'unknown') $category = 'unknown';
     elseif ($outcome === 'overloaded') $category = 'overload';
     elseif ($outcome === 'protocol') $category = 'protocol';
     else return array('category' => 'protocol', 'reason' => 'invalid_response_outcome');

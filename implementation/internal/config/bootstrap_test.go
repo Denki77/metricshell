@@ -108,6 +108,23 @@ func TestParseManagedQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestManagedPublicationIntervalConfiguration(t *testing.T) {
+	t.Parallel()
+	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-publication-interval=250ms", "--", "program"}, testNow, nil)
+	if err != nil || configuration.Managed.PublishInterval != 250*time.Millisecond {
+		t.Fatalf("configuration=%+v err=%v", configuration.Managed, err)
+	}
+	configuration, err = Parse([]string{"--mode=managed-registry", "--", "program"}, testNow, nil)
+	if err != nil || configuration.Managed.PublishInterval != time.Second {
+		t.Fatalf("default interval=%s err=%v", configuration.Managed.PublishInterval, err)
+	}
+	for _, value := range []string{"0", "9ms", "61s"} {
+		if _, err := Parse([]string{"--mode=managed-registry", "--managed-publication-interval=" + value, "--", "program"}, testNow, nil); err == nil {
+			t.Fatalf("invalid publication interval %q accepted", value)
+		}
+	}
+}
+
 func TestParseManagedFrameSize(t *testing.T) {
 	t.Parallel()
 

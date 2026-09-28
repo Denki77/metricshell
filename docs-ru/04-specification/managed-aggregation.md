@@ -14,20 +14,27 @@ families и series. State не сохраняется, не replay и не ра�
 
 ## Семантика метрик
 
-Каждая family имеет явный immutable descriptor: name, help, type, ordered label names и finite строго возрастающие
-buckets для histogram. Повторная идентичная declaration идемпотентна; конфликт type, metadata или buckets отклоняется
+Каждая family имеет явный immutable descriptor: name, help, type, ordered label names и non-negative строго
+возрастающие buckets для histogram, заканчивающиеся `+Inf`. Повторная идентичная declaration — accepted idempotent
+no-op; конфликт type, metadata или buckets отклоняется
 без mutation. Label identity canonical и должна точно соответствовать descriptor.
 
 Поддерживаются `counter_initialize`, `counter_add`, `gauge_set`, `histogram_observe` и atomic bounded batches. Counter
-finite, non-negative и не уменьшается внутри epoch. Gauge принимает finite values. Histogram observation finite и
-non-negative и атомарно обновляет count, sum и cumulative classic buckets. Успешная declaration или mutation
-увеличивает registry generation ровно один раз; rejection её не меняет.
+finite, non-negative и не уменьшается внутри epoch согласно существующему Core contract. Gauge принимает finite values,
+`NaN`, `+Inf` и `-Inf`. Histogram observation принимает non-negative finite values и `+Inf`, атомарно обновляет count,
+sum и cumulative classic buckets; `NaN` и отрицательные values отклоняются.
+
+Registry generation версионирует state: изменяющая state declaration или mutation увеличивает её один раз, а identical
+declaration оставляет неизменной. Owner commit/order отдельно увеличивается для каждой успешно обработанной accepted
+operation, включая idempotent declaration.
 
 ## Ordering и acknowledgement
 
 Один bounded owner задаёт registry-wide commit order. Полная queue даёт явный overload outcome. Success response
 отправляется только после commit и содержит generation и commit order. Disconnect или потеря response после submission
 может оставить client outcome unknown; non-idempotent operation нельзя автоматически повторять.
+Cancellation после owner admission также даёт `unknown`, потому что owner ещё может commit operation. Protocol v1 не
+имеет idempotency key или exactly-once retry: `counter_add 1 → UNKNOWN` нельзя повторять вслепую.
 
 ## Protocol и endpoint
 
@@ -49,6 +56,17 @@ Generation кодируется в один deterministic immutable Application 
 holder и exposition path, что snapshot transports. Ошибка conversion, validation или installation не создаёт partial
 install и сохраняет prior active Core state.
 
+Пока workload работает, один fixed periodic publisher materializes не более одной generation за настроенный цикл
+(`managed.publication_interval`, default `1s`). Он использует одну goroutine, не имеет work queue и per-operation timer.
+Mutation не ждёт exposition или materialization. Несколько registry generations могут coalesce; каждый installed
+candidate полный, publication failure сохраняет предыдущий Core snapshot и повторяется в следующем цикле. Успешные
+managed commits сами по себе не гарантируют, что результирующий complete snapshot удовлетворяет настроенному Core
+snapshot-size limit.
+
+Visibility имеет три границы: accepted означает commit в Managed Registry; publication — install одной complete registry
+generation в Core; scrape — чтение одной immutable Core generation. Accepted не означает немедленную visibility или
+получение Prometheus. Публикация каждой промежуточной generation и exactly-once после unknown outcome не гарантируются.
+
 ## Lifecycle
 
 Workload exit или external termination сначала закрывает socket и owner admission, затем drains только already admitted
@@ -56,6 +74,16 @@ work внутри существующего finalization/shutdown budget. Од�
 отклоняются как `late`. Ровно одна final generation materializes и передаётся Core. Natural completion использует
 неизменённый immediate, duration или scrape-count final wait; external termination — существующий immediate bounded
 shutdown path. Restart начинает новую empty epoch.
+
+Non-zero workload exit не уничтожает valid committed metrics: bounded drain, final freeze, final install и настроенный
+final-wait выполняются, затем MetricShell сохраняет workload exit code, если MetricShell-owned finalization failure не
+имеет больший приоритет.
+
+## Когда использовать Managed Aggregation
+
+Режим предназначен для CLI, cron, Job/CronJob, batch, ETL/import/export, legacy PHP/shell, one-shot и long-running
+workers, которым неудобно владеть Prometheus registry и endpoint. Snapshot mode вместо этого принимает complete
+registry-owned snapshots от workload. Обычному HTTP service с native Prometheus `/metrics` MetricShell может не требоваться.
 
 ## Observability и security
 

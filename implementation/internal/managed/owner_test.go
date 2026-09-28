@@ -77,7 +77,9 @@ func TestOwnerCommitOrderForGaugeHistogramAndDescriptors(t *testing.T) {
 
 	compatible := Descriptor{Name: "depth", Type: Gauge}
 	conflict := Descriptor{Name: "depth", Type: Counter}
-	if got := owner.Submit(context.Background(), Mutation{Descriptor: &compatible}); got.Outcome != OutcomeCommitted {
+	beforeGeneration := registry.Read().Generation
+	beforeCommit := histogram.Commit
+	if got := owner.Submit(context.Background(), Mutation{Descriptor: &compatible}); got.Outcome != OutcomeCommitted || got.Generation != beforeGeneration || got.Commit != beforeCommit+1 {
 		t.Fatalf("compatible declaration = %+v", got)
 	}
 	if got := owner.Submit(context.Background(), Mutation{Descriptor: &conflict}); got.Outcome != OutcomeRejected || got.Reason != ReasonDescriptorConflict {
@@ -164,4 +166,29 @@ func TestOwnerAdmissionClosureAndBoundedDrain(t *testing.T) {
 		t.Fatal("completed owner did not drain")
 	}
 	owner.Close()
+}
+
+func TestOwnerCancellationAfterAdmissionIsUnknown(t *testing.T) {
+	registry := NewRegistry()
+	start := make(chan struct{})
+	owner, err := newOwner(registry, 1, start)
+	if err != nil {
+		t.Fatal(err)
+	}
+	descriptor := Descriptor{Name: "jobs", Type: Counter}
+	ctx, cancel := context.WithCancel(context.Background())
+	result := make(chan Result, 1)
+	go func() { result <- owner.Submit(ctx, Mutation{Descriptor: &descriptor}) }()
+	for owner.State().Depth != 1 {
+	}
+	cancel()
+	if got := <-result; got.Outcome != OutcomeUnknown {
+		t.Fatalf("cancelled admitted operation = %+v, want unknown", got)
+	}
+	close(start)
+	owner.Close()
+	snapshot := registry.Read()
+	if snapshot.Generation != 1 || snapshot.Families["jobs"].Descriptor.Name != "jobs" {
+		t.Fatalf("admitted operation did not commit: %+v", snapshot)
+	}
 }

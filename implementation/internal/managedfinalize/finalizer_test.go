@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"strings"
 	"sync"
 	"sync/atomic"
 	"testing"
@@ -115,5 +116,48 @@ func TestFrozenGenerationBecomesCoreFinalSnapshot(t *testing.T) {
 	late := core.Publish(context.Background(), ingestion.Managed, materialized.Representation.Bytes())
 	if late.Outcome != ingestion.Rejected || late.Reason != snapshot.ReasonFrozen || final.Generation() != holder.Active().Generation() {
 		t.Fatalf("late publish=%+v active_generation=%d", late, holder.Active().Generation())
+	}
+}
+
+func TestFinalFreezeCannotBeOverwrittenByPreFreezePublication(t *testing.T) {
+	registry := managed.NewRegistry()
+	_, _ = registry.Declare(managed.Descriptor{Name: "depth", Type: managed.Gauge})
+	_, _ = registry.Apply(managed.Operation{Kind: managed.GaugeSet, Name: "depth", Value: 1})
+	encoded := make(chan struct{}, 1)
+	release := make(chan struct{})
+	var calls atomic.Int64
+	cache, _ := managedmaterialize.New(registry, func(value managed.Snapshot) ([]byte, error) {
+		if calls.Add(1) == 1 {
+			encoded <- struct{}{}
+			<-release
+		}
+		return managedmaterialize.Encode(value)
+	})
+	holder := snapshot.NewHolder(snapshot.Zero())
+	core, _ := ingestion.New(holder, snapshot.DefaultLimits(), 2, 0, nil)
+	bridge, _ := managedbridge.New(cache, core)
+	periodic := make(chan error, 1)
+	go func() {
+		_, err := bridge.Install(context.Background())
+		periodic <- err
+	}()
+	<-encoded
+	_, _ = registry.Apply(managed.Operation{Kind: managed.GaugeSet, Name: "depth", Value: 2})
+	finalizer, _ := New(registry, bridge)
+	final := make(chan error, 1)
+	go func() {
+		_, err := finalizer.FreezeAndInstall(context.Background())
+		final <- err
+	}()
+	close(release)
+	if err := <-periodic; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-final; err != nil {
+		t.Fatal(err)
+	}
+	canonical := string(holder.Active().Validated().Canonical())
+	if !registry.Frozen() || !strings.Contains(canonical, `"value":"2"`) || holder.Active().Generation() != 2 {
+		t.Fatalf("pre-freeze publication won: generation=%d canonical=%s", holder.Active().Generation(), canonical)
 	}
 }

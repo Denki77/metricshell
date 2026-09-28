@@ -228,6 +228,23 @@ METRICSHELL_ARTIFACT_IMAGE
 METRICSHELL_ARTIFACT_DIGEST
 ```
 
+## Эксплуатация Managed mode в Docker и Kubernetes
+
+Managed mode создаёт `/run/metricshell/managed.sock` до запуска workload. Используйте один runtime directory только
+для MetricShell и процессов workload; parent должен быть private, а ownership/group и mode socket — `0600` или `0660`.
+Socket удаляется после execution, restart начинает пустую registry epoch. Managed ingestion не открывает TCP; HTTP
+остаётся только у Prometheus exposition endpoint.
+
+Limits families/series/buckets/strings, owner queue и connections настраиваются независимо от Core snapshot-size limit.
+Переполнение queue даёт явный overload, а valid managed registry всё ещё может создать complete candidate, который
+Core отклонит по size. Running publication использует bounded configured interval; shutdown закрывает admission,
+прерывает partial frames, drains только admitted work в существующем grace, freezes и устанавливает final generation,
+затем применяет обычную final-wait policy.
+
+Для Job/CronJob оставляйте MetricShell PID 1 и задавайте bounded final-wait. Для long-running worker используйте тот же
+pod shape с одним wrapper и workload в Deployment и постоянно scrape exposition port; Kubernetes API не нужен. Native
+HTTP services с собственными Prometheus metrics обычно не нуждаются в этом режиме.
+
 ## CI
 
 - Full runner на Ubuntu для каждого release candidate.

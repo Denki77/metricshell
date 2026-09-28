@@ -48,6 +48,7 @@ func TestClientTransportProtocolAndUnknown(t *testing.T) {
 	}{
 		{name: "protocol", response: "not-json\n", want: Protocol},
 		{name: "unknown", response: "", want: Unknown},
+		{name: "server unknown", response: `{"version":1,"outcome":"unknown"}` + "\n", want: Unknown},
 	} {
 		t.Run(test.name, func(t *testing.T) {
 			socket, stop := oneShotServer(t, test.response)
@@ -79,6 +80,17 @@ func TestCLIExitCodesAndLocalValidation(t *testing.T) {
 	}
 	if code := RunCLI([]string{"--socket=" + filepath.Join(t.TempDir(), "missing"), "counter-add", "jobs", "1"}, &stdout, &stderr, lookup); code != ExitTransport {
 		t.Fatalf("transport code = %d", code)
+	}
+}
+
+func TestQuickStartDeclarationDefaultsToNoLabels(t *testing.T) {
+	request, err := parseCommand([]string{"declare", "jobs", "counter", "Processed jobs"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	labels, ok := request["label_names"].([]string)
+	if !ok || len(labels) != 0 {
+		t.Fatalf("label_names=%#v", request["label_names"])
 	}
 }
 

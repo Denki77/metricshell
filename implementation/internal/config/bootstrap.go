@@ -49,14 +49,15 @@ type Config struct {
 }
 
 type ManagedConfig struct {
-	QueueCapacity int
-	FrameBytes    int
-	SocketPath    string
-	SocketMode    uint32
-	Connections   int
-	ReadTimeout   time.Duration
-	WriteTimeout  time.Duration
-	Limits        managed.Limits
+	QueueCapacity   int
+	PublishInterval time.Duration
+	FrameBytes      int
+	SocketPath      string
+	SocketMode      uint32
+	Connections     int
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
+	Limits          managed.Limits
 }
 
 type LogConfig struct {
@@ -95,6 +96,7 @@ type HTTPConfig struct {
 var options = map[string]string{
 	"--mode":                          "mode",
 	"--managed-queue-capacity":        "managed_queue_capacity",
+	"--managed-publication-interval":  "managed_publication_interval",
 	"--managed-max-frame-bytes":       "managed_frame_bytes",
 	"--managed-socket-path":           "managed_socket_path",
 	"--managed-socket-mode":           "managed_socket_mode",
@@ -232,7 +234,7 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 
 func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig, error) {
 	configuration := ManagedConfig{
-		QueueCapacity: 64, FrameBytes: 8 << 10, SocketPath: "/run/metricshell/managed.sock", SocketMode: 0o660,
+		QueueCapacity: 64, PublishInterval: time.Second, FrameBytes: 8 << 10, SocketPath: "/run/metricshell/managed.sock", SocketMode: 0o660,
 		Connections: 8, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
 		Limits: managed.DefaultLimits(),
 	}
@@ -240,6 +242,7 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 	if lookupEnv != nil {
 		for environment, property := range map[string]string{
 			"METRICSHELL_MANAGED_QUEUE_CAPACITY":        "managed_queue_capacity",
+			"METRICSHELL_MANAGED_PUBLICATION_INTERVAL":  "managed_publication_interval",
 			"METRICSHELL_MANAGED_MAX_FRAME_BYTES":       "managed_frame_bytes",
 			"METRICSHELL_MANAGED_SOCKET_PATH":           "managed_socket_path",
 			"METRICSHELL_MANAGED_SOCKET_MODE":           "managed_socket_mode",
@@ -289,6 +292,13 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 			return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
 		}
 		configuration.QueueCapacity = parsed
+	}
+	if value, exists := values["managed_publication_interval"]; exists {
+		parsed, parseErr := parseDuration(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed publication interval")
+		}
+		configuration.PublishInterval = parsed
 	}
 	if value, exists := values["managed_frame_bytes"]; exists {
 		parsed, parseErr := parseBytes(value)
@@ -360,6 +370,9 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 	}
 	if configuration.QueueCapacity < 1 || configuration.QueueCapacity > 1024 {
 		return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
+	}
+	if configuration.PublishInterval < 10*time.Millisecond || configuration.PublishInterval > time.Minute {
+		return ManagedConfig{}, fmt.Errorf("invalid managed publication interval")
 	}
 	if configuration.FrameBytes < 1<<10 || configuration.FrameBytes > 64<<10 {
 		return ManagedConfig{}, fmt.Errorf("invalid managed frame size")

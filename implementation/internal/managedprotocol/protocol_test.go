@@ -57,6 +57,23 @@ func TestProtocolParsesDomainMutations(t *testing.T) {
 	}
 }
 
+func TestProtocolParsesPrometheusSpecialNumbers(t *testing.T) {
+	for _, test := range []struct {
+		token string
+		check func(float64) bool
+	}{
+		{"NaN", math.IsNaN},
+		{"+Inf", func(value float64) bool { return math.IsInf(value, 1) }},
+		{"-Inf", func(value float64) bool { return math.IsInf(value, -1) }},
+	} {
+		frame := `{"version":1,"op":"gauge_set","name":"depth","labels":{},"value":"` + test.token + `"}` + "\n"
+		mutation, err := ParseFrame([]byte(frame), 1024)
+		if err != nil || len(mutation.Operations) != 1 || !test.check(mutation.Operations[0].Value) {
+			t.Fatalf("token=%s mutation=%+v err=%v", test.token, mutation, err)
+		}
+	}
+}
+
 func TestFrameLimitIsExactAndBounded(t *testing.T) {
 	t.Parallel()
 
@@ -88,7 +105,7 @@ func TestSuccessRequiresCommittedOwnerResult(t *testing.T) {
 	t.Parallel()
 
 	frame := []byte(`{"version":1,"op":"counter_add","name":"jobs","labels":{},"value":"1"}` + "\n")
-	for _, outcome := range []managed.Outcome{managed.OutcomeRejected, managed.OutcomeOverloaded, managed.OutcomeCancelled, managed.OutcomeClosed} {
+	for _, outcome := range []managed.Outcome{managed.OutcomeRejected, managed.OutcomeOverloaded, managed.OutcomeCancelled, managed.OutcomeClosed, managed.OutcomeUnknown} {
 		submitter := stubSubmitter{result: managed.Result{Outcome: outcome, Generation: 7, Reason: managed.ReasonUndeclared}}
 		response := Handle(context.Background(), submitter, frame, 1024)
 		if response.Outcome != outcome || response.Outcome == managed.OutcomeCommitted {

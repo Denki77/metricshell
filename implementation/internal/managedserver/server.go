@@ -40,6 +40,7 @@ type Server struct {
 	listener      *net.UnixListener
 	identity      os.FileInfo
 	connections   chan struct{}
+	active        map[*net.UnixConn]struct{}
 	admissionMu   sync.Mutex
 	admitting     atomic.Bool
 	closed        atomic.Bool
@@ -92,7 +93,7 @@ func ListenWithObserver(configuration Config, submitter managedprotocol.Submitte
 	}
 	server := &Server{
 		configuration: configuration, submitter: submitter, listener: listener, identity: identity,
-		connections: make(chan struct{}, configuration.Connections), observer: observer,
+		connections: make(chan struct{}, configuration.Connections), active: make(map[*net.UnixConn]struct{}), observer: observer,
 	}
 	server.admitting.Store(true)
 	return server, nil
@@ -120,6 +121,7 @@ func (server *Server) Serve(ctx context.Context) error {
 		}
 		select {
 		case server.connections <- struct{}{}:
+			server.active[connection] = struct{}{}
 			server.observer.Connection(1)
 			server.wait.Add(1)
 			server.admissionMu.Unlock()
@@ -146,6 +148,9 @@ func (server *Server) CloseAdmission() {
 	server.admissionOnce.Do(func() {
 		server.admissionMu.Lock()
 		server.admitting.Store(false)
+		for connection := range server.active {
+			_ = connection.SetReadDeadline(time.Now())
+		}
 		server.admissionMu.Unlock()
 	})
 }
@@ -183,11 +188,21 @@ func (server *Server) Close() error {
 func (server *Server) serveConnection(ctx context.Context, connection *net.UnixConn) {
 	defer func() {
 		_ = connection.Close()
+		server.admissionMu.Lock()
+		delete(server.active, connection)
+		server.admissionMu.Unlock()
 		<-server.connections
 		server.observer.Connection(-1)
 		server.wait.Done()
 	}()
-	if err := connection.SetReadDeadline(time.Now().Add(server.configuration.ReadTimeout)); err != nil {
+	server.admissionMu.Lock()
+	deadline := time.Now().Add(server.configuration.ReadTimeout)
+	if !server.admitting.Load() {
+		deadline = time.Now()
+	}
+	err := connection.SetReadDeadline(deadline)
+	server.admissionMu.Unlock()
+	if err != nil {
 		return
 	}
 	frame, err := managedprotocol.ReadFrame(connection, server.configuration.FrameBytes)

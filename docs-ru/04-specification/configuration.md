@@ -57,6 +57,10 @@ variables фатальны до запуска workload.
 `--managed-max-frame-bytes` / `METRICSHELL_MANAGED_MAX_FRAME_BYTES`. Параметры допустимы только с `managed-registry` и
 задают ограниченную очередь допуска single-owner и размер NDJSON request frame.
 
+`--managed-publication-interval` / `METRICSHELL_MANAGED_PUBLICATION_INTERVAL` задаёт fixed bounded running publication
+cycle (`1s` default, `10ms`–`1m`). Один цикл coalesces все новые committed generations максимум в один complete Core
+candidate; per-operation timer или queue не создаются.
+
 Managed Unix endpoint настраивается параметрами `--managed-socket-path`, `--managed-socket-mode`,
 `--managed-max-connections`, `--managed-read-timeout` и `--managed-write-timeout` с соответствующими uppercase
 переменными `METRICSHELL_`. Путь абсолютный, его parent directory приватный, mode задаётся четырьмя восьмеричными

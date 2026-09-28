@@ -4,10 +4,15 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
+	"io"
 	"net"
+	"net/http"
 	"os"
+	"os/signal"
 	"strconv"
+	"strings"
 	"sync"
+	"syscall"
 	"time"
 )
 
@@ -22,6 +27,9 @@ func main() {
 		path = "/run/metricshell/managed.sock"
 	}
 	waitSocket(path)
+	if os.Getenv("MANAGED_E2E_MODE") == "partial-shutdown" {
+		partialShutdown(path)
+	}
 	if os.Getenv("MANAGED_E2E_MODE") == "restart" {
 		result := request(path, `{"version":1,"op":"counter_add","name":"jobs","labels":{},"value":"1"}`)
 		if result.Outcome != "rejected" || result.Generation != 0 {
@@ -60,11 +68,46 @@ func main() {
 		fail(fmt.Sprintf("semantic rejection changed generation: %+v", missing))
 	}
 	malformed(path)
+	waitForLiveMetric("jobs_total 33")
 	write(map[string]any{"event": "fixture.managed_e2e", "publishers": publishers, "generation": missing.Generation, "ack_loss_committed": true})
 	if text := os.Getenv("MANAGED_E2E_EXIT"); text != "" {
 		code, _ := strconv.Atoi(text)
 		os.Exit(code)
 	}
+}
+
+func partialShutdown(path string) {
+	connection, err := net.DialTimeout("unix", path, time.Second)
+	if err != nil {
+		fail(err.Error())
+	}
+	defer connection.Close()
+	if _, err := connection.Write([]byte(`{"version":1`)); err != nil {
+		fail(err.Error())
+	}
+	signal.Ignore(syscall.SIGTERM, syscall.SIGINT)
+	write(map[string]any{"event": "fixture.partial_ready"})
+	for {
+		time.Sleep(time.Hour)
+	}
+}
+
+func waitForLiveMetric(metric string) {
+	client := &http.Client{Timeout: time.Second}
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) {
+		response, err := client.Get("http://127.0.0.1:9090/metrics")
+		if err == nil {
+			body, readErr := io.ReadAll(response.Body)
+			_ = response.Body.Close()
+			if readErr == nil && response.StatusCode == http.StatusOK && strings.Contains(string(body), metric) {
+				write(map[string]any{"event": "fixture.managed_live", "metric": metric, "workload_running": true})
+				return
+			}
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	fail("managed metric did not become visible while workload was running")
 }
 
 func waitSocket(path string) {
