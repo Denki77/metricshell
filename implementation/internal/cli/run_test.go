@@ -308,6 +308,9 @@ func TestRunHelp(t *testing.T) {
 	if code != 0 || stdout.String() != usage || stderr.Len() != 0 {
 		t.Fatalf("Run(--help) = code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
 	}
+	if strings.Contains(strings.ToLower(stdout.String()), "batch") {
+		t.Fatalf("help advertises unsupported external batch submission: %q", stdout.String())
+	}
 }
 
 func TestRunRejectsInvalidStartupConfiguration(t *testing.T) {

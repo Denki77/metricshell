@@ -19,8 +19,10 @@ non-negative strictly increasing buckets ending in `+Inf`. A repeated identical 
 no-op; conflicting type, metadata or buckets are
 rejected without mutation. Label identity is canonical and must exactly match the descriptor.
 
-Supported operations are `counter_initialize`, `counter_add`, `gauge_set`, `histogram_observe` and atomic bounded
-batches. Counters are finite and non-negative and never decrease inside an epoch, matching the existing Core contract.
+Supported operations are `counter_initialize`, `counter_add`, `gauge_set` and `histogram_observe`. Protocol v1 accepts
+exactly one instrumentation operation per request. External atomic batch submission remains deferred and is not part of
+protocol v1; any internal all-or-nothing application primitive is not a public capability. Counters are finite and
+non-negative and never decrease inside an epoch, matching the existing Core contract.
 Gauges accept finite values, `NaN`, `+Inf` and `-Inf`. Histogram observations accept non-negative finite values and
 `+Inf` and update count, sum and cumulative classic buckets atomically; `NaN` and negative values are rejected.
 
@@ -45,7 +47,7 @@ read/write deadlines. No TCP or remote managed endpoint exists.
 
 ## Resource and failure semantics
 
-Family, active-series, label, histogram-bucket, batch, string, frame, connection and queue bounds are validated before
+Family, active-series, label, histogram-bucket, string, frame, connection and queue bounds are validated before
 unsafe allocation or registry mutation. Semantic, resource, protocol, overload, late, cancelled and unknown-client
 outcomes remain distinct. Every rejection preserves the complete committed registry and active Core snapshot.
 

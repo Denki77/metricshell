@@ -16,6 +16,8 @@ func TestManagedReleaseDocumentationIsCompleteAndBilingual(t *testing.T) {
 		"README.md", "README_RU.md", "CHANGELOG.md", "CHANGELOG_RU.md",
 		"docs/04-specification/managed-aggregation.md", "docs-ru/04-specification/managed-aggregation.md",
 		"docs/04-specification/configuration.md", "docs-ru/04-specification/configuration.md",
+		"docs/04-specification/runtime-defaults-and-resource-limits.md", "docs-ru/04-specification/runtime-defaults-and-resource-limits.md",
+		"docs/06-architecture/adr/ADR-019.md", "docs-ru/06-architecture/adr/ADR-019.md",
 		"docs/04-specification/self-metrics.md", "docs-ru/04-specification/self-metrics.md",
 		"docs/04-specification/structured-logging.md", "docs-ru/04-specification/structured-logging.md",
 	}
@@ -40,8 +42,26 @@ func TestManagedReleaseDocumentationIsCompleteAndBilingual(t *testing.T) {
 	managedOptions := []string{
 		"managed-queue-capacity", "managed-publication-interval", "managed-max-frame-bytes", "managed-socket-path", "managed-socket-mode",
 		"managed-max-connections", "managed-read-timeout", "managed-write-timeout", "managed-max-families",
-		"managed-max-series", "managed-max-labels", "managed-max-buckets", "managed-max-batch-operations",
+		"managed-max-series", "managed-max-labels", "managed-max-buckets",
 		"managed-max-metric-name-bytes", "managed-max-label-name-bytes", "managed-max-label-value-bytes", "managed-max-help-bytes",
+	}
+	for _, path := range []string{
+		"docs/04-specification/managed-aggregation.md", "docs-ru/04-specification/managed-aggregation.md",
+		"docs/04-specification/configuration.md", "docs-ru/04-specification/configuration.md",
+		"docs/04-specification/runtime-defaults-and-resource-limits.md", "docs-ru/04-specification/runtime-defaults-and-resource-limits.md",
+	} {
+		for _, unsupported := range []string{"managed.batch_operations", "managed-max-batch-operations", "METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS", "atomic bounded batches"} {
+			if strings.Contains(content[path], unsupported) {
+				t.Errorf("%s advertises unsupported external batch contract %q", path, unsupported)
+			}
+		}
+	}
+	for _, path := range []string{"docs/06-architecture/adr/ADR-019.md", "docs-ru/06-architecture/adr/ADR-019.md"} {
+		for _, required := range []string{"`1s`", "`10ms`", "`1m`", "100", "coalesce", "SLA"} {
+			if !strings.Contains(content[path], required) {
+				t.Errorf("%s misses running-publication rationale %q", path, required)
+			}
+		}
 	}
 	for _, path := range []string{"docs/04-specification/configuration.md", "docs-ru/04-specification/configuration.md"} {
 		for _, option := range managedOptions {

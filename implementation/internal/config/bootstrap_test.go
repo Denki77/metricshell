@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
 )
 
 var testNow = time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
@@ -430,7 +431,7 @@ func TestParseManagedResourceLimits(t *testing.T) {
 
 	configuration, err := Parse([]string{
 		"--mode=managed-registry", "--managed-max-families=2", "--managed-max-series=3",
-		"--managed-max-labels=1", "--managed-max-buckets=4", "--managed-max-batch-operations=5",
+		"--managed-max-labels=1", "--managed-max-buckets=4",
 		"--managed-max-metric-name-bytes=16B", "--managed-max-label-name-bytes=8B",
 		"--managed-max-label-value-bytes=32B", "--managed-max-help-bytes=64", "--", "program",
 	}, testNow, nil)
@@ -438,16 +439,33 @@ func TestParseManagedResourceLimits(t *testing.T) {
 		t.Fatal(err)
 	}
 	limits := configuration.Managed.Limits
-	if limits.Families != 2 || limits.Series != 3 || limits.Labels != 1 || limits.Buckets != 4 || limits.Batch != 5 ||
+	if limits.Families != 2 || limits.Series != 3 || limits.Labels != 1 || limits.Buckets != 4 || limits.Batch != managed.DefaultLimits().Batch ||
 		limits.MetricNameBytes != 16 || limits.LabelNameBytes != 8 || limits.LabelValueBytes != 32 || limits.HelpBytes != 64 {
 		t.Fatalf("managed limits = %+v", limits)
 	}
 	for _, option := range []string{
 		"--managed-max-families=0", "--managed-max-series=100001", "--managed-max-labels=65",
-		"--managed-max-buckets=0", "--managed-max-batch-operations=1025", "--managed-max-help-bytes=65KiB",
+		"--managed-max-buckets=0", "--managed-max-help-bytes=65KiB",
 	} {
 		if _, err := Parse([]string{"--mode=managed-registry", option, "--", "program"}, testNow, nil); err == nil {
 			t.Fatalf("accepted invalid option %s", option)
 		}
+	}
+}
+
+func TestParseRejectsRetiredExternalBatchConfiguration(t *testing.T) {
+	t.Parallel()
+
+	if _, err := Parse([]string{"--mode=managed-registry", "--managed-max-batch-operations=5", "--", "program"}, testNow, nil); err == nil {
+		t.Fatal("accepted retired managed batch CLI option")
+	}
+	lookup := func(name string) (string, bool) {
+		if name == "METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS" {
+			return "5", true
+		}
+		return "", false
+	}
+	if _, err := Parse([]string{"--mode=managed-registry", "--", "program"}, testNow, lookup); err == nil {
+		t.Fatal("accepted retired managed batch environment option")
 	}
 }

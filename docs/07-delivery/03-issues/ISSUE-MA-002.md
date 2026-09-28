@@ -18,7 +18,7 @@ ISSUE-MA-001.
 
 ## Scope
 
-Implement production domain types for descriptors, family/series identity, canonical labels, counter/gauge/classic-histogram semantics, descriptor conflict rules, reserved names, and ADR-016 batch semantics.
+Implement production domain types for descriptors, family/series identity, canonical labels, counter/gauge/classic-histogram semantics, descriptor conflict rules and reserved names. Retain all-or-nothing behavior only as an internal primitive; protocol v1 exposes unary operations.
 
 ## Out of scope
 
@@ -26,7 +26,7 @@ Owner queue, socket protocol/server, Core materialization/installation, lifecycl
 
 ## Configuration and observable errors
 
-This task consumes descriptor and operation data, not startup properties. Invalid metric names, unsupported types or operations, duplicate/canonical-label conflicts, invalid numeric operands, non-increasing histogram buckets, reserved-name collisions and descriptor/type/HELP/label/bucket conflicts are semantic runtime rejections. A rejected single operation or batch returns its stable semantic class and leaves every descriptor, series value and generation unchanged. Batch validation completes before mutation; no prefix may commit. Capacity policy belongs to ISSUE-MA-008 and framing errors to ISSUE-MA-005.
+This task consumes descriptor and operation data, not startup properties. Invalid metric names, unsupported types or operations, duplicate/canonical-label conflicts, invalid numeric operands, non-increasing histogram buckets, reserved-name collisions and descriptor/type/HELP/label/bucket conflicts are semantic runtime rejections. A rejected operation returns its stable semantic class and leaves every descriptor, series value and generation unchanged. Capacity policy belongs to ISSUE-MA-008 and framing errors to ISSUE-MA-005.
 
 ## Acceptance criteria
 
@@ -34,11 +34,11 @@ This task consumes descriptor and operation data, not startup properties. Invali
 - Counter/gauge operations implement ADR-016 semantics exactly.
 - Histogram observation atomically updates count, sum and applicable buckets.
 - Descriptor/type/HELP/label/bucket conflicts reject without partial mutation.
-- Supported batches are all-or-nothing.
+- Protocol v1 accepts exactly one instrumentation operation per request; external batching is deferred.
 
 ## Required test matrix
 
-Table-driven unit tests for numeric edge cases, NaN/Inf, labels, descriptor conflicts, histogram boundaries, batches and state preservation after rejection.
+Table-driven unit tests for numeric edge cases, NaN/Inf, labels, descriptor conflicts, histogram boundaries and state preservation after rejection. Internal primitive tests do not create a public batch contract.
 
 ## Completion
 

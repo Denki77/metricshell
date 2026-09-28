@@ -24,7 +24,8 @@ hardening defaults, configurable capacity/time limits, fault/soak/race gates, co
 supply-chain evidence.
 
 ISSUE-MA-002 provides the managed semantic core: explicit descriptors, canonical label identity, counter
-initialize/add, gauge set, Core-compatible classic histogram observations, deterministic conflicts and atomic batches.
+initialize/add, gauge set, Core-compatible classic histogram observations and deterministic conflicts. Its internal
+all-or-nothing application primitive is not exposed by protocol v1, which accepts one instrumentation operation per request.
 ISSUE-MA-003 wraps that core in one in-memory registry per execution: every managed bootstrap begins with an empty
 generation `0`, each successful commit advances once, rejected mutations preserve the complete state, and reads return
 a detached view of exactly one generation. No persistence, replay or disconnect-driven cleanup path exists.
@@ -40,7 +41,7 @@ removes only the socket inode created by the current execution.
 ISSUE-MA-007 adds a stateless managed client used by `metricshell managed` and a PHP 5.4 reference client. Both expose
 distinct accepted, rejected, overload, protocol, transport and unknown outcomes; an unknown result after complete
 submission is never retried automatically.
-ISSUE-MA-008 bounds managed families, active series, labels, histogram buckets, batches and descriptor/label strings.
+ISSUE-MA-008 bounds managed families, active series, labels, histogram buckets and descriptor/label strings.
 Every policy-limit rejection is distinct from queue overload and protocol rejection and preserves committed state and
 generation.
 ISSUE-MA-009 materializes one complete registry generation into deterministic immutable Application Snapshot Protocol

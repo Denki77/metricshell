@@ -19,8 +19,10 @@ families и series. State не сохраняется, не replay и не ра�
 no-op; конфликт type, metadata или buckets отклоняется
 без mutation. Label identity canonical и должна точно соответствовать descriptor.
 
-Поддерживаются `counter_initialize`, `counter_add`, `gauge_set`, `histogram_observe` и atomic bounded batches. Counter
-finite, non-negative и не уменьшается внутри epoch согласно существующему Core contract. Gauge принимает finite values,
+Поддерживаются `counter_initialize`, `counter_add`, `gauge_set` и `histogram_observe`. Protocol v1 принимает ровно одну
+instrumentation operation в request. External atomic batch submission остаётся отложенным и не входит в protocol v1;
+возможный внутренний all-or-nothing primitive не является публичной capability. Counter finite, non-negative и не
+уменьшается внутри epoch согласно существующему Core contract. Gauge принимает finite values,
 `NaN`, `+Inf` и `-Inf`. Histogram observation принимает non-negative finite values и `+Inf`, атомарно обновляет count,
 sum и cumulative classic buckets; `NaN` и отрицательные values отклоняются.
 
@@ -45,7 +47,7 @@ read/write deadlines. TCP или remote managed endpoint отсутствует.
 
 ## Resource и failure semantics
 
-Bounds для families, active series, labels, histogram buckets, batch, strings, frame, connections и queue проверяются
+Bounds для families, active series, labels, histogram buckets, strings, frame, connections и queue проверяются
 до unsafe allocation или registry mutation. Semantic, resource, protocol, overload, late, cancelled и unknown-client
 outcomes различаются. Любой rejection сохраняет complete committed registry и active Core snapshot.
 

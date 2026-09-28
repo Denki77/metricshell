@@ -25,6 +25,7 @@ func TestProtocolGoldenCorpus(t *testing.T) {
 		{name: "invalid version", frame: "{\"version\":\"1\",\"op\":\"gauge_set\"}\n", code: CodeInvalidVersion},
 		{name: "unsupported version", frame: "{\"version\":2,\"op\":\"gauge_set\"}\n", code: CodeUnsupportedVersion},
 		{name: "unknown operation", frame: "{\"version\":1,\"op\":\"reset\"}\n", code: CodeInvalidRequest},
+		{name: "external batch", frame: "{\"version\":1,\"op\":\"batch\",\"operations\":[]}\n", code: CodeInvalidRequest},
 		{name: "multiple", frame: "{}\n{}\n", code: CodeMultipleFrames},
 	}
 	for _, test := range tests {

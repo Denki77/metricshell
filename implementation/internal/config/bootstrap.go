@@ -107,7 +107,6 @@ var options = map[string]string{
 	"--managed-max-series":            "managed_series",
 	"--managed-max-labels":            "managed_labels",
 	"--managed-max-buckets":           "managed_buckets",
-	"--managed-max-batch-operations":  "managed_batch",
 	"--managed-max-metric-name-bytes": "managed_metric_name_bytes",
 	"--managed-max-label-name-bytes":  "managed_label_name_bytes",
 	"--managed-max-label-value-bytes": "managed_label_value_bytes",
@@ -166,8 +165,17 @@ var unsupportedSharedMemoryEnvironment = [...]string{
 	"METRICSHELL_SHM_PATH",
 }
 
+var retiredManagedEnvironment = [...]string{
+	"METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS",
+}
+
 func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if lookupEnv != nil {
+		for _, name := range retiredManagedEnvironment {
+			if _, exists := lookupEnv(name); exists {
+				return Config{}, err.Bootstrap.UnknownOption
+			}
+		}
 		for _, name := range unsupportedSharedMemoryEnvironment {
 			if _, exists := lookupEnv(name); exists {
 				return Config{}, err.Bootstrap.UnknownOption
@@ -253,7 +261,6 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 			"METRICSHELL_MANAGED_MAX_SERIES":            "managed_series",
 			"METRICSHELL_MANAGED_MAX_LABELS":            "managed_labels",
 			"METRICSHELL_MANAGED_MAX_BUCKETS":           "managed_buckets",
-			"METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS":  "managed_batch",
 			"METRICSHELL_MANAGED_MAX_METRIC_NAME_BYTES": "managed_metric_name_bytes",
 			"METRICSHELL_MANAGED_MAX_LABEL_NAME_BYTES":  "managed_label_name_bytes",
 			"METRICSHELL_MANAGED_MAX_LABEL_VALUE_BYTES": "managed_label_value_bytes",
@@ -343,7 +350,6 @@ func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig,
 		"managed_series":            &configuration.Limits.Series,
 		"managed_labels":            &configuration.Limits.Labels,
 		"managed_buckets":           &configuration.Limits.Buckets,
-		"managed_batch":             &configuration.Limits.Batch,
 		"managed_metric_name_bytes": &configuration.Limits.MetricNameBytes,
 		"managed_label_name_bytes":  &configuration.Limits.LabelNameBytes,
 		"managed_label_value_bytes": &configuration.Limits.LabelValueBytes,

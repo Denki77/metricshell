@@ -26,7 +26,7 @@ ISSUE-MA-004, ISSUE-MA-005 и ISSUE-MA-006.
 
 ## Конфигурация и наблюдаемые ошибки
 
-Независимые limits охватывают active families/series, labels, histogram buckets, размеры batch/operation, capacity owner queue и protocol frame согласно принятому configuration contract. Отсутствующие значения используют только принятые documented defaults; нулевые, отрицательные, переполненные, внутренне противоречивые или неподдерживаемые значения отклоняются до запуска workload. Во время runtime каждый limit проверяется до unsafe allocation и mutation. Исчерпание limit — policy rejection, отличный от queue overload, protocol rejection и fatal OOM; весь committed registry и generation сохраняются. Имя limit, его bound и число rejection наблюдаемы без application-controlled labels.
+Независимые limits охватывают active families/series, labels, histogram buckets, capacity owner queue и protocol frame согласно принятому configuration contract. Отсутствующие значения используют только принятые documented defaults; нулевые, отрицательные, переполненные, внутренне противоречивые или неподдерживаемые значения отклоняются до запуска workload. Во время runtime каждый limit проверяется до unsafe allocation и mutation. Исчерпание limit — policy rejection, отличный от queue overload, protocol rejection и fatal OOM; весь committed registry и generation сохраняются. Имя limit, его bound и число rejection наблюдаемы без application-controlled labels.
 
 ## Критерии приёмки
 

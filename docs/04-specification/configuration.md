@@ -67,7 +67,7 @@ The managed Unix endpoint is configured by `--managed-socket-path`, `--managed-s
 no permissions to other users, and timeouts are bounded durations.
 
 Registry resources use `--managed-max-families`, `--managed-max-series`, `--managed-max-labels`,
-`--managed-max-buckets`, `--managed-max-batch-operations`, `--managed-max-metric-name-bytes`,
+`--managed-max-buckets`, `--managed-max-metric-name-bytes`,
 `--managed-max-label-name-bytes`, `--managed-max-label-value-bytes`, and `--managed-max-help-bytes`, with corresponding
 uppercase `METRICSHELL_` environment names. These options are managed-only startup properties. Invalid values fail
 before workload start; runtime exhaustion is a semantic policy rejection and does not advance the registry generation.

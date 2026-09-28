@@ -26,7 +26,7 @@ Using research coverage endpoints as defaults; masking fatal OOM as normal rejec
 
 ## Configuration and observable errors
 
-Independent limits cover active families/series, labels, histogram buckets, batch/operation dimensions, owner-queue capacity and protocol frame size where specified by the accepted configuration contract. Missing values use only accepted documented defaults; zero, negative, overflowing, internally inconsistent or unsupported values fail configuration before workload start. At runtime each limit is checked before unsafe allocation and before mutation. Limit exhaustion is a policy rejection distinct from queue overload, protocol rejection and fatal process OOM; it preserves the complete committed registry and generation. Limit name, configured bound and rejection count are observable with bounded cardinality, without application-controlled labels.
+Independent limits cover active families/series, labels, histogram buckets, owner-queue capacity and protocol frame size where specified by the accepted configuration contract. Missing values use only accepted documented defaults; zero, negative, overflowing, internally inconsistent or unsupported values fail configuration before workload start. At runtime each limit is checked before unsafe allocation and before mutation. Limit exhaustion is a policy rejection distinct from queue overload, protocol rejection and fatal process OOM; it preserves the complete committed registry and generation. Limit name, configured bound and rejection count are observable with bounded cardinality, without application-controlled labels.
 
 ## Acceptance criteria
 
@@ -48,7 +48,7 @@ Complete when all acceptance criteria and required tests pass in CI and the task
 ## Delivery log
 
 - 2026-09-26: moved to `In Progress`; added independently configurable registry limits and pre-commit policy
-  enforcement for families, active series, labels, histogram buckets, batches and bounded strings.
+  enforcement for families, active series, labels, histogram buckets and bounded strings.
 - 2026-09-26: moved to `Testing`; added boundary/configuration/generation-preservation tests and audited the limits,
   configuration and EN/RU implementation documentation.
 - 2026-09-26: moved to `Done`; the Docker format, vet, race, dependency, Darwin compile and Linux multi-architecture
