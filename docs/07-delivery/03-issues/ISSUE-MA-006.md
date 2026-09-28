@@ -1,6 +1,6 @@
 # ISSUE-MA-006. Unix socket managed-operation server
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -44,3 +44,16 @@ AF_UNIX E2E; concurrent clients; slow/partial deadlines; disconnect cases; path/
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented the private Unix operation endpoint, bounded connections and I/O
+  deadlines, configured permissions, admission closure and owned-inode cleanup.
+- 2026-09-26: moved to `Testing`; added AF_UNIX concurrent-client, partial/disconnect, ACK-loss, permissions, unsafe
+  path, readiness, closure and cleanup tests and audited implementation/configuration/defaults documentation.
+- 2026-09-26: moved to `Done`; the Docker-only full race, vet, dependency and multi-architecture build gate passed.
+
+## Verification evidence
+
+- `cd implementation && make test`
+- `go test -race ./internal/managedserver ./internal/config ./internal/cli` (inside the pinned Docker toolchain)

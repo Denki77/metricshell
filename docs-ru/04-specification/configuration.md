@@ -19,7 +19,10 @@ metricshell --help
 без shell interpretation. Пустой workload argv даёт configuration_invalid. MetricShell options после -- являются
 аргументами workload. Shell behavior требует явный workload, например -- /bin/sh -c command.
 
-У Core нет option mode. В частности, --mode, --mode=snapshot и --mode=managed-registry невалидны.
+Режим владения выбирается через `--mode` / `METRICSHELL_MODE`. Значение по умолчанию и явное значение `snapshot`
+выбирают существующий путь приёма полных снимков. `managed-registry` выбирает границу запуска управляемого реестра.
+CLI имеет приоритет над environment. Неизвестные значения являются ошибкой конфигурации. Свойства приёма снимков
+нельзя задавать явно вместе с `managed-registry`, что исключает гибридное владение до запуска workload.
 
 ## Источники и precedence
 
@@ -45,6 +48,29 @@ variables фатальны до запуска workload.
 | socket.path           | --unix-socket-path      | METRICSHELL_UNIX_SOCKET_PATH      | /run/metricshell/ingest.sock   |
 | file.path             | --snapshot-file-path    | METRICSHELL_SNAPSHOT_FILE_PATH    | /run/metricshell/snapshot.json |
 | shutdown.deadline     | --shutdown-deadline     | METRICSHELL_SHUTDOWN_DEADLINE     | пусто                          |
+
+| Property | CLI    | Environment      | Default  |
+|----------|--------|------------------|----------|
+| mode     | --mode | METRICSHELL_MODE | snapshot |
+
+Управляемый режим добавляет `--managed-queue-capacity` / `METRICSHELL_MANAGED_QUEUE_CAPACITY` и
+`--managed-max-frame-bytes` / `METRICSHELL_MANAGED_MAX_FRAME_BYTES`. Параметры допустимы только с `managed-registry` и
+задают ограниченную очередь допуска single-owner и размер NDJSON request frame.
+
+`--managed-publication-interval` / `METRICSHELL_MANAGED_PUBLICATION_INTERVAL` задаёт fixed bounded running publication
+cycle (`1s` default, `10ms`–`1m`). Один цикл coalesces все новые committed generations максимум в один complete Core
+candidate; per-operation timer или queue не создаются.
+
+Managed Unix endpoint настраивается параметрами `--managed-socket-path`, `--managed-socket-mode`,
+`--managed-max-connections`, `--managed-read-timeout` и `--managed-write-timeout` с соответствующими uppercase
+переменными `METRICSHELL_`. Путь абсолютный, его parent directory приватный, mode задаётся четырьмя восьмеричными
+цифрами и не предоставляет прав other users, а timeouts являются ограниченными durations.
+
+Registry resources настраиваются через `--managed-max-families`, `--managed-max-series`, `--managed-max-labels`,
+`--managed-max-buckets`, `--managed-max-metric-name-bytes`,
+`--managed-max-label-name-bytes`, `--managed-max-label-value-bytes` и `--managed-max-help-bytes` с соответствующими
+uppercase переменными `METRICSHELL_`. Эти managed-only startup properties проверяются до workload start. Runtime
+exhaustion даёт semantic policy rejection и не меняет registry generation.
 
 ingestion.transport имеет только одно значение: file, unix или http. Активируется только выбранный ingestion
 listener/watcher. Явные transport-specific options неактивного transport отклоняются для обнаружения configuration

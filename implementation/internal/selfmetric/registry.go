@@ -61,6 +61,17 @@ const (
 	ShutdownActive             = "metricshell_shutdown_active"
 	ShutdownDeadline           = "metricshell_shutdown_deadline_timestamp_seconds"
 	ShutdownPhaseDuration      = "metricshell_shutdown_phase_duration_seconds"
+	ManagedOperationsTotal     = "metricshell_managed_operations_total"
+	ManagedRejectionsTotal     = "metricshell_managed_rejections_total"
+	ManagedProtocolTotal       = "metricshell_managed_protocol_rejections_total"
+	ManagedQueueDepth          = "metricshell_managed_queue_depth"
+	ManagedQueueCapacity       = "metricshell_managed_queue_capacity"
+	ManagedFamilies            = "metricshell_managed_families"
+	ManagedSeries              = "metricshell_managed_series"
+	ManagedGeneration          = "metricshell_managed_generation"
+	ManagedMaterializations    = "metricshell_managed_materializations_total"
+	ManagedFreezes             = "metricshell_managed_freezes_total"
+	ManagedFinalInstalls       = "metricshell_managed_final_installs_total"
 )
 
 type FinalWaitMode string
@@ -84,26 +95,32 @@ const (
 )
 
 var (
-	FinalWaitModes        = [...]string{"immediate", "duration", "scrapes"}
-	RuntimeFailureReasons = [...]string{RuntimeFailureConfiguration, RuntimeFailureBind, RuntimeFailureWorkloadStart, RuntimeFailureProtocol, RuntimeFailureResource, RuntimeFailureInternal}
-	WorkloadStartOutcomes = [...]string{WorkloadOutcomeStarted, WorkloadOutcomeStartFailed}
-	Signals               = [...]string{"TERM", "INT", "HUP", "QUIT", "KILL"}
-	SignalTargets         = [...]string{SignalTargetProcess, SignalTargetProcessGroup}
-	ChildKinds            = [...]string{"direct", "adopted"}
-	Transports            = [...]string{"file", "unix", "http"}
-	PublicationOutcomes   = [...]string{"accepted", "rejected", "busy", "timeout", "internal_error"}
-	FileTriggers          = [...]string{"startup", "event", "periodic", "overflow", "watch_reinstall"}
-	FileOutcomes          = [...]string{"accepted", "unchanged", "absent", "invalid", "error"}
-	FileWatchEvents       = [...]string{"overflow", "invalidated", "reinstalled"}
-	SocketFrameReasons    = [...]string{"malformed", "protocol_version", "frame_limit", "part_limit", "duplicate_part", "missing_part", "transaction_invalid", "transaction_expired"}
-	FilterKinds           = [...]string{"include", "exclude"}
-	FilterOutcomes        = [...]string{"included", "excluded"}
-	ExpositionFormats     = [...]string{"prometheus", "openmetrics"}
-	ExpositionOutcomes    = [...]string{"success", "write_error", "response_limit", "encoding_error", "timeout"}
-	FinalScrapeOutcomes   = [...]string{"completed", "ineligible", "write_error", "cancelled"}
-	FinalWaitReasons      = [...]string{"immediate", "duration_elapsed", "required_scrapes", "timeout", "external_termination", "runtime_failure"}
-	ShutdownPhases        = [...]string{"workload_wait", "forced_termination", "finalization", "http_drain", "total"}
-	ShutdownBuckets       = [...]float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60}
+	FinalWaitModes             = [...]string{"immediate", "duration", "scrapes"}
+	RuntimeFailureReasons      = [...]string{RuntimeFailureConfiguration, RuntimeFailureBind, RuntimeFailureWorkloadStart, RuntimeFailureProtocol, RuntimeFailureResource, RuntimeFailureInternal}
+	WorkloadStartOutcomes      = [...]string{WorkloadOutcomeStarted, WorkloadOutcomeStartFailed}
+	Signals                    = [...]string{"TERM", "INT", "HUP", "QUIT", "KILL"}
+	SignalTargets              = [...]string{SignalTargetProcess, SignalTargetProcessGroup}
+	ChildKinds                 = [...]string{"direct", "adopted"}
+	Transports                 = [...]string{"file", "unix", "http", "managed"}
+	PublicationOutcomes        = [...]string{"accepted", "rejected", "busy", "timeout", "internal_error"}
+	FileTriggers               = [...]string{"startup", "event", "periodic", "overflow", "watch_reinstall"}
+	FileOutcomes               = [...]string{"accepted", "unchanged", "absent", "invalid", "error"}
+	FileWatchEvents            = [...]string{"overflow", "invalidated", "reinstalled"}
+	SocketFrameReasons         = [...]string{"malformed", "protocol_version", "frame_limit", "part_limit", "duplicate_part", "missing_part", "transaction_invalid", "transaction_expired"}
+	FilterKinds                = [...]string{"include", "exclude"}
+	FilterOutcomes             = [...]string{"included", "excluded"}
+	ExpositionFormats          = [...]string{"prometheus", "openmetrics"}
+	ExpositionOutcomes         = [...]string{"success", "write_error", "response_limit", "encoding_error", "timeout"}
+	FinalScrapeOutcomes        = [...]string{"completed", "ineligible", "write_error", "cancelled"}
+	FinalWaitReasons           = [...]string{"immediate", "duration_elapsed", "required_scrapes", "timeout", "external_termination", "runtime_failure"}
+	ShutdownPhases             = [...]string{"workload_wait", "forced_termination", "finalization", "http_drain", "total"}
+	ShutdownBuckets            = [...]float64{0.001, 0.005, 0.01, 0.05, 0.1, 0.25, 0.5, 1, 2, 5, 10, 30, 60}
+	ManagedOutcomes            = [...]string{"committed", "rejected", "overloaded", "cancelled", "closed", "unknown"}
+	ManagedRejectClasses       = [...]string{"semantic", "resource", "overload", "late", "protocol"}
+	ManagedProtocolCodes       = [...]string{"empty_frame", "partial_frame", "frame_too_large", "multiple_frames", "malformed_json", "missing_version", "invalid_version", "unsupported_version", "invalid_request"}
+	ManagedMaterializeOutcomes = [...]string{"built", "cache_hit", "error"}
+	ManagedFreezeOutcomes      = [...]string{"winner", "duplicate"}
+	ManagedInstallOutcomes     = [...]string{"accepted", "rejected", "error"}
 )
 
 var (
@@ -471,6 +488,17 @@ func definitions() []definition {
 		{ShutdownActive, "Whether external termination is active.", Gauge, nil, nil, nil, false},
 		{ShutdownDeadline, "Effective absolute external shutdown deadline.", Gauge, nil, nil, nil, false},
 		{ShutdownPhaseDuration, "Completed shutdown phase durations.", Histogram, []string{"phase"}, [][]string{ShutdownPhases[:]}, ShutdownBuckets[:], false},
+		{ManagedOperationsTotal, "Managed operation outcomes.", Counter, []string{"outcome"}, [][]string{ManagedOutcomes[:]}, nil, false},
+		{ManagedRejectionsTotal, "Managed operation rejection classes.", Counter, []string{"class"}, [][]string{ManagedRejectClasses[:]}, nil, false},
+		{ManagedProtocolTotal, "Managed protocol rejection codes.", Counter, []string{"code"}, [][]string{ManagedProtocolCodes[:]}, nil, false},
+		{ManagedQueueDepth, "Managed owner queue depth.", Gauge, nil, nil, nil, false},
+		{ManagedQueueCapacity, "Managed owner queue capacity.", Gauge, nil, nil, nil, false},
+		{ManagedFamilies, "Managed registry family count.", Gauge, nil, nil, nil, false},
+		{ManagedSeries, "Managed registry active series count.", Gauge, nil, nil, nil, false},
+		{ManagedGeneration, "Managed committed registry generation.", Gauge, nil, nil, nil, false},
+		{ManagedMaterializations, "Managed materialization outcomes.", Counter, []string{"outcome"}, [][]string{ManagedMaterializeOutcomes[:]}, nil, false},
+		{ManagedFreezes, "Managed registry freeze outcomes.", Counter, []string{"outcome"}, [][]string{ManagedFreezeOutcomes[:]}, nil, false},
+		{ManagedFinalInstalls, "Managed final Core install outcomes.", Counter, []string{"outcome"}, [][]string{ManagedInstallOutcomes[:]}, nil, false},
 	}
 }
 

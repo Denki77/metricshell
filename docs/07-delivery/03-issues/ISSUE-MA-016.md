@@ -1,6 +1,6 @@
 # ISSUE-MA-016. Documentation, examples and release readiness
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -46,3 +46,17 @@ Documentation link/parity checks; example automation; configuration completeness
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-27: moved to `In Progress`; replaced the pre-ADR draft with the accepted bilingual Managed Aggregation
+  specification and completed release notes, top-level status, client guidance and traceability links.
+- 2026-09-27: moved to `Testing`; added a Docker-executed EN/RU completeness audit for every public managed option and
+  discovered then corrected a nine-option gap in the Russian configuration specification.
+- 2026-09-27: moved to `Done`; the bilingual documentation audit and full Docker format, vet, race, dependency, Darwin
+  compile and Linux multi-architecture build gate passed.
+
+## Verification evidence
+
+- `go test -race ./internal/releaseverify`
+- `cd implementation && make test IMAGE=metricshell-ma016`

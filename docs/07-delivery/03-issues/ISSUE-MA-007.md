@@ -1,6 +1,6 @@
 # ISSUE-MA-007. CLI helper and PHP 5.4 reference client
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -43,3 +43,19 @@ Real PHP 5.4 container tests; shell CLI tests; accepted/rejected/connect/protoco
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented the stateless Go client, shell-friendly CLI operations and PHP 5.4
+  reference client with bounded deadlines and explicit result categories.
+- 2026-09-26: moved to `Testing`; added CLI/unit/AF_UNIX tests plus real PHP 5.4 container coverage for accepted,
+  rejected, connect, protocol and unknown outcomes, reconnect, labels and numeric validation; audited both
+  implementation READMEs and the client README.
+- 2026-09-26: moved to `Done`; the Docker-only integration and full format, vet, race, dependency-boundary and
+  multi-architecture build gates passed.
+
+## Verification evidence
+
+- `go test -race ./internal/managedclient ./internal/cli` (inside the pinned Docker toolchain)
+- `cd implementation && make integration`
+- `cd implementation && make test`

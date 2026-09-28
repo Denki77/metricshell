@@ -1,6 +1,6 @@
 # ISSUE-MA-015. Legacy, performance, resource and production validation
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -45,3 +45,18 @@ Production matrices derived from INV-018/019/020; multiple architectures/environ
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-27: moved to `In Progress`; added a controlled policy/concurrency/materialization validation matrix and a
+  Docker artifact stage carrying raw race, benchmark, configuration, revision and Go environment evidence.
+- 2026-09-27: moved to `Testing`; composed evidence generation with the real PHP 5.4 compatibility and managed
+  production-process E2E gates and documented that timing selects no default or SLA.
+- 2026-09-27: moved to `Done`; repeated race validation, production compatibility, artifact provenance and the full
+  Docker test gate passed.
+
+## Verification evidence
+
+- `cd implementation && make managed-validation IMAGE=metricshell-ma015`
+- `cd implementation && make test IMAGE=metricshell-ma015`
+- generated artifact: `implementation/dist/managed-validation/validation/`

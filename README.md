@@ -21,9 +21,10 @@ snapshots through bounded local transports, serves `/metrics`, and preserves fin
 
 ## Current status
 
-Core is implemented and ready for operational use in the complete-snapshot profile: publishers replace the whole metric
-set at once, and partial metric updates are intentionally not part of this release. The project is still pre-1.0, so the
-public runtime contract may change between minor versions.
+Core and the optional Managed Aggregation profile are implemented and production-validated. Snapshot mode remains the
+default complete-replacement contract; `managed-registry` adds bounded local counter, gauge and histogram operations
+through a private Unix socket. The project is still pre-1.0, so the public runtime contract may change between minor
+versions.
 
 ## Quick start
 
@@ -50,12 +51,44 @@ docker run --rm metricshell:local -- /path/to/workload "argument with spaces"
 Everything after the standalone `--` is passed directly to the workload. Use an explicit shell workload if shell
 features are needed.
 
+### Managed Aggregation
+
+Run MetricShell in managed-registry mode when the workload should emit simple operations instead of maintaining a
+complete snapshot:
+
+```sh
+metricshell --mode=managed-registry --exposition-listen=0.0.0.0:9090 -- /path/to/workload
+```
+
+From that workload (the default private socket is `/run/metricshell/managed.sock`):
+
+```sh
+metricshell managed declare jobs counter "Processed jobs"
+metricshell managed counter-add jobs 1
+metricshell managed declare queue_depth gauge "Queued jobs"
+metricshell managed gauge-set queue_depth 7
+metricshell managed declare job_seconds histogram "Job duration" - 0.1 1 +Inf
+metricshell managed histogram-observe job_seconds 0.42
+```
+
+The path is: workload operation → local Unix socket → Managed Registry → periodically published complete snapshot →
+Core → `/metrics` → Prometheus. An accepted operation is committed to the current registry epoch; it is not a promise
+that Prometheus has already scraped it.
+
+## When to use Managed Aggregation
+
+Use it for CLI, cron, Kubernetes Job/CronJob, batch, ETL/import/export, legacy PHP or shell, one-shot workers, and
+long-running workers that cannot conveniently own a Prometheus registry and HTTP endpoint. Snapshot mode is different:
+the workload owns its registry and sends each complete snapshot. If a normal long-running HTTP service already uses a
+native Prometheus client and can expose `/metrics`, it may not need MetricShell at all.
+
 ## Documentation
 
 - [Production implementation](implementation/README.md)
 - [Configuration](docs/04-specification/configuration.md)
 - [Runtime state machine](docs/04-specification/runtime-state-machine.md)
 - [Application snapshot protocol](docs/04-specification/application-snapshot-protocol.md)
+- [Managed Aggregation](docs/04-specification/managed-aggregation.md)
 - [Docker and Compose examples](docs/04-specification/docker-compose-examples.md)
 - [Architecture decisions](docs/06-architecture/adr/README.md)
 - [Architecture investigation](docs/05-architecture-investigation/architecture-investigation.md)

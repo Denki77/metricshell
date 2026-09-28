@@ -1,6 +1,6 @@
 # ISSUE-MA-005. Operation protocol v1 and bounded framing
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -44,3 +44,16 @@ Golden corpus; exact frame limit/+1; malformed JSON; partial EOF; versions; sema
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented strict protocol v1 request/response mapping and bounded NDJSON
+  framing with deterministic version, shape, duplicate-key and frame errors.
+- 2026-09-26: moved to `Testing`; added golden, exact-limit, malformed/partial/multi-frame, result-mapping and fuzz tests
+  and audited the implementation README plus English/Russian configuration/defaults documentation.
+- 2026-09-26: moved to `Done`; the Docker-only full race, vet, dependency and multi-architecture build gate passed.
+
+## Verification evidence
+
+- `cd implementation && make test`
+- `go test -race ./internal/managedprotocol ./internal/config` (inside the pinned Docker toolchain)

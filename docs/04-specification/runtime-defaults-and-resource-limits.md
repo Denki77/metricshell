@@ -5,7 +5,8 @@
 > Status: Accepted normative specification
 > Requirements: FR-024, FR-046, FR-052, FR-080, FR-081, FR-082
 > Acceptance criteria: AC-ING-008, AC-MET-007, AC-MET-008, AC-FIN-004, AC-FIN-006–AC-FIN-008, AC-CONF-002–AC-CONF-004
-> Decisions: ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-011, ADR-014, ADR-015
+> Decisions: ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-011, ADR-014, ADR-015, ADR-016, ADR-017, ADR-018,
+> ADR-019, ADR-020
 
 ## Purpose
 
@@ -77,15 +78,36 @@ A candidate violating any limit is rejected atomically and cannot partially modi
 
 ## Unix socket defaults
 
-| Canonical property           | Environment variable                     | Default |  Allowed range |
-|------------------------------|------------------------------------------|--------:|---------------:|
-| `socket.frame_bytes`         | `METRICSHELL_SOCKET_MAX_FRAME_BYTES`     |  `8KiB` | `1KiB`–`64KiB` |
-| `socket.parts`               | `METRICSHELL_SOCKET_MAX_PARTS`           |   `256` |     `1`–`1024` |
-| `socket.connections`         | `METRICSHELL_SOCKET_MAX_CONNECTIONS`     |     `8` |       `1`–`64` |
-| `socket.transactions`        | `METRICSHELL_SOCKET_MAX_TRANSACTIONS`    |     `4` |       `1`–`32` |
-| `socket.transaction_timeout` | `METRICSHELL_SOCKET_TRANSACTION_TIMEOUT` |    `5s` |   `100ms`–`1m` |
-| `socket.read_timeout`        | `METRICSHELL_SOCKET_READ_TIMEOUT`        |    `5s` |   `100ms`–`1m` |
-| `socket.write_timeout`       | `METRICSHELL_SOCKET_WRITE_TIMEOUT`       |    `5s` |   `100ms`–`1m` |
+| Canonical property             | Environment variable                        | Default |  Allowed range |
+|--------------------------------|---------------------------------------------|--------:|---------------:|
+| `socket.frame_bytes`           | `METRICSHELL_SOCKET_MAX_FRAME_BYTES`        |  `8KiB` | `1KiB`–`64KiB` |
+| `managed.queue_capacity`       | `METRICSHELL_MANAGED_QUEUE_CAPACITY`        |    `64` |     `1`–`1024` |
+| `managed.publication_interval` | `METRICSHELL_MANAGED_PUBLICATION_INTERVAL`  |    `1s` |    `10ms`–`1m` |
+| `managed.frame_bytes`          | `METRICSHELL_MANAGED_MAX_FRAME_BYTES`       |  `8KiB` | `1KiB`–`64KiB` |
+| `managed.connections`          | `METRICSHELL_MANAGED_MAX_CONNECTIONS`       |     `8` |     `1`–`1024` |
+| `managed.read_timeout`         | `METRICSHELL_MANAGED_READ_TIMEOUT`          |    `5s` |   `100ms`–`1m` |
+| `managed.write_timeout`        | `METRICSHELL_MANAGED_WRITE_TIMEOUT`         |    `5s` |   `100ms`–`1m` |
+| `managed.families`             | `METRICSHELL_MANAGED_MAX_FAMILIES`          |  `1024` |   `1`–`100000` |
+| `managed.series`               | `METRICSHELL_MANAGED_MAX_SERIES`            | `10000` |   `1`–`100000` |
+| `managed.labels`               | `METRICSHELL_MANAGED_MAX_LABELS`            |     `8` |       `0`–`64` |
+| `managed.buckets`              | `METRICSHELL_MANAGED_MAX_BUCKETS`           |    `64` |     `1`–`1024` |
+| `managed.metric_name_bytes`    | `METRICSHELL_MANAGED_MAX_METRIC_NAME_BYTES` |   `256` |    `1B`–`1KiB` |
+| `managed.label_name_bytes`     | `METRICSHELL_MANAGED_MAX_LABEL_NAME_BYTES`  |   `128` |    `1B`–`1KiB` |
+| `managed.label_value_bytes`    | `METRICSHELL_MANAGED_MAX_LABEL_VALUE_BYTES` |  `1KiB` |   `1B`–`16KiB` |
+| `managed.help_bytes`           | `METRICSHELL_MANAGED_MAX_HELP_BYTES`        |  `4KiB` |    `0`–`64KiB` |
+| `socket.parts`                 | `METRICSHELL_SOCKET_MAX_PARTS`              |   `256` |     `1`–`1024` |
+| `socket.connections`           | `METRICSHELL_SOCKET_MAX_CONNECTIONS`        |     `8` |       `1`–`64` |
+| `socket.transactions`          | `METRICSHELL_SOCKET_MAX_TRANSACTIONS`       |     `4` |       `1`–`32` |
+| `socket.transaction_timeout`   | `METRICSHELL_SOCKET_TRANSACTION_TIMEOUT`    |    `5s` |   `100ms`–`1m` |
+| `socket.read_timeout`          | `METRICSHELL_SOCKET_READ_TIMEOUT`           |    `5s` |   `100ms`–`1m` |
+| `socket.write_timeout`         | `METRICSHELL_SOCKET_WRITE_TIMEOUT`          |    `5s` |   `100ms`–`1m` |
+
+The managed publication interval follows ADR-019's fixed, single-goroutine, queue-free policy. The `1s` default lets
+short bursts coalesce while keeping long-running updates live; the `10ms` lower bound caps triggers at 100 per second,
+and `1m` permits stronger coalescing without selecting final-only publication. Registry size, encoded snapshot limits,
+materialization cost and scrape cadence remain operator inputs. Large or high-churn registries should use a longer
+interval. These values are product defaults and ranges, not SLA or capacity claims, and intermediate generations need
+not become Core-visible.
 
 For part index `i`, define the conservative decoded payload capacity:
 
@@ -103,6 +125,11 @@ Negative `payload_chars` means zero capacity. Startup requires
 `effective_socket_decoded_capacity >= limits.snapshot_bytes`. The default `8KiB × 256` configuration satisfies this
 invariant after worst-case MSP/1 overhead and unpadded base64url expansion. The assembled input remains bounded by
 `limits.decoded_input_bytes`, and its canonical form by `limits.snapshot_bytes`.
+
+Managed series, label and string defaults deliberately reuse the already accepted Core limits. Family and bucket
+defaults are conservative product bounds selected independently of the INV-019 coverage endpoints; the tested
+20,000-series and 100-bucket values are not defaults. Every managed resource rejection occurs before committing the
+new family/series/bucket vector and preserves the complete registry generation.
 
 ## Local HTTP ingestion defaults
 
@@ -145,13 +172,15 @@ debug. Selector values are omitted unless `log.selector_values=true`; the destin
 The executable does not pretend to enforce all operating-system limits internally. Supported Docker and Compose examples
 use the following initial profile:
 
-| Resource               | Reference value |
-|------------------------|----------------:|
-| memory limit           |         `64MiB` |
-| PID limit              |            `64` |
-| `nofile` soft/hard     |         `64/64` |
-| runtime directory mode |          `0700` |
-| Unix socket mode       |          `0660` |
+| Resource               |                 Reference value |
+|------------------------|--------------------------------:|
+| memory limit           |                         `64MiB` |
+| PID limit              |                            `64` |
+| `nofile` soft/hard     |                         `64/64` |
+| runtime directory mode |                          `0700` |
+| Unix socket mode       |                          `0660` |
+| Managed socket path    | `/run/metricshell/managed.sock` |
+| Managed socket mode    |                          `0660` |
 
 A deployment may raise these values. Lower values are unsupported unless the full conformance suite passes. Hard memory
 containment is provided by cgroups.

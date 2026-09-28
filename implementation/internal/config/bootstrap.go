@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"math"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -10,6 +11,7 @@ import (
 	err "github.com/Denki77/metricshell/implementation/internal/error"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
 )
@@ -20,7 +22,16 @@ const (
 
 type LookupEnv func(string) (string, bool)
 
+type Mode string
+
+const (
+	ModeSnapshot        Mode = "snapshot"
+	ModeManagedRegistry Mode = "managed-registry"
+)
+
 type Config struct {
+	Mode                Mode
+	Managed             ManagedConfig
 	Workload            []string
 	Shutdown            shutdown.Config
 	Exposition          exposition.Config
@@ -35,6 +46,18 @@ type Config struct {
 	Socket              SocketConfig
 	HTTPIngestionListen string
 	HTTPIngestion       HTTPConfig
+}
+
+type ManagedConfig struct {
+	QueueCapacity   int
+	PublishInterval time.Duration
+	FrameBytes      int
+	SocketPath      string
+	SocketMode      uint32
+	Connections     int
+	ReadTimeout     time.Duration
+	WriteTimeout    time.Duration
+	Limits          managed.Limits
 }
 
 type LogConfig struct {
@@ -71,6 +94,23 @@ type HTTPConfig struct {
 }
 
 var options = map[string]string{
+	"--mode":                          "mode",
+	"--managed-queue-capacity":        "managed_queue_capacity",
+	"--managed-publication-interval":  "managed_publication_interval",
+	"--managed-max-frame-bytes":       "managed_frame_bytes",
+	"--managed-socket-path":           "managed_socket_path",
+	"--managed-socket-mode":           "managed_socket_mode",
+	"--managed-max-connections":       "managed_connections",
+	"--managed-read-timeout":          "managed_read_timeout",
+	"--managed-write-timeout":         "managed_write_timeout",
+	"--managed-max-families":          "managed_families",
+	"--managed-max-series":            "managed_series",
+	"--managed-max-labels":            "managed_labels",
+	"--managed-max-buckets":           "managed_buckets",
+	"--managed-max-metric-name-bytes": "managed_metric_name_bytes",
+	"--managed-max-label-name-bytes":  "managed_label_name_bytes",
+	"--managed-max-label-value-bytes": "managed_label_value_bytes",
+	"--managed-max-help-bytes":        "managed_help_bytes",
 	"--shutdown-total-grace":          "total_grace",
 	"--workload-shutdown-timeout":     "workload_timeout",
 	"--shutdown-reserve":              "reserve",
@@ -125,8 +165,17 @@ var unsupportedSharedMemoryEnvironment = [...]string{
 	"METRICSHELL_SHM_PATH",
 }
 
+var retiredManagedEnvironment = [...]string{
+	"METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS",
+}
+
 func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if lookupEnv != nil {
+		for _, name := range retiredManagedEnvironment {
+			if _, exists := lookupEnv(name); exists {
+				return Config{}, err.Bootstrap.UnknownOption
+			}
+		}
 		for _, name := range unsupportedSharedMemoryEnvironment {
 			if _, exists := lookupEnv(name); exists {
 				return Config{}, err.Bootstrap.UnknownOption
@@ -152,6 +201,14 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 	if separator == len(args)-1 {
 		return Config{}, err.Bootstrap.CommandRequired
 	}
+	mode, parseErr := parseMode(args[:separator], lookupEnv)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
+	managedConfiguration, parseErr := parseManaged(args[:separator], lookupEnv, mode)
+	if parseErr != nil {
+		return Config{}, parseErr
+	}
 
 	shutdownConfiguration, parseErr := parseShutdown(args[:separator], now, lookupEnv)
 	if parseErr != nil {
@@ -174,11 +231,197 @@ func Parse(args []string, now time.Time, lookupEnv LookupEnv) (Config, error) {
 		return Config{}, parseErr
 	}
 	ingestionConfiguration.Workload = args[separator+1:]
+	ingestionConfiguration.Mode = mode
+	ingestionConfiguration.Managed = managedConfiguration
 	ingestionConfiguration.Shutdown = shutdownConfiguration
 	ingestionConfiguration.Exposition = expositionConfiguration
 	ingestionConfiguration.FinalWait = finalWaitConfiguration
 	ingestionConfiguration.Log = logConfiguration
 	return ingestionConfiguration, nil
+}
+
+func parseManaged(args []string, lookupEnv LookupEnv, mode Mode) (ManagedConfig, error) {
+	configuration := ManagedConfig{
+		QueueCapacity: 64, PublishInterval: time.Second, FrameBytes: 8 << 10, SocketPath: "/run/metricshell/managed.sock", SocketMode: 0o660,
+		Connections: 8, ReadTimeout: 5 * time.Second, WriteTimeout: 5 * time.Second,
+		Limits: managed.DefaultLimits(),
+	}
+	values := map[string]string{}
+	if lookupEnv != nil {
+		for environment, property := range map[string]string{
+			"METRICSHELL_MANAGED_QUEUE_CAPACITY":        "managed_queue_capacity",
+			"METRICSHELL_MANAGED_PUBLICATION_INTERVAL":  "managed_publication_interval",
+			"METRICSHELL_MANAGED_MAX_FRAME_BYTES":       "managed_frame_bytes",
+			"METRICSHELL_MANAGED_SOCKET_PATH":           "managed_socket_path",
+			"METRICSHELL_MANAGED_SOCKET_MODE":           "managed_socket_mode",
+			"METRICSHELL_MANAGED_MAX_CONNECTIONS":       "managed_connections",
+			"METRICSHELL_MANAGED_READ_TIMEOUT":          "managed_read_timeout",
+			"METRICSHELL_MANAGED_WRITE_TIMEOUT":         "managed_write_timeout",
+			"METRICSHELL_MANAGED_MAX_FAMILIES":          "managed_families",
+			"METRICSHELL_MANAGED_MAX_SERIES":            "managed_series",
+			"METRICSHELL_MANAGED_MAX_LABELS":            "managed_labels",
+			"METRICSHELL_MANAGED_MAX_BUCKETS":           "managed_buckets",
+			"METRICSHELL_MANAGED_MAX_METRIC_NAME_BYTES": "managed_metric_name_bytes",
+			"METRICSHELL_MANAGED_MAX_LABEL_NAME_BYTES":  "managed_label_name_bytes",
+			"METRICSHELL_MANAGED_MAX_LABEL_VALUE_BYTES": "managed_label_value_bytes",
+			"METRICSHELL_MANAGED_MAX_HELP_BYTES":        "managed_help_bytes",
+		} {
+			if value, exists := lookupEnv(environment); exists {
+				values[property] = value
+			}
+		}
+	}
+	for index := 0; index < len(args); index++ {
+		name, candidate, hasValue := strings.Cut(args[index], "=")
+		property, known := options[name]
+		if !known {
+			return ManagedConfig{}, err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return ManagedConfig{}, fmt.Errorf("%s requires a value", name)
+			}
+			candidate = args[index]
+		}
+		if strings.HasPrefix(property, "managed_") {
+			values[property] = candidate
+		}
+	}
+	if len(values) != 0 {
+		if mode != ModeManagedRegistry {
+			return ManagedConfig{}, fmt.Errorf("managed options require managed-registry mode")
+		}
+	}
+	if value, exists := values["managed_queue_capacity"]; exists {
+		parsed, parseErr := parseCount(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
+		}
+		configuration.QueueCapacity = parsed
+	}
+	if value, exists := values["managed_publication_interval"]; exists {
+		parsed, parseErr := parseDuration(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed publication interval")
+		}
+		configuration.PublishInterval = parsed
+	}
+	if value, exists := values["managed_frame_bytes"]; exists {
+		parsed, parseErr := parseBytes(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed frame size")
+		}
+		configuration.FrameBytes = parsed
+	}
+	if value, exists := values["managed_socket_path"]; exists {
+		configuration.SocketPath = value
+	}
+	if value, exists := values["managed_socket_mode"]; exists {
+		parsed, parseErr := strconv.ParseUint(value, 8, 32)
+		if parseErr != nil || len(value) != 4 || value[0] != '0' {
+			return ManagedConfig{}, fmt.Errorf("invalid managed socket mode")
+		}
+		configuration.SocketMode = uint32(parsed)
+	}
+	if value, exists := values["managed_connections"]; exists {
+		parsed, parseErr := parseCount(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed connection limit")
+		}
+		configuration.Connections = parsed
+	}
+	if value, exists := values["managed_read_timeout"]; exists {
+		parsed, parseErr := parseDuration(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed read timeout")
+		}
+		configuration.ReadTimeout = parsed
+	}
+	if value, exists := values["managed_write_timeout"]; exists {
+		parsed, parseErr := parseDuration(value)
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed write timeout")
+		}
+		configuration.WriteTimeout = parsed
+	}
+	counts := map[string]*int{
+		"managed_families":          &configuration.Limits.Families,
+		"managed_series":            &configuration.Limits.Series,
+		"managed_labels":            &configuration.Limits.Labels,
+		"managed_buckets":           &configuration.Limits.Buckets,
+		"managed_metric_name_bytes": &configuration.Limits.MetricNameBytes,
+		"managed_label_name_bytes":  &configuration.Limits.LabelNameBytes,
+		"managed_label_value_bytes": &configuration.Limits.LabelValueBytes,
+		"managed_help_bytes":        &configuration.Limits.HelpBytes,
+	}
+	for property, target := range counts {
+		value, exists := values[property]
+		if !exists {
+			continue
+		}
+		var parsed int
+		var parseErr error
+		if property == "managed_labels" || property == "managed_help_bytes" {
+			parsed, parseErr = parseNonNegativeCount(value)
+		} else if strings.HasSuffix(property, "_bytes") {
+			parsed, parseErr = parseBytes(value)
+		} else {
+			parsed, parseErr = parseCount(value)
+		}
+		if parseErr != nil {
+			return ManagedConfig{}, fmt.Errorf("invalid managed resource limit")
+		}
+		*target = parsed
+	}
+	if configuration.QueueCapacity < 1 || configuration.QueueCapacity > 1024 {
+		return ManagedConfig{}, fmt.Errorf("invalid managed queue capacity")
+	}
+	if configuration.PublishInterval < 10*time.Millisecond || configuration.PublishInterval > time.Minute {
+		return ManagedConfig{}, fmt.Errorf("invalid managed publication interval")
+	}
+	if configuration.FrameBytes < 1<<10 || configuration.FrameBytes > 64<<10 {
+		return ManagedConfig{}, fmt.Errorf("invalid managed frame size")
+	}
+	if !filepath.IsAbs(configuration.SocketPath) || configuration.SocketMode&0o600 != 0o600 || configuration.SocketMode&0o117 != 0 || configuration.SocketMode > 0o660 ||
+		configuration.Connections < 1 || configuration.Connections > 1024 || configuration.ReadTimeout < 100*time.Millisecond || configuration.ReadTimeout > time.Minute ||
+		configuration.WriteTimeout < 100*time.Millisecond || configuration.WriteTimeout > time.Minute {
+		return ManagedConfig{}, fmt.Errorf("invalid managed socket configuration")
+	}
+	if configuration.Limits.Validate() != nil {
+		return ManagedConfig{}, fmt.Errorf("invalid managed resource limits")
+	}
+	return configuration, nil
+}
+
+func parseMode(args []string, lookupEnv LookupEnv) (Mode, error) {
+	mode := ModeSnapshot
+	if lookupEnv != nil {
+		if value, exists := lookupEnv("METRICSHELL_MODE"); exists {
+			mode = Mode(value)
+		}
+	}
+	for index := 0; index < len(args); index++ {
+		name, value, hasValue := strings.Cut(args[index], "=")
+		property, known := options[name]
+		if !known {
+			return "", err.Bootstrap.UnknownOption
+		}
+		if !hasValue {
+			index++
+			if index == len(args) {
+				return "", fmt.Errorf("%s requires a value", name)
+			}
+			value = args[index]
+		}
+		if property == "mode" {
+			mode = Mode(value)
+		}
+	}
+	if mode != ModeSnapshot && mode != ModeManagedRegistry {
+		return "", fmt.Errorf("invalid mode %q", mode)
+	}
+	return mode, nil
 }
 
 func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
@@ -254,8 +497,10 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			}
 			value = args[index]
 		}
-		values[property] = value
-		explicit[property] = true
+		if property != "mode" && !strings.HasPrefix(property, "managed_") {
+			values[property] = value
+			explicit[property] = true
+		}
 	}
 	var parseErr error
 	if value, exists := values["ingestion_transport"]; exists {
@@ -278,6 +523,13 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 	}
 	if parseErr != nil {
 		return Config{}, fmt.Errorf("invalid ingestion configuration: %w", parseErr)
+	}
+	if mode, modeErr := parseMode(args, lookupEnv); modeErr != nil {
+		return Config{}, modeErr
+	} else if mode == ModeManagedRegistry {
+		for property := range explicit {
+			return Config{}, fmt.Errorf("snapshot ingestion option %s conflicts with managed-registry mode", property)
+		}
 	}
 	if err := rejectInactiveTransportOptions(configuration.IngestionTransport, explicit); err != nil {
 		return Config{}, err
@@ -333,9 +585,15 @@ func rejectInactiveTransportOptions(transport string, explicit map[string]bool) 
 }
 
 func RequiredNoFile(configuration Config) int {
-	required := 16 + configuration.Exposition.Concurrent + configuration.ConcurrentIngestion
-	if configuration.IngestionTransport == "unix" {
+	required := 16 + configuration.Exposition.Concurrent
+	if configuration.Mode == ModeSnapshot {
+		required += configuration.ConcurrentIngestion
+	}
+	if configuration.Mode == ModeSnapshot && configuration.IngestionTransport == "unix" {
 		required += configuration.Socket.Connections
+	}
+	if configuration.Mode == ModeManagedRegistry {
+		required += configuration.Managed.Connections
 	}
 	return required
 }

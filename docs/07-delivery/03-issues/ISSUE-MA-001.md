@@ -1,6 +1,6 @@
 # ISSUE-MA-001. Managed mode configuration and bootstrap
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -43,3 +43,16 @@ Configuration table tests for default/snapshot/managed/unknown mode, precedence,
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented the explicit ownership mode, CLI-over-environment precedence,
+  managed bootstrap boundary and hybrid snapshot-configuration rejection.
+- 2026-09-26: moved to `Testing`; added configuration-table, no-listener and snapshot-regression coverage and audited
+  the implementation README plus the English/Russian configuration specification.
+- 2026-09-26: moved to `Done`; the Docker-only test target passed with race, vet, dependency-boundary and static
+  multi-architecture build checks.
+
+## Verification evidence
+
+- `cd implementation && make test`

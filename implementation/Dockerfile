@@ -1,5 +1,6 @@
 # syntax=docker/dockerfile:1.7@sha256:a57df69d0ea827fb7266491f2813635de6f17269be881f696fbfdf2d83dda33e
 ARG GO_IMAGE=golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
+ARG PHP54_IMAGE=devilbox/php-fpm-5.4@sha256:0060e0fc7f3f89d88b54fcac5a9767f4df02880c23415d3dba8ced497c296b12
 ARG REPO_URI=github.com/Denki77/metricshell
 
 FROM ${GO_IMAGE} AS source
@@ -13,12 +14,20 @@ COPY ["implementation/cmd", "./cmd"]
 COPY ["implementation/examples", "./examples"]
 COPY ["implementation/internal", "./internal"]
 COPY ["VERSION", "/project/VERSION"]
+COPY ["README.md", "README_RU.md", "CHANGELOG.md", "CHANGELOG_RU.md", "/project/"]
+COPY ["docs", "/project/docs"]
+COPY ["docs-ru", "/project/docs-ru"]
+
+FROM ${PHP54_IMAGE} AS php54-client
+COPY ["implementation/examples/clients/php54/metricshell.php", "/clients/metricshell.php"]
+ENTRYPOINT ["php", "/clients/metricshell.php"]
 
 FROM source AS test
 ARG REVISION=unknown
 RUN test -z "$(gofmt -l .)"
 RUN go vet ./...
 RUN go test -race -count=1 ./...
+RUN GOOS=darwin GOARCH=arm64 go test -c -o /tmp/cli-darwin.test ./internal/cli
 RUN go test -count=1 ./internal/dependencyboundary -run '^TestProductionDependencyBoundary$'
 RUN version="$(cat /project/VERSION)" && \
     test -n "${version}" && \
@@ -115,6 +124,10 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/final-scrape-fixture ./internal/testfixture/finalscrape && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/faultsuite-fixture ./internal/testfixture/faultsuite
+RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/managed-client-fixture ./internal/testfixture/managedclient && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/managed-e2e-fixture ./internal/testfixture/managede2e
 
 FROM scratch AS integration
 ENV METRICSHELL_FINAL_WAIT_MODE=immediate
@@ -128,7 +141,22 @@ COPY --from=integration-build /out/termination-fixture /termination-fixture
 COPY --from=integration-build /out/probe-fixture /probe-fixture
 COPY --from=integration-build /out/final-scrape-fixture /final-scrape-fixture
 COPY --from=integration-build /out/faultsuite-fixture /faultsuite-fixture
+COPY --from=integration-build /out/managed-client-fixture /managed-client-fixture
+COPY --from=integration-build /out/managed-e2e-fixture /managed-e2e-fixture
 ENTRYPOINT ["/metricshell"]
+
+FROM source AS managed-validation
+ARG REVISION=unknown
+RUN mkdir -p /validation && \
+    go test -race -count=10 ./internal/managedvalidation > /validation/raw-race-tests.txt && \
+    go test -run '^$$' -bench '^BenchmarkProductionOwnerAndMaterialization$$' -benchtime=20x -count=3 \
+      ./internal/managedvalidation > /validation/raw-benchmark.txt && \
+    go env -json GOOS GOARCH GOVERSION > /validation/go-environment.json && \
+    printf '{"schema_version":1,"revision":"%s","queue_capacity":64,"publishers":32,"benchmark_repetitions":3,"benchmark_iterations":20,"timing_selects_no_default_or_sla":true}\n' \
+      "${REVISION}" > /validation/metadata.json
+
+FROM scratch AS managed-validation-artifacts
+COPY --from=managed-validation /validation /validation
 
 FROM scratch AS runtime
 ARG VERSION=dev

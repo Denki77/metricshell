@@ -137,6 +137,29 @@ reason  = malformed | protocol_version | frame_limit | part_limit | duplicate_pa
 
 ## Filtering
 
+## Managed aggregation
+
+Эти families существуют в обоих режимах с фиксированным набором нулевых series. Managed mode обновляет их, snapshot
+mode — нет. Application metric name, label, socket path, payload, client identity и raw error запрещены в labels.
+
+| Metric                                          | Type    | Labels    | Семантика                              |
+|-------------------------------------------------|---------|-----------|----------------------------------------|
+| `metricshell_managed_operations_total`          | counter | `outcome` | Результат operation, видимый owner.    |
+| `metricshell_managed_rejections_total`          | counter | `class`   | Bounded rejection class.               |
+| `metricshell_managed_protocol_rejections_total` | counter | `code`    | Protocol-v1 rejection code.            |
+| `metricshell_managed_queue_depth`               | gauge   | —         | Текущая глубина bounded owner queue.   |
+| `metricshell_managed_queue_capacity`            | gauge   | —         | Настроенная ёмкость owner queue.       |
+| `metricshell_managed_families`                  | gauge   | —         | Число committed managed families.      |
+| `metricshell_managed_series`                    | gauge   | —         | Число committed active series.         |
+| `metricshell_managed_generation`                | gauge   | —         | Committed registry generation.         |
+| `metricshell_managed_materializations_total`    | counter | `outcome` | Build, cache hit или conversion error. |
+| `metricshell_managed_freezes_total`             | counter | `outcome` | Freeze winner или duplicate contender. |
+| `metricshell_managed_final_installs_total`      | counter | `outcome` | Результат final Core candidate.        |
+
+Registries закрыты: operation `committed|rejected|overloaded|cancelled|closed`; rejection class
+`semantic|resource|overload|late|protocol`; materialization `built|cache_hit|error`; freeze `winner|duplicate`; final
+install `accepted|rejected|error`. Protocol codes — девять кодов managed protocol version 1.
+
 | Metric                        | Type  | Labels    | Семантика                                                       |
 |-------------------------------|-------|-----------|-----------------------------------------------------------------|
 | `metricshell_filter_rules`    | gauge | `kind`    | Число effective normalized правил include/exclude.              |

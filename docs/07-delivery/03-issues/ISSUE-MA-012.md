@@ -1,6 +1,6 @@
 # ISSUE-MA-012. Freeze, final snapshot and final-scrape integration
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -46,3 +46,18 @@ Freeze races; late publisher storm; conversion/validation/install failures; natu
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; added a registry freeze barrier, deterministic late rejection and an exactly-once
+  finalizer that materializes and offers the authoritative managed generation to the existing Core.
+- 2026-09-26: moved to `Testing`; added freeze races, late-publisher storm, stable failure, real Core final-snapshot and
+  restart-isolation coverage, then audited the runtime state machine and both implementation READMEs.
+- 2026-09-26: moved to `Done`; the full Docker format, vet, race, dependency, Darwin compile and Linux
+  multi-architecture build gate passed with the existing final-wait and snapshot-mode tests intact.
+
+## Verification evidence
+
+- `go test -race ./internal/managed ./internal/managedfinalize ./internal/managedbridge ./internal/cli` (inside the
+  pinned Docker toolchain)
+- `cd implementation && make test IMAGE=metricshell-ma012`

@@ -1,6 +1,6 @@
 # ISSUE-MA-010. Core candidate bridge and atomic installation
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -44,3 +44,17 @@ Managed-to-Core conformance corpus; valid/invalid conversion; validator failures
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented the managed generation bridge through Core publication, whole-candidate
+  parsing and the shared atomic holder, with duplicate-generation install suppression.
+- 2026-09-26: moved to `Testing`; added valid/equivalent candidate, conversion/validation retention, concurrent install
+  and Core observability tests and audited both implementation READMEs.
+- 2026-09-26: moved to `Done`; the full Docker format, vet, race, dependency, Darwin compile and Linux
+  multi-architecture build gate passed with snapshot regressions intact.
+
+## Verification evidence
+
+- `go test -race ./internal/managedbridge ./internal/ingestion ./internal/selfmetric` (inside the pinned Docker toolchain)
+- `cd implementation && make test`

@@ -5,7 +5,8 @@
 > Статус: принятая нормативная спецификация
 > Требования: FR-024, FR-046, FR-052, FR-080, FR-081, FR-082
 > Критерии приёмки: AC-ING-008, AC-MET-007, AC-MET-008, AC-FIN-004, AC-FIN-006–AC-FIN-008, AC-CONF-002–AC-CONF-004
-> Решения: ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-011, ADR-014, ADR-015
+> Решения: ADR-003, ADR-006, ADR-007, ADR-008, ADR-010, ADR-011, ADR-014, ADR-015, ADR-016, ADR-017, ADR-018, ADR-019,
+> ADR-020
 
 ## Назначение
 
@@ -69,15 +70,28 @@ Periodic reconciliation нельзя отключить.
 
 ## Unix socket
 
-| Property                     | Environment                              | Default |      Допустимо |
-|------------------------------|------------------------------------------|--------:|---------------:|
-| `socket.frame_bytes`         | `METRICSHELL_SOCKET_MAX_FRAME_BYTES`     |  `8KiB` | `1KiB`–`64KiB` |
-| `socket.parts`               | `METRICSHELL_SOCKET_MAX_PARTS`           |   `256` |     `1`–`1024` |
-| `socket.connections`         | `METRICSHELL_SOCKET_MAX_CONNECTIONS`     |     `8` |       `1`–`64` |
-| `socket.transactions`        | `METRICSHELL_SOCKET_MAX_TRANSACTIONS`    |     `4` |       `1`–`32` |
-| `socket.transaction_timeout` | `METRICSHELL_SOCKET_TRANSACTION_TIMEOUT` |    `5s` |   `100ms`–`1m` |
-| `socket.read_timeout`        | `METRICSHELL_SOCKET_READ_TIMEOUT`        |    `5s` |   `100ms`–`1m` |
-| `socket.write_timeout`       | `METRICSHELL_SOCKET_WRITE_TIMEOUT`       |    `5s` |   `100ms`–`1m` |
+| Property                       | Environment                                | Default |      Допустимо |
+|--------------------------------|--------------------------------------------|--------:|---------------:|
+| `socket.frame_bytes`           | `METRICSHELL_SOCKET_MAX_FRAME_BYTES`       |  `8KiB` | `1KiB`–`64KiB` |
+| `managed.queue_capacity`       | `METRICSHELL_MANAGED_QUEUE_CAPACITY`       |    `64` |     `1`–`1024` |
+| `managed.publication_interval` | `METRICSHELL_MANAGED_PUBLICATION_INTERVAL` |    `1s` |    `10ms`–`1m` |
+| `managed.frame_bytes`          | `METRICSHELL_MANAGED_MAX_FRAME_BYTES`      |  `8KiB` | `1KiB`–`64KiB` |
+| `managed.connections`          | `METRICSHELL_MANAGED_MAX_CONNECTIONS`      |     `8` |     `1`–`1024` |
+| `managed.read_timeout`         | `METRICSHELL_MANAGED_READ_TIMEOUT`         |    `5s` |   `100ms`–`1m` |
+| `managed.write_timeout`        | `METRICSHELL_MANAGED_WRITE_TIMEOUT`        |    `5s` |   `100ms`–`1m` |
+| `socket.parts`                 | `METRICSHELL_SOCKET_MAX_PARTS`             |   `256` |     `1`–`1024` |
+| `socket.connections`           | `METRICSHELL_SOCKET_MAX_CONNECTIONS`       |     `8` |       `1`–`64` |
+| `socket.transactions`          | `METRICSHELL_SOCKET_MAX_TRANSACTIONS`      |     `4` |       `1`–`32` |
+| `socket.transaction_timeout`   | `METRICSHELL_SOCKET_TRANSACTION_TIMEOUT`   |    `5s` |   `100ms`–`1m` |
+| `socket.read_timeout`          | `METRICSHELL_SOCKET_READ_TIMEOUT`          |    `5s` |   `100ms`–`1m` |
+| `socket.write_timeout`         | `METRICSHELL_SOCKET_WRITE_TIMEOUT`         |    `5s` |   `100ms`–`1m` |
+
+Managed publication interval следует fixed single-goroutine queue-free policy из ADR-019. Default `1s` позволяет
+коротким bursts coalesce и сохраняет live updates; lower bound `10ms` ограничивает triggers 100 попытками в секунду, а
+`1m` допускает более сильный coalescing без выбора final-only publication. Registry size, encoded snapshot limits,
+materialization cost и scrape cadence остаются operator inputs. Для больших или high-churn registries следует выбрать
+более длинный interval. Эти значения — product defaults и ranges, но не SLA или capacity claims; intermediate
+generations могут не стать Core-visible.
 
 Для part с index `i` определяется консервативная decoded payload capacity:
 
@@ -133,13 +147,15 @@ Selector values отсутствуют, если не задано `log.selector
 
 ## Reference container profile
 
-| Resource               | Значение |
-|------------------------|---------:|
-| memory                 |  `64MiB` |
-| PID limit              |     `64` |
-| `nofile` soft/hard     |  `64/64` |
-| runtime directory mode |   `0700` |
-| Unix socket mode       |   `0660` |
+| Resource               |                        Значение |
+|------------------------|--------------------------------:|
+| memory                 |                         `64MiB` |
+| PID limit              |                            `64` |
+| `nofile` soft/hard     |                         `64/64` |
+| runtime directory mode |                          `0700` |
+| Unix socket mode       |                          `0660` |
+| Managed socket path    | `/run/metricshell/managed.sock` |
+| Managed socket mode    |                          `0660` |
 
 Более низкие значения unsupported без полного conformance suite. Hard memory boundary обеспечивает cgroup.
 

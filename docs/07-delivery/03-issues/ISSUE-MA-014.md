@@ -1,6 +1,6 @@
 # ISSUE-MA-014. Concurrency, shutdown, restart and failure E2E suite
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -45,3 +45,17 @@ Production scenario matrix derived from INV-017/018/020; repeated races; process
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-27: moved to `In Progress`; added a production-image fixture and Docker gate spanning real Unix requests,
+  concurrent publishers, ACK-loss, protocol/semantic rejection, Core final installation and exposition.
+- 2026-09-27: moved to `Testing`; verified the exact final counter through scrape-count final wait and two consecutive
+  executions against one reused volume, each beginning at the empty generation-zero epoch.
+- 2026-09-27: moved to `Done`; the dedicated process E2E and full Docker format, vet, race, dependency, Darwin compile
+  and Linux multi-architecture build gates passed.
+
+## Verification evidence
+
+- `cd implementation && make managed-e2e IMAGE=metricshell-ma014`
+- `cd implementation && make test IMAGE=metricshell-ma014`

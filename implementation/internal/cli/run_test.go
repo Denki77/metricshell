@@ -3,19 +3,76 @@ package cli
 import (
 	"bufio"
 	"bytes"
+	"context"
 	"encoding/json"
 	"net"
+	"os"
+	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/buildinfo"
+	"github.com/Denki77/metricshell/implementation/internal/config"
 	"github.com/Denki77/metricshell/implementation/internal/diagnostic"
 	"github.com/Denki77/metricshell/implementation/internal/exposition"
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
+	"github.com/Denki77/metricshell/implementation/internal/managedclient"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 )
+
+func TestManagedModeDoesNotStartSnapshotIngestion(t *testing.T) {
+	t.Parallel()
+
+	directory := t.TempDir()
+	if err := os.Chmod(directory, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	configuration := config.Config{Mode: config.ModeManagedRegistry, IngestionTransport: "invalid", Managed: config.ManagedConfig{
+		SocketPath: filepath.Join(directory, "managed.sock"), SocketMode: 0o600, Connections: 1, FrameBytes: 1024,
+		ReadTimeout: time.Second, WriteTimeout: time.Second,
+	}}
+	owner, err := managed.NewOwner(managed.NewRegistry(), 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer owner.Close()
+	control, err := startConfiguredIngestion(context.Background(), configuration, nil, owner, nil)
+	if err != nil {
+		t.Fatalf("startConfiguredIngestion() error = %v", err)
+	}
+	if err := control.Close(); err != nil {
+		t.Fatalf("stop() error = %v", err)
+	}
+}
+
+func TestManagedModeBootstrapsOneFreshRegistry(t *testing.T) {
+	t.Parallel()
+
+	if registry, err := bootstrapManagedRegistry(config.ModeSnapshot, managed.DefaultLimits()); registry != nil || err != nil {
+		t.Fatal("snapshot mode constructed managed registry")
+	}
+	first, err := bootstrapManagedRegistry(config.ModeManagedRegistry, managed.DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first == nil || first.Read().Generation != 0 || len(first.Read().Families) != 0 {
+		t.Fatalf("managed bootstrap = %+v", first)
+	}
+	if _, err := first.Declare(managed.Descriptor{Name: "jobs", Type: managed.Counter}); err != nil {
+		t.Fatal(err)
+	}
+	second, err := bootstrapManagedRegistry(config.ModeManagedRegistry, managed.DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if second == first || second.Read().Generation != 0 || len(second.Read().Families) != 0 {
+		t.Fatal("managed bootstrap reused a previous execution epoch")
+	}
+}
 
 func TestRunVersion(t *testing.T) {
 	t.Parallel()
@@ -32,6 +89,16 @@ func TestRunVersion(t *testing.T) {
 	}
 	if stderr.Len() != 0 {
 		t.Fatalf("stderr = %q, want empty", stderr.String())
+	}
+}
+
+func TestRunDispatchesManagedClientBeforeRuntimeBootstrap(t *testing.T) {
+	t.Parallel()
+
+	var stdout, stderr bytes.Buffer
+	code := Run([]string{"managed", "counter-add", "jobs", "invalid"}, nil, &stdout, &stderr, buildinfo.Info{}, time.Now)
+	if code != managedclient.ExitLocal || stdout.Len() != 0 || strings.Contains(stderr.String(), "runtime.initializing") {
+		t.Fatalf("code=%d stdout=%q stderr=%q", code, stdout.String(), stderr.String())
 	}
 }
 
@@ -240,6 +307,9 @@ func TestRunHelp(t *testing.T) {
 	code := Run([]string{"--help"}, nil, &stdout, &stderr, buildinfo.Info{}, time.Now)
 	if code != 0 || stdout.String() != usage || stderr.Len() != 0 {
 		t.Fatalf("Run(--help) = code %d, stdout %q, stderr %q", code, stdout.String(), stderr.String())
+	}
+	if strings.Contains(strings.ToLower(stdout.String()), "batch") {
+		t.Fatalf("help advertises unsupported external batch submission: %q", stdout.String())
 	}
 }
 

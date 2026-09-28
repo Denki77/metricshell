@@ -23,6 +23,14 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/httpingest"
 	"github.com/Denki77/metricshell/implementation/internal/ingestion"
 	"github.com/Denki77/metricshell/implementation/internal/lifecycle"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
+	"github.com/Denki77/metricshell/implementation/internal/managedbridge"
+	"github.com/Denki77/metricshell/implementation/internal/managedclient"
+	"github.com/Denki77/metricshell/implementation/internal/managedfinalize"
+	"github.com/Denki77/metricshell/implementation/internal/managedmaterialize"
+	"github.com/Denki77/metricshell/implementation/internal/managedobserve"
+	"github.com/Denki77/metricshell/implementation/internal/managedpublish"
+	"github.com/Denki77/metricshell/implementation/internal/managedserver"
 	"github.com/Denki77/metricshell/implementation/internal/probe"
 	"github.com/Denki77/metricshell/implementation/internal/selfmetric"
 	"github.com/Denki77/metricshell/implementation/internal/shutdown"
@@ -34,12 +42,16 @@ import (
 const usage = `Usage:
   metricshell --version
   metricshell --help
+  metricshell managed [--socket=PATH] [--timeout=DURATION] OPERATION ...
   metricshell [options] -- executable [argument ...]
 
 `
 
 // Run executes the command line interface with the given arguments and returns the exit code.
 func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buildinfo.Info, now func() time.Time) int {
+	if len(args) > 0 && args[0] == "managed" {
+		return managedclient.RunCLI(args[1:], stdout, stderr, os.LookupEnv)
+	}
 	logger := diagnostic.New(stderr, now)
 
 	if len(args) == 1 {
@@ -76,6 +88,23 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 
 	configuration, err := config.Parse(args, now(), os.LookupEnv)
 	if err == nil {
+		managedRegistry, registryErr := bootstrapManagedRegistry(configuration.Mode, configuration.Managed.Limits)
+		if registryErr != nil {
+			return rejectConfiguration(machine, metrics, logger, registryErr)
+		}
+		var managedOwner *managed.Owner
+		if managedRegistry != nil {
+			managedOwner, err = managed.NewOwner(managedRegistry, configuration.Managed.QueueCapacity)
+			if err != nil {
+				return rejectConfiguration(machine, metrics, logger, err)
+			}
+			defer managedOwner.Close()
+		}
+		var managedObserver *managedobserve.Observer
+		if managedRegistry != nil {
+			managedObserver = managedobserve.New(metrics, logger, managedRegistry, managedOwner, func() string { return string(machine.State()) })
+			managedObserver.Initialize()
+		}
 		if err := metrics.SetFinalWaitMode(selfmetric.FinalWaitMode(configuration.FinalWait.Mode)); err != nil {
 			return failLifecycle(machine, logger)
 		}
@@ -96,9 +125,30 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		if coreErr != nil {
 			return rejectConfiguration(machine, metrics, logger, coreErr)
 		}
+		var managedFinalizer *managedfinalize.Finalizer
+		var managedPublisher *managedpublish.Publisher
+		if managedRegistry != nil {
+			cache, cacheErr := managedmaterialize.New(managedRegistry, nil)
+			if cacheErr != nil {
+				return rejectConfiguration(machine, metrics, logger, cacheErr)
+			}
+			bridge, bridgeErr := managedbridge.New(cache, core)
+			if bridgeErr != nil {
+				return rejectConfiguration(machine, metrics, logger, bridgeErr)
+			}
+			managedFinalizer, bridgeErr = managedfinalize.NewObserved(managedRegistry, bridge, managedObserver)
+			if bridgeErr != nil {
+				return rejectConfiguration(machine, metrics, logger, bridgeErr)
+			}
+			managedPublisher, bridgeErr = managedpublish.New(bridge, configuration.Managed.PublishInterval, managedObserver)
+			if bridgeErr != nil {
+				return rejectConfiguration(machine, metrics, logger, bridgeErr)
+			}
+		}
 		debugView := func() []byte {
 			include, exclude := len(configuration.Exposition.Include), len(configuration.Exposition.Exclude)
-			content, marshalErr := json.Marshal(map[string]any{
+			debugConfiguration := map[string]any{
+				"mode":                   configuration.Mode,
 				"exposition_listen":      configuration.Exposition.Listen,
 				"max_response_bytes":     configuration.Exposition.ResponseBytes,
 				"max_concurrent_scrapes": configuration.Exposition.Concurrent,
@@ -120,7 +170,13 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				"concurrent_ingestions":  configuration.ConcurrentIngestion,
 				"pending_ingestions":     configuration.PendingIngestion,
 				"required_nofile":        config.RequiredNoFile(configuration),
-			})
+			}
+			if managedRegistry != nil {
+				debugConfiguration["managed_generation"] = managedRegistry.Read().Generation
+				debugConfiguration["managed_queue_capacity"] = managedOwner.State().Capacity
+				debugConfiguration["managed_publication_interval"] = configuration.Managed.PublishInterval.String()
+			}
+			content, marshalErr := json.Marshal(debugConfiguration)
 			if marshalErr != nil {
 				return []byte("{}\n")
 			}
@@ -150,7 +206,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		server.Start()
 		ingestionContext, stopIngestion := context.WithCancel(context.Background())
-		stopSelectedIngestion, ingestionErr := startIngestion(ingestionContext, configuration, core)
+		ingestionControl, ingestionErr := startConfiguredIngestion(ingestionContext, configuration, core, managedOwner, managedObserver)
 		if ingestionErr != nil {
 			stopIngestion()
 			_ = server.Close()
@@ -162,7 +218,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		defer func() {
 			stopIngestion()
-			_ = stopSelectedIngestion()
+			_ = ingestionControl.Close()
 		}()
 		defer func() {
 			ctx, cancel := context.WithTimeout(context.Background(), configuration.Exposition.WriteTimeout)
@@ -186,6 +242,9 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.WorkloadStarted); err != nil {
 					return err
 				}
+				if managedPublisher != nil {
+					managedPublisher.Start(ingestionContext)
+				}
 				if err := metrics.SetWorkload(pid, true); err != nil {
 					return err
 				}
@@ -198,6 +257,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.WorkloadExited); err != nil {
 					return err
 				}
+				ingestionControl.CloseAdmission()
 				if err := metrics.SetWorkload(0, false); err != nil {
 					return err
 				}
@@ -228,6 +288,7 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 				if err := machine.TransitionEvent(lifecycle.TerminationAfterSpawn); err != nil {
 					return err
 				}
+				ingestionControl.CloseAdmission()
 				if err := metrics.SetGauge(selfmetric.ShutdownActive, nil, 1); err != nil {
 					return err
 				}
@@ -281,6 +342,19 @@ func Run(args []string, stdin io.Reader, stdout, stderr io.Writer, identity buil
 		}
 		if result.Started && machine.State() == lifecycle.Finalizing {
 			freezeContext, cancelFreeze := finalizationContext(configuration, shutdownPlan, now())
+			ingestionControl.CloseAdmission()
+			if managedPublisher != nil && !managedPublisher.Stop(freezeContext) {
+				cancelFreeze()
+				return failLifecycle(machine, logger)
+			}
+			_ = ingestionControl.Drain(freezeContext)
+			if managedFinalizer != nil {
+				managedResult, managedErr := managedFinalizer.FreezeAndInstall(freezeContext)
+				if managedErr != nil || managedResult.Install.Core.Outcome != ingestion.Accepted {
+					cancelFreeze()
+					return failLifecycle(machine, logger)
+				}
+			}
 			final := core.CloseAndFreeze(freezeContext)
 			cancelFreeze()
 			metrics.SetActiveSnapshot(final)
@@ -507,6 +581,56 @@ func startIngestion(ctx context.Context, configuration config.Config, core *inge
 	default:
 		return nil, fmt.Errorf("unknown ingestion transport %q", configuration.IngestionTransport)
 	}
+}
+
+type configuredIngestion struct {
+	close          func() error
+	closeAdmission func()
+	drain          func(context.Context) bool
+}
+
+func (control *configuredIngestion) Close() error                   { return control.close() }
+func (control *configuredIngestion) CloseAdmission()                { control.closeAdmission() }
+func (control *configuredIngestion) Drain(ctx context.Context) bool { return control.drain(ctx) }
+
+func startConfiguredIngestion(ctx context.Context, configuration config.Config, core *ingestion.Core, owner *managed.Owner, observer *managedobserve.Observer) (*configuredIngestion, error) {
+	if configuration.Mode == config.ModeManagedRegistry {
+		managedConfiguration := managedserver.Config{
+			Path: configuration.Managed.SocketPath, Mode: os.FileMode(configuration.Managed.SocketMode),
+			Connections: configuration.Managed.Connections, FrameBytes: configuration.Managed.FrameBytes,
+			ReadTimeout: configuration.Managed.ReadTimeout, WriteTimeout: configuration.Managed.WriteTimeout,
+		}
+		var server *managedserver.Server
+		var err error
+		if observer == nil {
+			server, err = managedserver.Listen(managedConfiguration, owner)
+		} else {
+			server, err = managedserver.ListenWithObserver(managedConfiguration, observer, observer)
+		}
+		if err != nil {
+			return nil, err
+		}
+		go func() { _ = server.Serve(ctx) }()
+		return &configuredIngestion{
+			close:          server.Close,
+			closeAdmission: func() { server.CloseAdmission(); owner.CloseAdmission() },
+			drain: func(drainContext context.Context) bool {
+				return server.Drain(drainContext) && owner.Drain(drainContext)
+			},
+		}, nil
+	}
+	stop, err := startIngestion(ctx, configuration, core)
+	if err != nil {
+		return nil, err
+	}
+	return &configuredIngestion{close: stop, closeAdmission: func() {}, drain: func(context.Context) bool { return true }}, nil
+}
+
+func bootstrapManagedRegistry(mode config.Mode, limits managed.Limits) (*managed.Registry, error) {
+	if mode != config.ModeManagedRegistry {
+		return nil, nil
+	}
+	return managed.NewRegistryWithLimits(limits)
 }
 
 func ensurePrivateParent(path string) error {

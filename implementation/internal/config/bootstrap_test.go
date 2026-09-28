@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/Denki77/metricshell/implementation/internal/finalwait"
+	"github.com/Denki77/metricshell/implementation/internal/managed"
 )
 
 var testNow = time.Date(2026, 8, 24, 12, 0, 0, 0, time.UTC)
@@ -27,8 +28,142 @@ func TestParseWorkloadAndShutdownDefaults(t *testing.T) {
 	if configuration.FinalWait != finalwait.Defaults() {
 		t.Fatalf("final-wait defaults = %+v", configuration.FinalWait)
 	}
+	if configuration.Mode != ModeSnapshot {
+		t.Fatalf("mode = %q, want %q", configuration.Mode, ModeSnapshot)
+	}
 	if configuration.IngestionTransport != "unix" || configuration.UnixSocketPath != "/run/metricshell/ingest.sock" {
 		t.Fatalf("ingestion defaults = %+v", configuration)
+	}
+}
+
+func TestParseModeSelectionAndPrecedence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name string
+		args []string
+		env  map[string]string
+		want Mode
+	}{
+		{name: "default", args: []string{"--", "program"}, want: ModeSnapshot},
+		{name: "explicit snapshot", args: []string{"--mode=snapshot", "--", "program"}, want: ModeSnapshot},
+		{name: "managed", args: []string{"--mode", "managed-registry", "--", "program"}, want: ModeManagedRegistry},
+		{name: "environment", args: []string{"--", "program"}, env: map[string]string{"METRICSHELL_MODE": "managed-registry"}, want: ModeManagedRegistry},
+		{name: "cli precedence", args: []string{"--mode=snapshot", "--", "program"}, env: map[string]string{"METRICSHELL_MODE": "managed-registry"}, want: ModeSnapshot},
+	}
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			lookup := func(name string) (string, bool) { value, ok := test.env[name]; return value, ok }
+			configuration, err := Parse(test.args, testNow, lookup)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if configuration.Mode != test.want {
+				t.Fatalf("Mode = %q, want %q", configuration.Mode, test.want)
+			}
+		})
+	}
+}
+
+func TestParseRejectsInvalidOrHybridMode(t *testing.T) {
+	t.Parallel()
+
+	for _, args := range [][]string{
+		{"--mode=unknown", "--", "program"},
+		{"--mode=", "--", "program"},
+		{"--mode=managed-registry", "--ingestion-transport=file", "--", "program"},
+		{"--mode=managed-registry", "--snapshot-file-path=/tmp/snapshot.json", "--", "program"},
+	} {
+		if _, err := Parse(args, testNow, nil); err == nil {
+			t.Errorf("Parse(%q) succeeded", args)
+		}
+	}
+	lookup := func(name string) (string, bool) {
+		values := map[string]string{"METRICSHELL_MODE": "managed-registry", "METRICSHELL_INGESTION_TRANSPORT": "unix"}
+		value, ok := values[name]
+		return value, ok
+	}
+	if _, err := Parse([]string{"--", "program"}, testNow, lookup); err == nil {
+		t.Error("Parse accepted simultaneous managed and snapshot ownership")
+	}
+}
+
+func TestParseManagedQueueCapacity(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-queue-capacity=16", "--", "program"}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Managed.QueueCapacity != 16 {
+		t.Fatalf("queue capacity = %d", configuration.Managed.QueueCapacity)
+	}
+	for _, args := range [][]string{
+		{"--managed-queue-capacity=1", "--", "program"},
+		{"--mode=managed-registry", "--managed-queue-capacity=0", "--", "program"},
+		{"--mode=managed-registry", "--managed-queue-capacity=1025", "--", "program"},
+	} {
+		if _, err := Parse(args, testNow, nil); err == nil {
+			t.Errorf("Parse(%q) succeeded", args)
+		}
+	}
+}
+
+func TestManagedPublicationIntervalConfiguration(t *testing.T) {
+	t.Parallel()
+	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-publication-interval=250ms", "--", "program"}, testNow, nil)
+	if err != nil || configuration.Managed.PublishInterval != 250*time.Millisecond {
+		t.Fatalf("configuration=%+v err=%v", configuration.Managed, err)
+	}
+	configuration, err = Parse([]string{"--mode=managed-registry", "--", "program"}, testNow, nil)
+	if err != nil || configuration.Managed.PublishInterval != time.Second {
+		t.Fatalf("default interval=%s err=%v", configuration.Managed.PublishInterval, err)
+	}
+	for _, value := range []string{"0", "9ms", "61s"} {
+		if _, err := Parse([]string{"--mode=managed-registry", "--managed-publication-interval=" + value, "--", "program"}, testNow, nil); err == nil {
+			t.Fatalf("invalid publication interval %q accepted", value)
+		}
+	}
+}
+
+func TestParseManagedFrameSize(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-max-frame-bytes=4KiB", "--", "program"}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Managed.FrameBytes != 4<<10 {
+		t.Fatalf("frame bytes = %d", configuration.Managed.FrameBytes)
+	}
+	for _, option := range []string{"512B", "65KiB"} {
+		if _, err := Parse([]string{"--mode=managed-registry", "--managed-max-frame-bytes=" + option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("frame size %s accepted", option)
+		}
+	}
+}
+
+func TestParseManagedSocketConfiguration(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{
+		"--mode=managed-registry", "--managed-socket-path=/tmp/managed.sock", "--managed-socket-mode=0620",
+		"--managed-max-connections=12", "--managed-read-timeout=2s", "--managed-write-timeout=3s", "--", "program",
+	}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	managed := configuration.Managed
+	if managed.SocketPath != "/tmp/managed.sock" || managed.SocketMode != 0o620 || managed.Connections != 12 || managed.ReadTimeout != 2*time.Second || managed.WriteTimeout != 3*time.Second {
+		t.Fatalf("managed socket = %+v", managed)
+	}
+	for _, option := range []string{
+		"--managed-socket-path=relative.sock", "--managed-socket-mode=0666", "--managed-socket-mode=660",
+		"--managed-max-connections=0", "--managed-read-timeout=0", "--managed-write-timeout=61s",
+	} {
+		if _, err := Parse([]string{"--mode=managed-registry", option, "--", "program"}, testNow, nil); err == nil {
+			t.Errorf("option %s accepted", option)
+		}
 	}
 }
 
@@ -288,5 +423,49 @@ func TestParseLogPrecedenceAndRequiredNoFile(t *testing.T) {
 		if _, err := Parse([]string{option, "--", "program"}, testNow, nil); err == nil {
 			t.Errorf("Parse accepted %s", option)
 		}
+	}
+}
+
+func TestParseManagedResourceLimits(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{
+		"--mode=managed-registry", "--managed-max-families=2", "--managed-max-series=3",
+		"--managed-max-labels=1", "--managed-max-buckets=4",
+		"--managed-max-metric-name-bytes=16B", "--managed-max-label-name-bytes=8B",
+		"--managed-max-label-value-bytes=32B", "--managed-max-help-bytes=64", "--", "program",
+	}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	limits := configuration.Managed.Limits
+	if limits.Families != 2 || limits.Series != 3 || limits.Labels != 1 || limits.Buckets != 4 || limits.Batch != managed.DefaultLimits().Batch ||
+		limits.MetricNameBytes != 16 || limits.LabelNameBytes != 8 || limits.LabelValueBytes != 32 || limits.HelpBytes != 64 {
+		t.Fatalf("managed limits = %+v", limits)
+	}
+	for _, option := range []string{
+		"--managed-max-families=0", "--managed-max-series=100001", "--managed-max-labels=65",
+		"--managed-max-buckets=0", "--managed-max-help-bytes=65KiB",
+	} {
+		if _, err := Parse([]string{"--mode=managed-registry", option, "--", "program"}, testNow, nil); err == nil {
+			t.Fatalf("accepted invalid option %s", option)
+		}
+	}
+}
+
+func TestParseRejectsRetiredExternalBatchConfiguration(t *testing.T) {
+	t.Parallel()
+
+	if _, err := Parse([]string{"--mode=managed-registry", "--managed-max-batch-operations=5", "--", "program"}, testNow, nil); err == nil {
+		t.Fatal("accepted retired managed batch CLI option")
+	}
+	lookup := func(name string) (string, bool) {
+		if name == "METRICSHELL_MANAGED_MAX_BATCH_OPERATIONS" {
+			return "5", true
+		}
+		return "", false
+	}
+	if _, err := Parse([]string{"--mode=managed-registry", "--", "program"}, testNow, lookup); err == nil {
+		t.Fatal("accepted retired managed batch environment option")
 	}
 }

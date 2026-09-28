@@ -114,6 +114,11 @@ Unknown fields must be ignored by consumers. Existing fields cannot change type 
 | `runtime.failed`              | error         | `reason`, `error_code`                                                        | Unrecoverable MetricShell failure.                  |
 | `runtime.terminated`          | info          | `exit_code`, `duration_ms`                                                    | Final MetricShell-owned record before process exit. |
 | `logging.suppression_summary` | warn          | `suppressed_event`, `suppressed_count`, `window_ms`; optional `reason`        | Periodic summary for rate-limited records.          |
+| `managed.operation`           | debug         | `outcome`, `snapshot_generation`; bounded rejection `reason` when applicable  | Every owner-visible result.                         |
+| `managed.protocol_rejected`   | warn          | bounded protocol `reason`                                                     | Every rejected managed protocol frame.              |
+| `managed.materialized`        | debug         | `outcome`                                                                     | Every final materialization result.                 |
+| `managed.frozen`              | info          | `outcome`, `snapshot_generation`                                              | Logical managed freeze attempt.                     |
+| `managed.final_installed`     | info          | `outcome`, `snapshot_generation`                                              | Final Core candidate result.                        |
 
 High-frequency success events are debug-level so default info logging does not scale with publication or scrape rate.
 Rejections and lifecycle boundaries remain visible at normal levels.

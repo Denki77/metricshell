@@ -8,6 +8,10 @@ and dependency graph.
 Core through Wave 6 is complete and ready for operational use in the complete-snapshot profile. Publishers replace the
 whole metric set at once; partial metric updates are intentionally out of scope for this release.
 
+Managed Aggregation Wave 1 adds an explicit ownership boundary. Snapshot ownership remains the default; use
+`--mode=managed-registry` or `METRICSHELL_MODE=managed-registry` to select the managed bootstrap path. Explicit snapshot
+ingestion settings are rejected in managed mode so the two ownership models cannot be combined.
+
 ISSUE-011 through ISSUE-015 provide the immutable snapshot model, strict whole-candidate parser/validator, atomic
 last-valid holder, exact generation-zero state and a separate bounded self-metrics registry. ISSUE-016 through
 ISSUE-022 provide one bounded ingestion core, atomic-file reconciliation, acknowledged MSP/1 Unix ingestion and its
@@ -18,6 +22,53 @@ observability. ISSUE-029 through ISSUE-031 add Kubernetes Job/CronJob examples, 
 Prometheus verification. ISSUE-032 through ISSUE-037 add static multi-architecture release artifacts, container
 hardening defaults, configurable capacity/time limits, fault/soak/race gates, controlled release benchmarks and signed
 supply-chain evidence.
+
+ISSUE-MA-002 provides the managed semantic core: explicit descriptors, canonical label identity, counter
+initialize/add, gauge set, Core-compatible classic histogram observations and deterministic conflicts. Its internal
+all-or-nothing application primitive is not exposed by protocol v1, which accepts one instrumentation operation per request.
+ISSUE-MA-003 wraps that core in one in-memory registry per execution: every managed bootstrap begins with an empty
+generation `0`, each successful commit advances once, rejected mutations preserve the complete state, and reads return
+a detached view of exactly one generation. No persistence, replay or disconnect-driven cleanup path exists.
+ISSUE-MA-004 routes managed mutations through one bounded owner goroutine. Admission is non-blocking and produces an
+explicit overload result when the configured queue is full; success is returned only after the owner commits and
+assigns the registry-wide commit order.
+ISSUE-MA-005 defines protocol version 1 as one bounded NDJSON operation frame and one JSON response. Protocol parsing
+maps declarations and mutations into the managed domain, rejects incomplete/oversized/malformed/multi-frame input
+before admission, and derives success exclusively from the owner's committed result.
+ISSUE-MA-006 binds the managed protocol to a private Unix stream socket before workload startup. Connection count,
+frame size, read/write deadlines and filesystem mode are bounded; admission can close independently, and cleanup
+removes only the socket inode created by the current execution.
+ISSUE-MA-007 adds a stateless managed client used by `metricshell managed` and a PHP 5.4 reference client. Both expose
+distinct accepted, rejected, overload, protocol, transport and unknown outcomes; an unknown result after complete
+submission is never retried automatically.
+ISSUE-MA-008 bounds managed families, active series, labels, histogram buckets and descriptor/label strings.
+Every policy-limit rejection is distinct from queue overload and protocol rejection and preserves committed state and
+generation.
+ISSUE-MA-009 materializes one complete registry generation into deterministic immutable Application Snapshot Protocol
+bytes. An unchanged generation reuses the cache, concurrent misses coalesce, issued reader bytes remain isolated, and
+a failed rebuild retains the preceding successful entry.
+ISSUE-MA-010 installs materialized managed generations through the same Core parser, admission barrier, atomic holder
+and exposition source as snapshot transports. Failed conversion or Core validation preserves the prior active state;
+an unchanged managed generation is not installed twice.
+ISSUE-MA-011 closes managed socket and owner admission as the first finalization action. Only work admitted before that
+barrier may drain, and only within the existing finalization or shutdown context; no managed-specific drain timeout is
+added.
+ISSUE-MA-012 freezes the drained managed registry exactly once, rejects every later publisher as `late`, and makes one
+final materialization/install attempt through Core before its existing freeze and final-wait policy. A failed final
+candidate is not retried and cannot replace the previously active Core snapshot.
+ISSUE-MA-013 adds fixed-cardinality managed operation, protocol, queue, registry, materialization, freeze and final
+install self-metrics plus structured events. Application-controlled names, labels, paths, payloads and client identity
+never enter observability labels or records.
+ISSUE-MA-014 adds a production-container E2E gate with concurrent real Unix publishers, ACK-loss commit verification,
+protocol and semantic rejection, exact final exposition, final-scrape completion and two consecutive empty restarts.
+ISSUE-MA-015 combines the real PHP 5.4 and process E2E gates with a repeated race/resource matrix and controlled
+owner/materialization benchmark. It emits raw results, the exact configuration, revision and Go OS/architecture/version
+fingerprint under `dist/managed-validation`; timing evidence explicitly selects neither defaults nor an SLA.
+ISSUE-MA-016 promotes the accepted bilingual Managed Aggregation contract, completes configuration, lifecycle,
+observability, client and release documentation, and makes EN/RU option completeness a Docker-tested release gate.
+The PR #38 review closes the live-visibility gap with one bounded coalescing publisher (`1s` default), preserves final
+freeze as authoritative, maps cancellation after owner admission to `unknown`, and verifies non-zero exits, partial
+frames, special numeric values, limit boundaries and oversized Core candidates.
 
 Complete accepted application snapshots replace one immutable generation at a time; live self-metrics use their own
 fixed-cardinality state and do not affect application identity. Production runtime creates one shared `ingestion.Core`,
@@ -65,6 +116,19 @@ Run the Wave 5 exposition and final-wait exit gate:
 
 ```sh
 make wave5
+```
+
+Run the managed production-process E2E gate or the complete Wave 6 gate:
+
+```sh
+make managed-e2e
+make wave6
+```
+
+Generate the reproducible managed production-validation evidence:
+
+```sh
+make managed-validation
 ```
 
 Run the Wave 6 Kubernetes, hardening, release, benchmark and supply-chain exit gate:
@@ -162,6 +226,16 @@ metricshell version=0.1.2 revision=0123456
 - `internal/httpingest`: loopback-only POST adapter with independent wire/decoded limits and exact HTTP mapping.
 - `internal/fileingest`: bounded no-follow file reconciliation and Linux directory-inotify recovery.
 - `internal/kubeexamples`: Kubernetes Job, CronJob, lifecycle and Prometheus example verification.
+- `internal/managed`: descriptor-driven semantics, execution-scoped registry, bounded single-owner mutation loop,
+  generation/commit accounting and detached views.
+- `internal/managedclient`: stateless managed operation client, result taxonomy and shell-friendly command surface.
+- `internal/managedmaterialize`: generation-keyed immutable complete-snapshot encoding cache and reader ownership.
+- `internal/managedobserve`: bounded managed self-metric projection and redacted lifecycle diagnostics.
+- `internal/managedpublish`: single-goroutine bounded periodic publication and finalization join barrier.
+- `internal/managedbridge`: complete managed-candidate handoff to the existing Core validation and atomic install path.
+- `internal/managedfinalize`: single-winner registry freeze and exactly-once final managed install coordination.
+- `internal/managedprotocol`: versioned bounded NDJSON request/response framing and domain/result mapping.
+- `internal/managedserver`: permission-aware managed Unix listener, bounded connections/deadlines and admission closure.
 - `internal/socketingest`: bounded MSP/1 transactions, exact ACK/NACK framing and mode-0660 Unix listener.
 - `internal/lifecycle`: synchronized public runtime state and transitions.
 - `internal/probe`: bounded HTTP health/readiness responses derived only from lifecycle state.
@@ -173,6 +247,7 @@ metricshell version=0.1.2 revision=0123456
 - `internal/supplychain`: signed release evidence, SBOM, provenance and vulnerability verification.
 - `internal/workload`: owned process-group execution, signal forwarding, subreaper adoption, and child reaping.
 - `internal/testfixture`: binaries used only by real-container acceptance, fault, release and supply-chain tests.
+- `examples/clients/php54`: dependency-free PHP 5.4 managed-operation reference client and usage documentation.
 - `internal/dependencyboundary`: production/research, public-API, primitive, module and license boundary checks.
 - `../VERSION`: repository-wide project version.
 

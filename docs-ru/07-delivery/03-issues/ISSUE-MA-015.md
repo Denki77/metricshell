@@ -1,6 +1,6 @@
 # ISSUE-MA-015. Legacy, performance, resource и production validation
 
-**Статус:** Planned  
+**Статус:** Done
 **Готовность:** Code-ready
 
 **Эпик:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  

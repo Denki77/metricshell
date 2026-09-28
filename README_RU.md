@@ -21,9 +21,10 @@ HTTP-серверами. MetricShell выносит эту обязанност�
 
 ## Текущий статус
 
-Core реализован и готов к эксплуатации в complete-snapshot profile: publishers заменяют весь набор метрик целиком, а
-partial metric updates намеренно не входят в этот release. Проект всё ещё pre-1.0, поэтому публичный runtime contract
-может меняться между minor versions.
+Core и optional Managed Aggregation profile реализованы и production-validated. Snapshot mode остаётся default
+complete-replacement contract; `managed-registry` добавляет bounded local operations для counter, gauge и histogram
+через private Unix socket. Проект всё ещё pre-1.0, поэтому публичный runtime contract может меняться между minor
+versions.
 
 ## Быстрый старт
 
@@ -50,12 +51,43 @@ docker run --rm metricshell:local -- /path/to/workload "argument with spaces"
 Всё после отдельного `--` передаётся напрямую в workload. Если нужны shell features, используйте shell как явный
 workload.
 
+### Managed Aggregation
+
+Используйте managed-registry mode, когда workload должен отправлять простые операции вместо ведения полного snapshot:
+
+```sh
+metricshell --mode=managed-registry --exposition-listen=0.0.0.0:9090 -- /path/to/workload
+```
+
+Из workload (default private socket — `/run/metricshell/managed.sock`):
+
+```sh
+metricshell managed declare jobs counter "Processed jobs"
+metricshell managed counter-add jobs 1
+metricshell managed declare queue_depth gauge "Queued jobs"
+metricshell managed gauge-set queue_depth 7
+metricshell managed declare job_seconds histogram "Job duration" - 0.1 1 +Inf
+metricshell managed histogram-observe job_seconds 0.42
+```
+
+Путь данных: workload operation → local Unix socket → Managed Registry → периодически публикуемый complete snapshot →
+Core → `/metrics` → Prometheus. Accepted operation committed в registry текущей epoch, но это не обещание, что
+Prometheus уже получил её через scrape.
+
+## Когда использовать Managed Aggregation
+
+Режим подходит для CLI, cron, Kubernetes Job/CronJob, batch, ETL/import/export, legacy PHP или shell, one-shot и
+long-running workers, которым неудобно поддерживать собственный Prometheus registry и HTTP endpoint. В snapshot mode
+workload сам владеет registry и отправляет каждый complete snapshot. Обычному long-running HTTP service с native
+Prometheus client и собственным `/metrics` MetricShell может вообще не требоваться.
+
 ## Документация
 
 - [Production implementation](implementation/README_RU.md)
 - [Configuration](docs-ru/04-specification/configuration.md)
 - [Runtime state machine](docs-ru/04-specification/runtime-state-machine.md)
 - [Application snapshot protocol](docs-ru/04-specification/application-snapshot-protocol.md)
+- [Managed Aggregation](docs-ru/04-specification/managed-aggregation.md)
 - [Docker and Compose examples](docs-ru/04-specification/docker-compose-examples.md)
 - [Architecture decisions](docs-ru/06-architecture/adr/README.md)
 - [Architecture investigation](docs-ru/05-architecture-investigation/architecture-investigation.md)

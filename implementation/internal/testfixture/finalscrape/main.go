@@ -55,6 +55,9 @@ func main() {
 			strings.Contains(content, `metricshell_final_wait_mode_info{mode="scrapes"} 1`) &&
 			strings.Contains(content, "metricshell_final_wait_required_scrapes 2") &&
 			strings.Contains(content, "metricshell_final_wait_completed_scrapes 1") {
+			if expected := os.Getenv("FIXTURE_EXPECT_METRIC"); expected != "" && !strings.Contains(content, expected) {
+				fail(fmt.Errorf("expected final metric %q was absent", expected))
+			}
 			observedFinalMetrics = true
 		}
 		completed++

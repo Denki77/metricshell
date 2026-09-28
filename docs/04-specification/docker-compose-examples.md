@@ -258,6 +258,23 @@ METRICSHELL_ARTIFACT_IMAGE
 METRICSHELL_ARTIFACT_DIGEST
 ```
 
+## Managed operation in Docker and Kubernetes
+
+Managed mode creates `/run/metricshell/managed.sock` before starting the workload. Mount one runtime directory shared
+only by MetricShell and its workload processes; its parent must be private, and configure socket ownership/group plus
+mode `0600` or `0660`. The socket is removed when the execution ends and a restart begins an empty registry epoch.
+Managed ingestion never opens TCP; only the Prometheus exposition endpoint remains HTTP.
+
+Operators must size family/series/bucket/string limits, owner queue and connection bounds independently from the Core
+snapshot-size limit. Queue saturation is an explicit overload, and a valid managed registry can still produce a
+complete candidate rejected by Core for size. Running publication uses the bounded configured interval; shutdown closes
+admission, interrupts partial frames, drains only admitted work inside the existing grace, freezes and installs the
+final generation, then applies the normal final-wait policy.
+
+For Job/CronJob, keep MetricShell as PID 1 and configure a bounded final-wait window. For a long-running worker, use the
+same one-wrapper/one-workload pod shape as a Deployment and scrape the exposition port continuously; no Kubernetes API
+access is required. Native HTTP services that already expose Prometheus metrics normally do not need this mode.
+
 ## CI requirements
 
 - Execute the full example runner on Ubuntu for every release candidate.

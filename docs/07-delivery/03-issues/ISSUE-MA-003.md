@@ -1,6 +1,6 @@
 # ISSUE-MA-003. Managed Registry and execution epoch
 
-**Status:** Planned  
+**Status:** Done
 **Readiness:** Code-ready
 
 **Epic:** [EPIC-002 Managed Aggregation](../02-epics/EPIC-002-managed-aggregation.md)  
@@ -44,3 +44,17 @@ Registry unit tests for generation accounting, rejected mutations, empty epoch, 
 ## Completion
 
 Complete when all acceptance criteria and required tests pass in CI and the task preserves ADR-016...ADR-020 and snapshot-mode backward compatibility.
+
+## Delivery log
+
+- 2026-09-26: moved to `In Progress`; implemented the execution-scoped in-memory registry, generation accounting and
+  complete detached state reads and connected fresh epoch creation to the managed bootstrap path.
+- 2026-09-26: moved to `Testing`; added empty/restart, accepted/rejected generation, complete-read, disconnect
+  independence, overflow and bootstrap isolation tests and audited the implementation README.
+- 2026-09-26: moved to `Done`; the Docker-only full test, race, vet, dependency-boundary and multi-architecture build
+  gate passed.
+
+## Verification evidence
+
+- `cd implementation && make test`
+- `go test -race ./internal/managed ./internal/cli` (inside the pinned Docker toolchain)
