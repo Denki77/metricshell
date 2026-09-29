@@ -56,7 +56,7 @@ func TestRegistryRejectionPreservesCompleteCommittedState(t *testing.T) {
 
 	if generation, err := registry.ApplyBatch([]Operation{
 		{Kind: HistogramObserve, Name: "latency", Value: 0.75},
-		{Kind: HistogramObserve, Name: "latency", Value: -1},
+		{Kind: HistogramObserve, Name: "missing", Value: -1},
 	}); err == nil || generation != before.Generation {
 		t.Fatalf("rejected batch = generation %d, error %v", generation, err)
 	}

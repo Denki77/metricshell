@@ -117,9 +117,11 @@ func TestHandlerFailuresBeforeSuccessAndSaturation(t *testing.T) {
 		t.Fatal(err)
 	}
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, MetricsPath, nil))
-	if response.Code != http.StatusServiceUnavailable || strings.Contains(response.Header().Get("Content-Type"), "version=0.0.4") {
-		t.Fatalf("preflight failure committed success metadata: %d %v", response.Code, response.Header())
+	request := httptest.NewRequest(http.MethodGet, MetricsPath, nil)
+	request.Header.Set("Accept", "application/openmetrics-text; version=1.0.0")
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusServiceUnavailable || strings.Contains(response.Header().Get("Content-Type"), "openmetrics") || response.Body.String() != "exposition unavailable\n" {
+		t.Fatalf("preflight failure committed partial OpenMetrics response: %d %v %q", response.Code, response.Header(), response.Body.String())
 	}
 
 	for _, test := range []struct {

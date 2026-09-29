@@ -15,16 +15,23 @@ zero with no families or series. State is never persisted, replayed or shared ac
 ## Metric semantics
 
 Every family has an explicit immutable descriptor: name, help, type, ordered label names and, for histograms,
-non-negative strictly increasing buckets ending in `+Inf`. A repeated identical declaration is an accepted idempotent
+strictly increasing non-NaN buckets ending in `+Inf`. Negative and `-Inf` boundaries are valid. A repeated identical declaration is an accepted idempotent
 no-op; conflicting type, metadata or buckets are
 rejected without mutation. Label identity is canonical and must exactly match the descriptor.
 
 Supported operations are `counter_initialize`, `counter_add`, `gauge_set` and `histogram_observe`. Protocol v1 accepts
 exactly one instrumentation operation per request. External atomic batch submission remains deferred and is not part of
-protocol v1; any internal all-or-nothing application primitive is not a public capability. Counters are finite and
-non-negative and never decrease inside an epoch, matching the existing Core contract.
-Gauges accept finite values, `NaN`, `+Inf` and `-Inf`. Histogram observations accept non-negative finite values and
-`+Inf` and update count, sum and cumulative classic buckets atomically; `NaN` and negative values are rejected.
+protocol v1; any internal all-or-nothing application primitive is not a public capability. Counter initialization and
+addition accept non-NaN, non-negative values, including `-0` and `+Inf`; negative deltas, `-Inf`, and `NaN` are rejected
+as operation-semantic violations. Initialization canonicalizes `-0` to `+0`; addition treats it as a no-op. Finite
+overflow produces `+Inf`, which is retained. Counters never decrease inside an epoch.
+Gauges accept finite values, `NaN`, `+Inf` and `-Inf`. Histogram observations accept every binary64 value, including
+negative values, `-0`, `NaN`, and both infinities, and update count, IEEE-754 sum, and cumulative classic buckets
+atomically. A `NaN` observation increments count and the terminal `+Inf` bucket but no finite bucket.
+
+Numeric representation and operation semantics are distinct: Core validates an absolute snapshot state, while Managed
+operations additionally preserve counter monotonicity and atomic histogram observation. Both paths otherwise expose
+the same representable numeric state. See [Numeric Semantics](numeric-semantics.md).
 
 Registry generation versions state: a state-changing declaration or mutation advances it once, while an identical
 declaration leaves it unchanged. Owner commit/order separately advances for every successfully processed accepted

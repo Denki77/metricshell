@@ -14,17 +14,24 @@ families и series. State не сохраняется, не replay и не ра�
 
 ## Семантика метрик
 
-Каждая family имеет явный immutable descriptor: name, help, type, ordered label names и non-negative строго
-возрастающие buckets для histogram, заканчивающиеся `+Inf`. Повторная идентичная declaration — accepted idempotent
+Каждая family имеет явный immutable descriptor: name, help, type, ordered label names и строго возрастающие non-NaN
+buckets для histogram, заканчивающиеся `+Inf`. Negative boundaries и `-Inf` валидны. Повторная идентичная declaration — accepted idempotent
 no-op; конфликт type, metadata или buckets отклоняется
 без mutation. Label identity canonical и должна точно соответствовать descriptor.
 
 Поддерживаются `counter_initialize`, `counter_add`, `gauge_set` и `histogram_observe`. Protocol v1 принимает ровно одну
 instrumentation operation в request. External atomic batch submission остаётся отложенным и не входит в protocol v1;
-возможный внутренний all-or-nothing primitive не является публичной capability. Counter finite, non-negative и не
-уменьшается внутри epoch согласно существующему Core contract. Gauge принимает finite values,
-`NaN`, `+Inf` и `-Inf`. Histogram observation принимает non-negative finite values и `+Inf`, атомарно обновляет count,
-sum и cumulative classic buckets; `NaN` и отрицательные values отклоняются.
+возможный внутренний all-or-nothing primitive не является публичной capability. Counter initialization и addition
+принимают non-NaN значения не меньше zero, включая `-0` и `+Inf`; negative delta, `-Inf` и `NaN` отклоняются как
+operation-semantic violations. Initialization canonicalizes `-0` в `+0`, addition считает его no-op. Finite overflow
+даёт `+Inf`. Counter не уменьшается внутри epoch. Gauge принимает finite
+values, `NaN`, `+Inf` и `-Inf`. Histogram observation принимает любое binary64 значение, включая negative, `-0`, `NaN`
+и обе infinity, и атомарно обновляет count, IEEE-754 sum и cumulative classic buckets. `NaN` увеличивает count и
+terminal `+Inf` bucket, но не finite buckets.
+
+Numeric representation и operation semantics различаются: Core валидирует absolute snapshot state, а Managed
+operations дополнительно сохраняют counter monotonicity и atomic histogram observation. В остальном оба пути создают
+одинаковое представимое состояние. См. [Числовую семантику](numeric-semantics.md).
 
 Registry generation версионирует state: изменяющая state declaration или mutation увеличивает её один раз, а identical
 declaration оставляет неизменной. Owner commit/order отдельно увеличивается для каждой успешно обработанной accepted

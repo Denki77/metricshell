@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"bytes"
+	"math"
 	"sync"
 	"testing"
 )
@@ -94,11 +95,9 @@ func TestDeterministicRejections(t *testing.T) {
 		{"duplicate label", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Gauge, Series: []InputSeries{{Value: "1", Labels: []InputLabel{{Name: "x"}, {Name: "x"}}}}}}, 1), DefaultLimits(), ReasonDuplicateSeries},
 		{"label policy", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Gauge, Series: []InputSeries{{Value: "1", Labels: []InputLabel{{Name: "__name__"}}}}}}, 1), DefaultLimits(), ReasonPolicy},
 		{"counter negative", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Counter, Series: []InputSeries{{Value: "-1"}}}}, 1), DefaultLimits(), ReasonNumericInvalid},
-		{"counter negative zero", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Counter, Series: []InputSeries{{Value: "-0"}}}}, 1), DefaultLimits(), ReasonNumericInvalid},
 		{"numeric overflow", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Gauge, Series: []InputSeries{{Value: "1e999"}}}}, 1), DefaultLimits(), ReasonNumericInvalid},
 		{"numeric underflow", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Gauge, Series: []InputSeries{{Value: "1e-999"}}}}, 1), DefaultLimits(), ReasonNumericInvalid},
 		{"histogram le label", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Histogram, Series: []InputSeries{{Labels: []InputLabel{{Name: "le"}}, Histogram: validHistogram}}}}, 1), DefaultLimits(), ReasonHistogramInvalid},
-		{"histogram negative sum", NewCandidate(1, []InputFamily{{Name: "jobs", Type: Histogram, Series: []InputSeries{{Histogram: &InputHistogram{Count: "1", Sum: "-1", Buckets: validHistogram.Buckets}}}}}, 1), DefaultLimits(), ReasonHistogramInvalid},
 		{"histogram boundary collision", histogramCandidate(InputHistogram{
 			Count: "1", Sum: "1", Buckets: []InputBucket{
 				{UpperBound: "1", Count: "0"},
@@ -115,6 +114,36 @@ func TestDeterministicRejections(t *testing.T) {
 				t.Fatalf("error = %v (%s), want %s", err, reason, test.reason)
 			}
 		})
+	}
+}
+
+func TestPrometheusNumericSurface(t *testing.T) {
+	candidate := NewCandidate(1, []InputFamily{
+		{Name: "counter", Type: Counter, Series: []InputSeries{{Value: "-0"}, {Labels: []InputLabel{{Name: "id", Value: "inf"}}, Value: "+Inf"}}},
+		{Name: "gauge", Type: Gauge, Series: []InputSeries{{Value: "-0"}, {Labels: []InputLabel{{Name: "id", Value: "nan"}}, Value: "NaN"}, {Labels: []InputLabel{{Name: "id", Value: "pos"}}, Value: "+Inf"}, {Labels: []InputLabel{{Name: "id", Value: "neg"}}, Value: "-Inf"}}},
+		{Name: "distribution", Type: Histogram, Series: []InputSeries{{Histogram: &InputHistogram{
+			Count: "3", Sum: "NaN", Buckets: []InputBucket{
+				{UpperBound: "-Inf", Count: "1"},
+				{UpperBound: "-0", Count: "1"},
+				{UpperBound: "+Inf", Count: "3"},
+			},
+		}}}},
+	}, 1)
+	validated, err := Validate(candidate, DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := string(validated.Canonical()); !bytes.Contains([]byte(got), []byte(`"value":"-0"`)) || !bytes.Contains([]byte(got), []byte(`"sum":"NaN"`)) || !bytes.Contains([]byte(got), []byte(`"le":"-Inf"`)) {
+		t.Fatalf("special values not preserved: %s", got)
+	}
+	for _, token := range []string{"NaN", "-Inf", "-1"} {
+		_, err := Validate(NewCandidate(1, []InputFamily{{Name: "counter", Type: Counter, Series: []InputSeries{{Value: token}}}}, 1), DefaultLimits())
+		if err == nil {
+			t.Fatalf("counter %s accepted", token)
+		}
+	}
+	if value, _, err := canonicalHistogramBoundary("-0"); err != nil || value != "-0" || !math.Signbit(math.Copysign(0, -1)) {
+		t.Fatalf("negative zero boundary lost: %q %v", value, err)
 	}
 }
 
@@ -163,8 +192,8 @@ func TestConcurrentReadersReceiveIndependentValues(t *testing.T) {
 		go func() {
 			defer wait.Done()
 			for iteration := 0; iteration < 100; iteration++ {
-				copy := active.Validated()
-				copy.canonical[0] = 'X'
+				validatedSnapshot := active.Validated()
+				validatedSnapshot.canonical[0] = 'X'
 				if active.Generation() != 7 || active.Validated().Canonical()[0] != '{' {
 					t.Error("immutable active snapshot changed")
 				}

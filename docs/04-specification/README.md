@@ -6,6 +6,7 @@ This part contains normative externally observable specifications derived from r
 
 - [Runtime State Specification](runtime-state-machine.md)
 - [Application Snapshot Protocol](application-snapshot-protocol.md)
+- [Numeric Semantics](numeric-semantics.md)
 - [Managed Aggregation Specification](managed-aggregation.md)
 - [Configuration Specification](configuration.md)
 - [Configuration Value Grammar](configuration-value-grammar.md)

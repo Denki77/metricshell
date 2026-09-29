@@ -344,8 +344,8 @@ func validateSeries(metricType MetricType, input InputSeries, limits Limits) (Se
 		if input.Histogram != nil {
 			return Series{}, "", Reject(ReasonTypeConflict)
 		}
-		value, parsed, err := canonicalFinite(input.Value)
-		if err != nil || math.Signbit(parsed) {
+		value, parsed, err := canonicalCounter(input.Value)
+		if err != nil || parsed < 0 {
 			return Series{}, "", Reject(ReasonNumericInvalid)
 		}
 		series.value = value
@@ -376,17 +376,17 @@ func validateHistogram(input InputHistogram) (HistogramValue, error) {
 	if err != nil {
 		return HistogramValue{}, Reject(ReasonHistogramInvalid)
 	}
-	sum, sumValue, err := canonicalNonNegative(input.Sum, true)
-	if err != nil || math.Signbit(sumValue) {
+	sum, err := canonicalPrometheusFloat(input.Sum)
+	if err != nil {
 		return HistogramValue{}, Reject(ReasonHistogramInvalid)
 	}
 	value := HistogramValue{count: count, sum: sum, buckets: make([]Bucket, 0, len(input.Buckets))}
 	var previousBound float64
 	var previousCount uint64
 	for index, inputBucket := range input.Buckets {
-		bound, parsedBound, boundErr := canonicalNonNegative(inputBucket.UpperBound, true)
+		bound, parsedBound, boundErr := canonicalHistogramBoundary(inputBucket.UpperBound)
 		bucketCount, countErr := parseCount(inputBucket.Count)
-		if boundErr != nil || countErr != nil || math.Signbit(parsedBound) || (index > 0 && parsedBound <= previousBound) || (index > 0 && bucketCount < previousCount) {
+		if boundErr != nil || countErr != nil || (index > 0 && parsedBound <= previousBound) || (index > 0 && bucketCount < previousCount) {
 			return HistogramValue{}, Reject(ReasonHistogramInvalid)
 		}
 		value.buckets = append(value.buckets, Bucket{upperBound: bound, count: bucketCount})
@@ -399,24 +399,35 @@ func validateHistogram(input InputHistogram) (HistogramValue, error) {
 }
 
 func canonicalGauge(token string) (string, error) {
+	return canonicalPrometheusFloat(token)
+}
+
+func canonicalCounter(token string) (string, float64, error) {
+	if token == "+Inf" {
+		return token, math.Inf(1), nil
+	}
+	return canonicalFinite(token)
+}
+
+func canonicalPrometheusFloat(token string) (string, error) {
 	switch token {
 	case "NaN", "+Inf", "-Inf":
 		return token, nil
 	default:
-		value, _, err := canonicalFinite(token)
-		if err != nil {
-			return "", Reject(ReasonNumericInvalid)
-		}
-		return value, nil
+		canonical, _, err := canonicalFinite(token)
+		return canonical, err
 	}
 }
 
-func canonicalNonNegative(token string, allowPositiveInfinity bool) (string, float64, error) {
-	if allowPositiveInfinity && token == "+Inf" {
+func canonicalHistogramBoundary(token string) (string, float64, error) {
+	if token == "+Inf" {
 		return token, math.Inf(1), nil
 	}
+	if token == "-Inf" {
+		return token, math.Inf(-1), nil
+	}
 	canonical, value, err := canonicalFinite(token)
-	if err != nil || value < 0 || math.Signbit(value) {
+	if err != nil {
 		return "", 0, Reject(ReasonHistogramInvalid)
 	}
 	return canonical, value, nil

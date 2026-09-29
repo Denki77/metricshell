@@ -26,8 +26,7 @@ func TestDescriptorValidationAndConflicts(t *testing.T) {
 		{name: "duplicate label", descriptor: Descriptor{Name: "metric", Type: Gauge, Labels: []string{"zone", "zone"}}, reason: ReasonDuplicateLabel},
 		{name: "buckets on gauge", descriptor: Descriptor{Name: "metric", Type: Gauge, Buckets: []float64{1}}, reason: ReasonInvalidBuckets},
 		{name: "missing infinity", descriptor: Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1}}, reason: ReasonInvalidBuckets},
-		{name: "negative bucket", descriptor: Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{-1, math.Inf(1)}}, reason: ReasonInvalidBuckets},
-		{name: "negative zero bucket", descriptor: Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{math.Copysign(0, -1), math.Inf(1)}}, reason: ReasonInvalidBuckets},
+		{name: "NaN bucket", descriptor: Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{math.NaN(), math.Inf(1)}}, reason: ReasonInvalidBuckets},
 		{name: "unordered buckets", descriptor: Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, 1, math.Inf(1)}}, reason: ReasonInvalidBuckets},
 	}
 	for _, test := range tests {
@@ -81,7 +80,6 @@ func TestCounterSemanticsAndCanonicalLabels(t *testing.T) {
 		{Kind: CounterAdd, Name: "requests", Labels: map[string]string{"method": "GET"}, Value: 1},
 		{Kind: CounterAdd, Name: "requests", Labels: map[string]string{"method": "GET", "status": "200"}, Value: -1},
 		{Kind: CounterAdd, Name: "requests", Labels: map[string]string{"method": "GET", "status": "200"}, Value: math.NaN()},
-		{Kind: CounterAdd, Name: "requests", Labels: map[string]string{"method": "GET", "status": "200"}, Value: math.Inf(1)},
 	} {
 		if err := model.Apply(operation); err == nil {
 			t.Fatalf("Apply(%+v) succeeded", operation)
@@ -90,6 +88,12 @@ func TestCounterSemanticsAndCanonicalLabels(t *testing.T) {
 			t.Fatal("rejected counter operation mutated model")
 		}
 	}
+	if err := model.Apply(Operation{Kind: CounterAdd, Name: "requests", Labels: map[string]string{"method": "GET", "status": "200"}, Value: math.Inf(1)}); err != nil {
+		t.Fatalf("counter overflow to +Inf rejected: %v", err)
+	}
+	if !math.IsInf(onlySeries(t, model, "requests").Value, 1) {
+		t.Fatal("counter did not retain +Inf")
+	}
 }
 
 func TestGaugeAndHistogramSemantics(t *testing.T) {
@@ -97,7 +101,7 @@ func TestGaugeAndHistogramSemantics(t *testing.T) {
 
 	model := NewModel()
 	mustDeclare(t, model, Descriptor{Name: "temperature", Type: Gauge})
-	mustDeclare(t, model, Descriptor{Name: "latency", Type: Histogram, Labels: []string{"route"}, Buckets: []float64{0, 0.5, 1, math.Inf(1)}})
+	mustDeclare(t, model, Descriptor{Name: "latency", Type: Histogram, Labels: []string{"route"}, Buckets: []float64{-10, -1, 0, 1, 10, math.Inf(1)}})
 	for _, value := range []float64{-3, 0, math.NaN(), math.Inf(1), math.Inf(-1)} {
 		if err := model.Apply(Operation{Kind: GaugeSet, Name: "temperature", Value: value}); err != nil {
 			t.Fatalf("GaugeSet(%v): %v", value, err)
@@ -107,21 +111,23 @@ func TestGaugeAndHistogramSemantics(t *testing.T) {
 		}
 	}
 	labels := map[string]string{"route": "/jobs"}
-	for _, value := range []float64{0, 0.5, 2, math.Inf(1)} {
+	for _, value := range []float64{-20, -5, -1, 0, 0.5, 5, 20} {
 		if err := model.Apply(Operation{Kind: HistogramObserve, Name: "latency", Labels: labels, Value: value}); err != nil {
 			t.Fatal(err)
 		}
 	}
 	series := onlySeries(t, model, "latency")
-	if series.Count != 4 || !math.IsInf(series.Sum, 1) || !reflect.DeepEqual(series.BucketCounts, []uint64{1, 2, 2, 4}) {
+	if series.Count != 7 || series.Sum != -0.5 || !reflect.DeepEqual(series.BucketCounts, []uint64{1, 3, 4, 5, 6, 7}) {
 		t.Fatalf("histogram = %+v", series)
 	}
-	before := model.Families()
-	for _, value := range []float64{-1, math.Copysign(0, -1), math.NaN(), math.Inf(-1)} {
-		assertReason(t, model.Apply(Operation{Kind: HistogramObserve, Name: "latency", Labels: labels, Value: value}), ReasonInvalidNumber)
-		if !reflect.DeepEqual(model.Families(), before) {
-			t.Fatal("rejected observation mutated histogram")
+	for _, value := range []float64{math.Inf(1), math.Inf(-1), math.NaN()} {
+		if err := model.Apply(Operation{Kind: HistogramObserve, Name: "latency", Labels: labels, Value: value}); err != nil {
+			t.Fatalf("HistogramObserve(%v): %v", value, err)
 		}
+	}
+	series = onlySeries(t, model, "latency")
+	if series.Count != 10 || !math.IsNaN(series.Sum) || !reflect.DeepEqual(series.BucketCounts, []uint64{2, 4, 5, 6, 7, 10}) {
+		t.Fatalf("special histogram = %+v", series)
 	}
 }
 
@@ -208,9 +214,9 @@ func TestPrometheusSpecialNumericValues(t *testing.T) {
 		{"gauge positive infinity", Descriptor{Name: "metric", Type: Gauge}, Operation{Kind: GaugeSet, Name: "metric", Value: math.Inf(1)}, true},
 		{"gauge negative infinity", Descriptor{Name: "metric", Type: Gauge}, Operation{Kind: GaugeSet, Name: "metric", Value: math.Inf(-1)}, true},
 		{"histogram positive infinity", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.Inf(1)}, true},
-		{"histogram NaN", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.NaN()}, false},
-		{"histogram negative infinity", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.Inf(-1)}, false},
-		{"counter positive infinity", Descriptor{Name: "metric", Type: Counter}, Operation{Kind: CounterAdd, Name: "metric", Value: math.Inf(1)}, false},
+		{"histogram NaN", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.NaN()}, true},
+		{"histogram negative infinity", Descriptor{Name: "metric", Type: Histogram, Buckets: []float64{1, math.Inf(1)}}, Operation{Kind: HistogramObserve, Name: "metric", Value: math.Inf(-1)}, true},
+		{"counter positive infinity", Descriptor{Name: "metric", Type: Counter}, Operation{Kind: CounterAdd, Name: "metric", Value: math.Inf(1)}, true},
 		{"counter NaN", Descriptor{Name: "metric", Type: Counter}, Operation{Kind: CounterAdd, Name: "metric", Value: math.NaN()}, false},
 	}
 	for _, test := range tests {
@@ -230,5 +236,43 @@ func TestPrometheusSpecialNumericValues(t *testing.T) {
 				}
 			}
 		})
+	}
+}
+
+func TestCounterInfinityOverflowAndNegativeZeroMatchClientGo(t *testing.T) {
+	model := NewModel()
+	mustDeclare(t, model, Descriptor{Name: "initialized", Type: Counter})
+	mustDeclare(t, model, Descriptor{Name: "added", Type: Counter})
+	mustDeclare(t, model, Descriptor{Name: "overflowed", Type: Counter})
+
+	if err := model.Apply(Operation{Kind: CounterInitialize, Name: "initialized", Value: math.Copysign(0, -1)}); err != nil {
+		t.Fatal(err)
+	}
+	if value := onlySeries(t, model, "initialized").Value; value != 0 || math.Signbit(value) {
+		t.Fatalf("initialized -0 stored as %v (signbit=%t)", value, math.Signbit(value))
+	}
+	if err := model.Apply(Operation{Kind: CounterAdd, Name: "added", Value: math.Inf(1)}); err != nil {
+		t.Fatal(err)
+	}
+	if err := model.Apply(Operation{Kind: CounterAdd, Name: "overflowed", Value: math.MaxFloat64}); err != nil {
+		t.Fatal(err)
+	}
+	if err := model.Apply(Operation{Kind: CounterAdd, Name: "overflowed", Value: math.MaxFloat64}); err != nil {
+		t.Fatal(err)
+	}
+	if !math.IsInf(onlySeries(t, model, "added").Value, 1) || !math.IsInf(onlySeries(t, model, "overflowed").Value, 1) {
+		t.Fatal("+Inf add or finite overflow did not produce +Inf")
+	}
+}
+
+func TestHistogramNaNObservationMatchesClientGo(t *testing.T) {
+	model := NewModel()
+	mustDeclare(t, model, Descriptor{Name: "distribution", Type: Histogram, Buckets: []float64{-1, 0, 1, math.Inf(1)}})
+	if err := model.Apply(Operation{Kind: HistogramObserve, Name: "distribution", Value: math.NaN()}); err != nil {
+		t.Fatal(err)
+	}
+	series := onlySeries(t, model, "distribution")
+	if series.Count != 1 || !math.IsNaN(series.Sum) || !reflect.DeepEqual(series.BucketCounts, []uint64{0, 0, 0, 1}) {
+		t.Fatalf("NaN observation = %+v", series)
 	}
 }

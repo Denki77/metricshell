@@ -1,5 +1,10 @@
 # INV-016 — Managed Registry Semantics
 
+> **2026-09-28 amendment:** The non-negative/finite numeric restrictions selected by this historical investigation were
+> superseded by amended ADR-016 after an authoritative Prometheus semantics audit. The original experiment and results
+> below are retained as evidence, not as the current numeric contract. See
+> [Numeric Semantics](../../docs/04-specification/numeric-semantics.md).
+
 **Status:** completed
 
 **Reference run:** `results/20260924T114723Z`
