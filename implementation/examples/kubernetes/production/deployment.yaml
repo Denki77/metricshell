@@ -1,0 +1,30 @@
+# TEMPLATE — NOT DIRECTLY DEPLOYABLE. release.yml substitutes __METRICSHELL_IMAGE_DIGEST__.
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: metricshell-worker}
+spec:
+  replicas: 1
+  selector: {matchLabels: {app: metricshell-worker}}
+  template:
+    metadata:
+      labels: {app: metricshell-worker, metricshell.io/scrape: "true"}
+      annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9090", prometheus.io/path: /metrics}
+    spec:
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 32
+      securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+      containers:
+        - name: workload
+          image: ghcr.io/denki77/metricshell-example@sha256:__METRICSHELL_IMAGE_DIGEST__
+          env:
+            - {name: METRICSHELL_MODE, value: managed-registry}
+            - {name: METRICSHELL_MANAGED_PUBLICATION_INTERVAL, value: 1s}
+          ports: [{name: metrics, containerPort: 9090}]
+          readinessProbe: {httpGet: {path: /readyz, port: metrics}, periodSeconds: 2}
+          livenessProbe: {httpGet: {path: /healthz, port: metrics}, periodSeconds: 10}
+          resources:
+            requests: {cpu: 10m, memory: 16Mi}
+            limits: {cpu: 250m, memory: 64Mi}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts: [{name: runtime, mountPath: /run/metricshell}]
+      volumes: [{name: runtime, emptyDir: {sizeLimit: 8Mi}}]

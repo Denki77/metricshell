@@ -3,6 +3,7 @@
 
 implementation/bin/
 implementation/dist/
+implementation/examples/docker/standalone-copy/release/
 
 research/INV*/latest-*results.txt
 

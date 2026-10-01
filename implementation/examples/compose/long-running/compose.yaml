@@ -1,0 +1,18 @@
+services:
+  application:
+    image: ${METRICSHELL_LONG_RUNNING_IMAGE:-metricshell-example-standalone:local}
+    read_only: true
+    tmpfs: ["/run/metricshell:uid=65532,gid=65532,mode=0700"]
+    user: "65532:65532"
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 64m
+    ulimits:
+      nofile: {soft: 64, hard: 64}
+    restart: "no"
+  prometheus:
+    image: prom/prometheus:v3.6.0
+    command: [--config.file=/etc/prometheus/prometheus.yml]
+    volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro]
+    ports: ["127.0.0.1:19090:9090"]

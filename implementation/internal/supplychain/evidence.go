@@ -18,7 +18,7 @@ import (
 
 const SchemaVersion = 1
 
-var releaseSubjects = []string{"linux_amd64/metricshell", "linux_arm64/metricshell"}
+var releaseSubjects = []string{"metricshell-linux-amd64", "metricshell-linux-arm64"}
 var signedEvidenceFiles = []string{"MODULES.jsonl", "GOVULNCHECK.json", "SBOM.json", "PROVENANCE.json", "VULNERABILITIES.json", "RELEASE_PUBLIC_KEY", "VERIFYING.md"}
 
 type Inputs struct {

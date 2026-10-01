@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/Denki77/metricshell/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/ci.yml)
 [![Documentation](https://github.com/Denki77/metricshell/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/docs.yml)
-![Version](https://img.shields.io/badge/version-0.1.2-blue)
+[![Release](https://github.com/Denki77/metricshell/actions/workflows/release.yml/badge.svg)](https://github.com/Denki77/metricshell/actions/workflows/release.yml)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Go](https://img.shields.io/badge/go-1.26-00ADD8)
-![Docker](https://img.shields.io/badge/runtime-Docker-2496ED)
 ![Platforms](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -18,6 +18,22 @@ Prometheus-compatible endpoint.
 Batch jobs, one-shot workers and CLI tools often need Prometheus metrics without becoming HTTP servers themselves.
 MetricShell keeps that responsibility outside the workload: it supervises the process, accepts complete metric
 snapshots through bounded local transports, serves `/metrics`, and preserves final metrics long enough for a scrape.
+
+MetricShell gives serverless and non-HTTP workloads a normal Prometheus pull target without making the workload own an
+HTTP metrics server or monitoring-infrastructure push configuration. The workload knows only a local socket or snapshot
+path. Prometheus discovery, credentials and routing remain infrastructure concerns; application configuration never
+needs `PROMETHEUS_URL`, `PUSHGATEWAY_URL` or an equivalent destination.
+
+## When should I use MetricShell?
+
+Use it for CLI programs, cron, Kubernetes Jobs/CronJobs, workers, queue consumers, batch/ETL processes, legacy PHP,
+shell scripts, and long-running daemons that do not expose HTTP metrics. Choose snapshot mode when the workload owns a
+complete registry; choose Managed Registry for local counter, gauge and histogram operations.
+
+## When should I NOT use MetricShell?
+
+If an HTTP application already exposes `/metrics` correctly through a standard Prometheus client library, MetricShell
+usually adds no value. It is not a replacement for normal in-process instrumentation or a universal Pushgateway.
 
 ## Current status
 
@@ -42,14 +58,18 @@ cd implementation
 make build PLATFORM=linux/amd64 IMAGE=metricshell
 ```
 
-Run a workload without shell interpretation:
+Copy the released binary into an existing application image:
 
-```sh
-docker run --rm metricshell:local -- /path/to/workload "argument with spaces"
+```dockerfile
+FROM ghcr.io/denki77/metricshell-artifact:0.2.0 AS metricshell
+FROM my-application
+COPY --from=metricshell /metricshell /usr/local/bin/metricshell
+ENTRYPOINT ["/usr/local/bin/metricshell", "--"]
+CMD ["my-worker"]
 ```
 
-Everything after the standalone `--` is passed directly to the workload. Use an explicit shell workload if shell
-features are needed.
+For production, replace the version tag with the release digest published on GitHub. Standalone installation and
+deployable Kubernetes examples are in the [Production Deployment Guide](docs/07-delivery/production-deployment.md).
 
 ### Managed Aggregation
 
@@ -85,6 +105,7 @@ native Prometheus client and can expose `/metrics`, it may not need MetricShell 
 ## Documentation
 
 - [Production implementation](implementation/README.md)
+- [Production deployment guide](docs/07-delivery/production-deployment.md)
 - [Configuration](docs/04-specification/configuration.md)
 - [Runtime state machine](docs/04-specification/runtime-state-machine.md)
 - [Application snapshot protocol](docs/04-specification/application-snapshot-protocol.md)
@@ -96,7 +117,7 @@ native Prometheus client and can expose `/metrics`, it may not need MetricShell 
 
 ## Versioning
 
-The repository-wide version lives in [`VERSION`](VERSION). The current version is `0.1.2`. Runtime artifacts also embed
+The repository-wide version lives in [`VERSION`](VERSION). The current version is `0.2.0`. Runtime artifacts also embed
 the source revision supplied by CI or Make.
 
 ## Contributing

@@ -1,0 +1,32 @@
+services:
+  file:
+    image: ${METRICSHELL_TRANSPORT_IMAGE:-metricshell-example-transport:local}
+    environment:
+      METRICSHELL_INGESTION_TRANSPORT: file
+      METRICSHELL_SNAPSHOT_FILE_PATH: /run/metricshell/snapshot.json
+      METRICSHELL_FILE_RECONCILE_INTERVAL: 100ms
+      METRICSHELL_EXPOSITION_LISTEN: 0.0.0.0:9090
+      FIXTURE_SLEEP: 60s
+    command: ["--", "/workload-fixture"]
+    volumes: [file-state:/run/metricshell]
+  unix:
+    image: ${METRICSHELL_TRANSPORT_IMAGE:-metricshell-example-transport:local}
+    environment:
+      METRICSHELL_INGESTION_TRANSPORT: unix
+      METRICSHELL_UNIX_SOCKET_PATH: /run/metricshell/ingest.sock
+      METRICSHELL_EXPOSITION_LISTEN: 0.0.0.0:9090
+      FIXTURE_SLEEP: 60s
+    command: ["--", "/workload-fixture"]
+    volumes: [unix-state:/run/metricshell]
+  http:
+    image: ${METRICSHELL_TRANSPORT_IMAGE:-metricshell-example-transport:local}
+    environment:
+      METRICSHELL_INGESTION_TRANSPORT: http
+      METRICSHELL_HTTP_INGESTION_LISTEN: 127.0.0.1:9091
+      METRICSHELL_EXPOSITION_LISTEN: 0.0.0.0:9090
+      FIXTURE_SLEEP: 60s
+    command: ["--", "/workload-fixture"]
+
+volumes:
+  file-state:
+  unix-state:

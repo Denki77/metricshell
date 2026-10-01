@@ -497,7 +497,7 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 			}
 			value = args[index]
 		}
-		if property != "mode" && !strings.HasPrefix(property, "managed_") {
+		if isIngestionProperty(property) {
 			values[property] = value
 			explicit[property] = true
 		}
@@ -528,7 +528,9 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 		return Config{}, modeErr
 	} else if mode == ModeManagedRegistry {
 		for property := range explicit {
-			return Config{}, fmt.Errorf("snapshot ingestion option %s conflicts with managed-registry mode", property)
+			if isSnapshotTransportProperty(property) {
+				return Config{}, fmt.Errorf("snapshot ingestion option %s conflicts with managed-registry mode", property)
+			}
 		}
 	}
 	if err := rejectInactiveTransportOptions(configuration.IngestionTransport, explicit); err != nil {
@@ -568,6 +570,34 @@ func parseIngestion(args []string, lookupEnv LookupEnv) (Config, error) {
 		return Config{}, fmt.Errorf("invalid ingestion configuration")
 	}
 	return configuration, nil
+}
+
+func isIngestionProperty(property string) bool {
+	switch property {
+	case "ingestion_transport", "snapshot_file_path", "file_reconcile_interval", "unix_socket_path",
+		"socket_frame_bytes", "socket_parts", "socket_connections", "socket_transactions",
+		"socket_transaction_timeout", "socket_read_timeout", "socket_write_timeout", "http_ingestion_listen",
+		"http_ingestion_wire_bytes", "http_read_header_timeout", "http_read_timeout", "http_write_timeout",
+		"http_idle_timeout", "http_max_header_bytes", "snapshot_bytes", "decoded_input_bytes", "series",
+		"labels_per_series", "metric_name_bytes", "label_name_bytes", "label_value_bytes", "help_bytes",
+		"concurrent_ingestions", "pending_ingestions":
+		return true
+	default:
+		return false
+	}
+}
+
+func isSnapshotTransportProperty(property string) bool {
+	switch property {
+	case "ingestion_transport", "snapshot_file_path", "file_reconcile_interval", "unix_socket_path",
+		"socket_frame_bytes", "socket_parts", "socket_connections", "socket_transactions",
+		"socket_transaction_timeout", "socket_read_timeout", "socket_write_timeout", "http_ingestion_listen",
+		"http_ingestion_wire_bytes", "http_read_header_timeout", "http_read_timeout", "http_write_timeout",
+		"http_idle_timeout", "http_max_header_bytes", "concurrent_ingestions", "pending_ingestions":
+		return true
+	default:
+		return false
+	}
 }
 
 func rejectInactiveTransportOptions(transport string, explicit map[string]bool) error {

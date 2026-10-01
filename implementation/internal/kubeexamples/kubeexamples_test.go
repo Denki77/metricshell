@@ -89,6 +89,29 @@ func TestLifecycleControlManifestsEncodeOuterBounds(t *testing.T) {
 	)
 }
 
+func TestProductionTemplatesAreHardenedAndDigestRendered(t *testing.T) {
+	t.Parallel()
+
+	root := filepath.Join("..", "..", "examples", "kubernetes", "production")
+	for _, name := range []string{"job.yaml", "cronjob.yaml", "deployment.yaml"} {
+		manifest := readExample(t, root, name)
+		requireAll(t, manifest,
+			"TEMPLATE — NOT DIRECTLY DEPLOYABLE",
+			"@sha256:__METRICSHELL_IMAGE_DIGEST__",
+			"automountServiceAccountToken: false",
+			"terminationGracePeriodSeconds: 32",
+			"runAsNonRoot: true",
+			"seccompProfile: {type: RuntimeDefault}",
+			"allowPrivilegeEscalation: false",
+			"readOnlyRootFilesystem: true",
+			"capabilities: {drop: [ALL]}",
+			"containerPort: 9090",
+			"resources:",
+		)
+		requireNotContains(t, manifest, "sha256:00000000")
+	}
+}
+
 func readExample(t *testing.T, root, name string) string {
 	t.Helper()
 	content, err := os.ReadFile(filepath.Join(root, name))

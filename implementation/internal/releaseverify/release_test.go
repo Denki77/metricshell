@@ -13,9 +13,11 @@ func TestDockerfileDefinesStaticMultiArchReleaseArtifacts(t *testing.T) {
 	dockerfile := readText(t, filepath.Join("..", "..", "Dockerfile"))
 	requireAll(t, dockerfile,
 		"FROM source AS release",
+		"FROM scratch AS release-artifacts",
+		"COPY --from=release /release /release",
 		"CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build",
 		"CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build",
-		"sha256sum linux_amd64/metricshell linux_arm64/metricshell > SHA256SUMS",
+		"sha256sum metricshell-linux-amd64 metricshell-linux-arm64 > SHA256SUMS",
 		"sha256sum -c SHA256SUMS",
 		"org.opencontainers.image.version",
 		"org.opencontainers.image.revision",
@@ -28,8 +30,9 @@ func TestMakefileExportsReleaseThroughDockerOnlyTarget(t *testing.T) {
 
 	makefile := readText(t, filepath.Join("..", "..", "Makefile"))
 	requireAll(t, makefile,
+		"PROJECT_ROOT := $(abspath ..)",
 		"release:",
-		"docker build --target release",
+		"docker build --target release-artifacts",
 		"--output type=local,dest=\"$(CURDIR)/dist\"",
 	)
 }
@@ -79,6 +82,44 @@ func TestPinnedMultistageCopyExampleForbidsMutableArtifactTags(t *testing.T) {
 		"COPY --from=ghcr.io/denki77/metricshell-artifact@sha256:<immutable-digest>",
 		"Mutable tags alone are not valid release evidence",
 	)
+}
+
+func TestReleaseWorkflowPublishesRuntimeArtifactAndExampleDigests(t *testing.T) {
+	t.Parallel()
+
+	workflow := readProjectText(t, ".github", "workflows", "release.yml")
+	exampleDockerfile := readText(t, filepath.Join("..", "..", "examples", "docker", "base-image", "Dockerfile"))
+	requireAll(t, exampleDockerfile,
+		"ARG METRICSHELL_IMAGE_REF=",
+		"FROM ${METRICSHELL_IMAGE_REF} AS metricshell",
+	)
+	requireAll(t, workflow,
+		"metricshell:$version",
+		"metricshell-artifact:$version",
+		"metricshell-example:$version",
+		`--build-arg METRICSHELL_IMAGE_REF="${REGISTRY,,}/metricshell@${digest}"`,
+		"example_digest=$example_digest",
+		"render-kubernetes-release.sh '${{ steps.image.outputs.example_digest }}'",
+	)
+	requireNotContains(t, workflow, "--build-arg METRICSHELL_IMAGE=")
+	requireNotContains(t, workflow, "--build-arg METRICSHELL_IMAGE_DIGEST=")
+}
+
+func readProjectText(t *testing.T, elements ...string) string {
+	t.Helper()
+
+	repositoryPath := filepath.Join(append([]string{"..", "..", ".."}, elements...)...)
+	content, err := os.ReadFile(repositoryPath)
+	if err == nil {
+		return string(content)
+	}
+
+	containerPath := filepath.Join(append([]string{"/project"}, elements...)...)
+	content, containerErr := os.ReadFile(containerPath)
+	if containerErr != nil {
+		t.Fatalf("read project file: host path %q: %v; container path %q: %v", repositoryPath, err, containerPath, containerErr)
+	}
+	return string(content)
 }
 
 func readText(t *testing.T, path string) string {

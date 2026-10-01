@@ -2,9 +2,9 @@
 
 [![CI](https://github.com/Denki77/metricshell/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/ci.yml)
 [![Documentation](https://github.com/Denki77/metricshell/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/docs.yml)
-![Version](https://img.shields.io/badge/version-0.1.2-blue)
+[![Release](https://github.com/Denki77/metricshell/actions/workflows/release.yml/badge.svg)](https://github.com/Denki77/metricshell/actions/workflows/release.yml)
+![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Go](https://img.shields.io/badge/go-1.26-00ADD8)
-![Docker](https://img.shields.io/badge/runtime-Docker-2496ED)
 ![Platforms](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -18,6 +18,22 @@ Prometheus-compatible endpoint.
 Batch jobs, одноразовые workers и CLI-инструменты часто нуждаются в Prometheus-метриках, но не должны сами становиться
 HTTP-серверами. MetricShell выносит эту обязанность наружу: управляет процессом, принимает complete metric snapshots
 через bounded local transports, отдаёт `/metrics` и удерживает финальные метрики достаточно долго для scrape.
+
+MetricShell даёт serverless- и non-HTTP-нагрузкам обычную pull-цель для Prometheus, не заставляя workload поднимать
+HTTP-сервер или хранить конфигурацию push в monitoring infrastructure. Workload знает только локальный socket или путь
+snapshot. Discovery, credentials и routing принадлежат инфраструктуре; приложению не нужны `PROMETHEUS_URL`,
+`PUSHGATEWAY_URL` и аналогичные destination variables.
+
+## Когда нужен MetricShell?
+
+Для CLI, cron, Kubernetes Job/CronJob, worker, queue consumer, batch/ETL, legacy PHP, shell script и long-running daemon
+без собственного HTTP metrics endpoint. Snapshot mode подходит workload с complete registry, Managed Registry — для
+локальных операций counter, gauge и histogram.
+
+## Когда MetricShell не нужен?
+
+Если HTTP-приложение уже корректно публикует `/metrics` стандартной Prometheus client library, MetricShell обычно
+избыточен. Это не замена обычной in-process instrumentation и не универсальная замена Pushgateway.
 
 ## Текущий статус
 
@@ -42,14 +58,18 @@ cd implementation
 make build PLATFORM=linux/amd64 IMAGE=metricshell
 ```
 
-Запустить workload без shell interpretation:
+Добавить released binary в существующий application image:
 
-```sh
-docker run --rm metricshell:local -- /path/to/workload "argument with spaces"
+```dockerfile
+FROM ghcr.io/denki77/metricshell-artifact:0.2.0 AS metricshell
+FROM my-application
+COPY --from=metricshell /metricshell /usr/local/bin/metricshell
+ENTRYPOINT ["/usr/local/bin/metricshell", "--"]
+CMD ["my-worker"]
 ```
 
-Всё после отдельного `--` передаётся напрямую в workload. Если нужны shell features, используйте shell как явный
-workload.
+В production замените version tag на digest из GitHub Release. Standalone installation и deployable Kubernetes
+examples описаны в [Production Deployment Guide](docs-ru/07-delivery/production-deployment.md).
 
 ### Managed Aggregation
 
@@ -84,6 +104,7 @@ Prometheus client и собственным `/metrics` MetricShell может в
 ## Документация
 
 - [Production implementation](implementation/README_RU.md)
+- [Production deployment guide](docs-ru/07-delivery/production-deployment.md)
 - [Configuration](docs-ru/04-specification/configuration.md)
 - [Runtime state machine](docs-ru/04-specification/runtime-state-machine.md)
 - [Application snapshot protocol](docs-ru/04-specification/application-snapshot-protocol.md)
@@ -95,7 +116,7 @@ Prometheus client и собственным `/metrics` MetricShell может в
 
 ## Версионирование
 
-Версия всего репозитория находится в [`VERSION`](VERSION). Текущая версия — `0.1.2`. Runtime artifacts также встраивают
+Версия всего репозитория находится в [`VERSION`](VERSION). Текущая версия — `0.2.0`. Runtime artifacts также встраивают
 source revision, переданный CI или Make.
 
 ## Участие

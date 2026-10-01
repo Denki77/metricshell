@@ -8,12 +8,17 @@
 !docs/**
 !docs-ru/
 !docs-ru/**
+!.github/
+!.github/workflows/
+!.github/workflows/release.yml
 !implementation/
 !implementation/go.mod
 !implementation/cmd/
 !implementation/cmd/**
 !implementation/internal/
 !implementation/internal/**
+implementation/dist/
+implementation/examples/docker/standalone-copy/release/
 !research/
 !research/INV-016/
 !research/INV-016/corecheck/
