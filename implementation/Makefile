@@ -1,4 +1,4 @@
-PROJECT_ROOT := ..
+PROJECT_ROOT := $(abspath ..)
 DOCKERFILE := $(CURDIR)/Dockerfile
 REVISION ?= $(shell git -C $(PROJECT_ROOT) rev-parse --verify HEAD 2>/dev/null || printf unknown)
 VERSION ?= $(shell sed -n '1p' $(PROJECT_ROOT)/VERSION)

@@ -17,6 +17,7 @@ COPY ["VERSION", "/project/VERSION"]
 COPY ["README.md", "README_RU.md", "CHANGELOG.md", "CHANGELOG_RU.md", "/project/"]
 COPY ["docs", "/project/docs"]
 COPY ["docs-ru", "/project/docs-ru"]
+COPY [".github/workflows/release.yml", "/project/.github/workflows/release.yml"]
 
 FROM ${PHP54_IMAGE} AS php54-client
 COPY ["implementation/examples/clients/php54/metricshell.php", "/clients/metricshell.php"]
@@ -130,7 +131,9 @@ RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
 RUN CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid=" -o /out/managed-client-fixture ./internal/testfixture/managedclient && \
     CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
-      -ldflags="-s -w -buildid=" -o /out/managed-e2e-fixture ./internal/testfixture/managede2e
+      -ldflags="-s -w -buildid=" -o /out/managed-e2e-fixture ./internal/testfixture/managede2e && \
+    CGO_ENABLED=0 GOOS=linux go build -trimpath -buildvcs=false \
+      -ldflags="-s -w -buildid=" -o /out/snapshot-client-fixture ./internal/testfixture/snapshotclient
 
 FROM scratch AS integration
 ENV METRICSHELL_FINAL_WAIT_MODE=immediate
@@ -146,6 +149,7 @@ COPY --from=integration-build /out/final-scrape-fixture /final-scrape-fixture
 COPY --from=integration-build /out/faultsuite-fixture /faultsuite-fixture
 COPY --from=integration-build /out/managed-client-fixture /managed-client-fixture
 COPY --from=integration-build /out/managed-e2e-fixture /managed-e2e-fixture
+COPY --from=integration-build /out/snapshot-client-fixture /snapshot-client-fixture
 ENTRYPOINT ["/metricshell"]
 
 FROM source AS managed-validation

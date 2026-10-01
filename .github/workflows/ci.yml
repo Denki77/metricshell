@@ -16,4 +16,16 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
       - name: Mandatory production release gate
         working-directory: implementation
-        run: make production-gate REVISION=${{ github.sha }} IMAGE=metricshell-ci
+        shell: bash
+        run: |
+          log_file="$(mktemp)"
+          trap 'rm -f "$log_file"' EXIT
+          set +e
+          make production-gate REVISION=${{ github.sha }} IMAGE=metricshell-ci 2>&1 | tee "$log_file"
+          status=${PIPESTATUS[0]}
+          set -e
+          if [[ "$status" -ne 0 ]]; then
+            message="$(tail -n 25 "$log_file" | sed -e 's/%/%25/g' -e 's/\r/%0D/g' -e ':a;N;$!ba;s/\n/%0A/g')"
+            echo "::error title=Production release gate failed::$message"
+          fi
+          exit "$status"

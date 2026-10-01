@@ -1,13 +1,14 @@
 services:
   finite-application:
-    build:
-      context: ../../docker/standalone-copy
+    image: ${METRICSHELL_FINITE_IMAGE:-metricshell-example-finite:local}
     environment:
+      EXAMPLE_EXIT_CODE: ${EXAMPLE_EXIT_CODE:-0}
+      EXAMPLE_JOBS: ${EXAMPLE_JOBS:-7}
       METRICSHELL_FINAL_WAIT_MODE: scrapes
       METRICSHELL_FINAL_WAIT_REQUIRED_SCRAPES: "1"
-      METRICSHELL_FINAL_WAIT_TIMEOUT: 15s
+      METRICSHELL_FINAL_WAIT_TIMEOUT: 10s
     read_only: true
-    tmpfs: [/run/metricshell:uid=65532,gid=65532,mode=0700]
+    tmpfs: ["/run/metricshell:uid=65532,gid=65532,mode=0700"]
     user: "65532:65532"
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -15,7 +16,3 @@ services:
   prometheus:
     image: prom/prometheus:v3.6.0
     volumes: [./prometheus.yml:/etc/prometheus/prometheus.yml:ro]
-  verifier:
-    image: curlimages/curl:8.16.0
-    command: ["--fail", "--retry", "20", "--retry-delay", "1", "http://prometheus:9090/api/v1/query?query=example_jobs_total"]
-    depends_on: [prometheus, finite-application]

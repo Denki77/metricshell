@@ -8,6 +8,9 @@
 !docs/**
 !docs-ru/
 !docs-ru/**
+!.github/
+!.github/workflows/
+!.github/workflows/release.yml
 !implementation/
 !implementation/go.mod
 !implementation/cmd/

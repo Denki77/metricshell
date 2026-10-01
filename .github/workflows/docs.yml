@@ -50,7 +50,20 @@ jobs:
             - name: Checkout repository
               uses: actions/checkout@v7
 
-            - name: Check documentation links
+            - name: Check documentation links in pull request
+              if: github.event_name == 'pull_request'
+              uses: lycheeverse/lychee-action@v2
+              with:
+                  args: >-
+                      --verbose
+                      --no-progress
+                      --accept 200,204,206,429
+                      --exclude '^https://github\.com/Denki77/metricshell/actions/workflows/release\.yml/badge\.svg$'
+                      "./**/*.md"
+                  fail: true
+
+            - name: Check documentation links after merge
+              if: github.event_name == 'push'
               uses: lycheeverse/lychee-action@v2
               with:
                   args: >-

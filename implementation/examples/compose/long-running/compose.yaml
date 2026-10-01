@@ -1,9 +1,8 @@
 services:
   application:
-    build:
-      context: ../../docker/standalone-copy
+    image: ${METRICSHELL_LONG_RUNNING_IMAGE:-metricshell-example-standalone:local}
     read_only: true
-    tmpfs: [/run/metricshell:uid=65532,gid=65532,mode=0700]
+    tmpfs: ["/run/metricshell:uid=65532,gid=65532,mode=0700"]
     user: "65532:65532"
     cap_drop: [ALL]
     security_opt: [no-new-privileges:true]
@@ -11,7 +10,7 @@ services:
     mem_limit: 64m
     ulimits:
       nofile: {soft: 64, hard: 64}
-    restart: on-failure
+    restart: "no"
   prometheus:
     image: prom/prometheus:v3.6.0
     command: [--config.file=/etc/prometheus/prometheus.yml]

@@ -78,12 +78,21 @@ jobs:
           digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/image-metadata.json")
           test -n "$digest" && test "$digest" != null
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
-          printf 'metricshell=%s/metricshell@%s\nartifact=%s/metricshell-artifact@%s\n' \
-            "${REGISTRY,,}" "$digest" "${REGISTRY,,}" "$digest" > dist/supply-chain/release/OCI_DIGESTS
+          docker buildx build --platform linux/amd64,linux/arm64 \
+            --build-arg METRICSHELL_IMAGE_REF="${REGISTRY,,}/metricshell@${digest}" \
+            --tag "${REGISTRY,,}/metricshell-example:$version" \
+            --metadata-file "$RUNNER_TEMP/example-image-metadata.json" --push \
+            -f examples/docker/base-image/Dockerfile examples/docker/base-image
+          example_digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/example-image-metadata.json")
+          test -n "$example_digest" && test "$example_digest" != null
+          echo "example_digest=$example_digest" >> "$GITHUB_OUTPUT"
+          printf 'metricshell=%s/metricshell@%s\nartifact=%s/metricshell-artifact@%s\nexample=%s/metricshell-example@%s\n' \
+            "${REGISTRY,,}" "$digest" "${REGISTRY,,}" "$digest" "${REGISTRY,,}" "$example_digest" \
+            > dist/supply-chain/release/OCI_DIGESTS
       - name: Render deployable Kubernetes release bundle
         working-directory: implementation
         run: |
-          ./scripts/render-kubernetes-release.sh '${{ steps.image.outputs.digest }}' dist/kubernetes-release
+          ./scripts/render-kubernetes-release.sh '${{ steps.image.outputs.example_digest }}' dist/kubernetes-release
           tar -C dist -czf dist/supply-chain/release/metricshell-kubernetes-${GITHUB_REF_NAME}.tar.gz kubernetes-release
       - name: Generate GitHub artifact attestations
         uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
@@ -97,4 +106,5 @@ jobs:
           test "$GITHUB_REF_NAME" = "v$version"
           gh release create "$GITHUB_REF_NAME" implementation/dist/supply-chain/release/* \
             --verify-tag --title "MetricShell $version" --generate-notes \
-            --notes "OCI digest: ${{ steps.image.outputs.digest }}"
+            --notes "MetricShell OCI digest: ${{ steps.image.outputs.digest }}
+          Example workload OCI digest: ${{ steps.image.outputs.example_digest }}"
