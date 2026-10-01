@@ -1,0 +1,12 @@
+services:
+  file:
+    image: metricshell-example-transport:local
+    environment: {METRICSHELL_INGESTION_TRANSPORT: file}
+  unix:
+    image: metricshell-example-transport:local
+    environment: {METRICSHELL_INGESTION_TRANSPORT: unix}
+  http:
+    image: metricshell-example-transport:local
+    environment:
+      METRICSHELL_INGESTION_TRANSPORT: http
+      METRICSHELL_HTTP_INGESTION_LISTEN: 127.0.0.1:9091

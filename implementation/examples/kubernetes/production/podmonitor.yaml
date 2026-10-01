@@ -1,0 +1,10 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata: {name: metricshell}
+spec:
+  selector: {matchLabels: {metricshell.io/scrape: "true"}}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 5s
+      scrapeTimeout: 2s

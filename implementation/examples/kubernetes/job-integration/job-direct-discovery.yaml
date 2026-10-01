@@ -28,7 +28,8 @@ spec:
           type: RuntimeDefault
       containers:
         - name: application
-          image: ghcr.io/denki77/metricshell-example@sha256:0000000000000000000000000000000000000000000000000000000000000000
+          # TEMPLATE — NOT DIRECTLY DEPLOYABLE. release.yml substitutes the published digest.
+          image: ghcr.io/denki77/metricshell-example@sha256:__METRICSHELL_IMAGE_DIGEST__
           imagePullPolicy: IfNotPresent
           args: ["--", "/workload"]
           env:
@@ -81,4 +82,3 @@ spec:
         - name: runtime
           emptyDir:
             medium: Memory
-

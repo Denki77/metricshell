@@ -1,0 +1,34 @@
+# TEMPLATE — NOT DIRECTLY DEPLOYABLE. release.yml substitutes __METRICSHELL_IMAGE_DIGEST__.
+apiVersion: batch/v1
+kind: CronJob
+metadata: {name: metricshell-cron}
+spec:
+  schedule: "*/5 * * * *"
+  concurrencyPolicy: Forbid
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 95
+      ttlSecondsAfterFinished: 300
+      template:
+        metadata:
+          labels: {app: metricshell-cron, metricshell.io/scrape: "true"}
+          annotations: {prometheus.io/scrape: "true", prometheus.io/port: "9090", prometheus.io/path: /metrics}
+        spec:
+          automountServiceAccountToken: false
+          restartPolicy: Never
+          terminationGracePeriodSeconds: 32
+          securityContext: {runAsNonRoot: true, seccompProfile: {type: RuntimeDefault}}
+          containers:
+            - name: workload
+              image: ghcr.io/denki77/metricshell-example@sha256:__METRICSHELL_IMAGE_DIGEST__
+              env:
+                - {name: METRICSHELL_FINAL_WAIT_MODE, value: scrapes}
+                - {name: METRICSHELL_FINAL_WAIT_TIMEOUT, value: 60s}
+              ports: [{name: metrics, containerPort: 9090}]
+              resources:
+                requests: {cpu: 10m, memory: 16Mi}
+                limits: {cpu: 250m, memory: 64Mi}
+              securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+              volumeMounts: [{name: runtime, mountPath: /run/metricshell}]
+          volumes: [{name: runtime, emptyDir: {sizeLimit: 8Mi}}]
