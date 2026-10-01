@@ -54,7 +54,7 @@ func TestVerifyRejectsTamperedBinary(t *testing.T) {
 	if err := Generate(directory, inputs); err != nil {
 		t.Fatal(err)
 	}
-	appendFile(t, filepath.Join(directory, "linux_amd64", "metricshell"), "tamper")
+	appendFile(t, filepath.Join(directory, "metricshell-linux-amd64"), "tamper")
 	if err := Verify(directory, inputs.Revision, inputs.PublicSigningKeyHex); err == nil || !strings.Contains(err.Error(), "checksum mismatch") {
 		t.Fatalf("Verify tampered binary err = %v", err)
 	}
@@ -109,8 +109,8 @@ func TestVerifyRejectsSBOMMissingModuleAndModuleMismatch(t *testing.T) {
 		t.Fatal(err)
 	}
 	sbom := SBOM{SchemaVersion: SchemaVersion, Components: []SBOMComponent{
-		{Name: "metricshell", Type: "file", Version: inputs.Version, SHA256: mustDigest(t, filepath.Join(directory, "linux_amd64", "metricshell"))},
-		{Name: "metricshell", Type: "file", Version: inputs.Version, SHA256: mustDigest(t, filepath.Join(directory, "linux_arm64", "metricshell"))},
+		{Name: "metricshell", Type: "file", Version: inputs.Version, SHA256: mustDigest(t, filepath.Join(directory, "metricshell-linux-amd64"))},
+		{Name: "metricshell", Type: "file", Version: inputs.Version, SHA256: mustDigest(t, filepath.Join(directory, "metricshell-linux-arm64"))},
 		{Name: "github.com/Denki77/metricshell/implementation", Type: "go-module", Version: inputs.Version, SHA256: mustDigest(t, filepath.Join(directory, "go.mod"))},
 	}}
 	if err := writeJSON(filepath.Join(directory, "SBOM.json"), sbom); err != nil {

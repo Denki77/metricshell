@@ -13,9 +13,11 @@ func TestDockerfileDefinesStaticMultiArchReleaseArtifacts(t *testing.T) {
 	dockerfile := readText(t, filepath.Join("..", "..", "Dockerfile"))
 	requireAll(t, dockerfile,
 		"FROM source AS release",
+		"FROM scratch AS release-artifacts",
+		"COPY --from=release /release /release",
 		"CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build",
 		"CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build",
-		"sha256sum linux_amd64/metricshell linux_arm64/metricshell > SHA256SUMS",
+		"sha256sum metricshell-linux-amd64 metricshell-linux-arm64 > SHA256SUMS",
 		"sha256sum -c SHA256SUMS",
 		"org.opencontainers.image.version",
 		"org.opencontainers.image.revision",
@@ -29,7 +31,7 @@ func TestMakefileExportsReleaseThroughDockerOnlyTarget(t *testing.T) {
 	makefile := readText(t, filepath.Join("..", "..", "Makefile"))
 	requireAll(t, makefile,
 		"release:",
-		"docker build --target release",
+		"docker build --target release-artifacts",
 		"--output type=local,dest=\"$(CURDIR)/dist\"",
 	)
 }

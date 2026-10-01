@@ -1,0 +1,100 @@
+name: Release
+
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+jobs:
+  production-gate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - name: Reject tag/version mismatch before validation
+        run: test "${GITHUB_REF_NAME}" = "v$(cat VERSION)"
+      - name: Full mandatory production validation
+        working-directory: implementation
+        run: make production-gate REVISION=${GITHUB_SHA} IMAGE=metricshell-release-gate
+
+  publish:
+    needs: production-gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: docker/setup-qemu-action@68827325e0b33c7199f8e6e4c7de034cc9d1f2c5
+      - uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435
+      - uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Validate release identity and build binaries
+        working-directory: implementation
+        run: |
+          test "${GITHUB_REF_NAME}" = "v$(cat ../VERSION)"
+          make release REVISION=${GITHUB_SHA}
+          ./scripts/verify-release-version.sh
+      - name: Generate signed supply-chain release material
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          RELEASE_SIGNING_PUBLIC_KEY: ${{ vars.RELEASE_SIGNING_PUBLIC_KEY }}
+        working-directory: implementation
+        run: |
+          test -n "$RELEASE_SIGNING_KEY"
+          test -n "$RELEASE_SIGNING_PUBLIC_KEY"
+          umask 077
+          printf '%s' "$RELEASE_SIGNING_KEY" > "$RUNNER_TEMP/release-key.hex"
+          printf '%s' "$RELEASE_SIGNING_PUBLIC_KEY" > "$RUNNER_TEMP/release-public.hex"
+          make supply-chain REVISION=${GITHUB_SHA} IMAGE=metricshell-release \
+            RELEASE_SIGNING_KEY_FILE="$RUNNER_TEMP/release-key.hex" \
+            RELEASE_SIGNING_PUBLIC_KEY_FILE="$RUNNER_TEMP/release-public.hex"
+          rm -f "$RUNNER_TEMP/release-key.hex" "$RUNNER_TEMP/release-public.hex"
+      - name: Independently verify files delivered to consumers
+        working-directory: implementation
+        run: |
+          cd dist/supply-chain/release
+          sha256sum -c SHA256SUMS
+          test "$(./metricshell-linux-amd64 --version)" = "metricshell version=$(cat ../../../VERSION) revision=${GITHUB_SHA}"
+      - name: Publish official multi-architecture images
+        id: image
+        working-directory: implementation
+        env:
+          REGISTRY: ghcr.io/${{ github.repository_owner }}
+        run: |
+          version=$(cat ../VERSION)
+          docker buildx build --platform linux/amd64,linux/arm64 --target runtime \
+            --build-arg VERSION="$version" --build-arg REVISION="${GITHUB_SHA}" \
+            --tag "${REGISTRY,,}/metricshell:$version" --tag "${REGISTRY,,}/metricshell-artifact:$version" \
+            --metadata-file "$RUNNER_TEMP/image-metadata.json" --push -f Dockerfile ..
+          digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/image-metadata.json")
+          test -n "$digest" && test "$digest" != null
+          echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          printf 'metricshell=%s/metricshell@%s\nartifact=%s/metricshell-artifact@%s\n' \
+            "${REGISTRY,,}" "$digest" "${REGISTRY,,}" "$digest" > dist/supply-chain/release/OCI_DIGESTS
+      - name: Render deployable Kubernetes release bundle
+        working-directory: implementation
+        run: |
+          ./scripts/render-kubernetes-release.sh '${{ steps.image.outputs.digest }}' dist/kubernetes-release
+          tar -C dist -czf dist/supply-chain/release/metricshell-kubernetes-${GITHUB_REF_NAME}.tar.gz kubernetes-release
+      - name: Generate GitHub artifact attestations
+        uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be
+        with:
+          subject-path: implementation/dist/supply-chain/release/metricshell-linux-*
+      - name: Publish immutable GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(cat VERSION)
+          test "$GITHUB_REF_NAME" = "v$version"
+          gh release create "$GITHUB_REF_NAME" implementation/dist/supply-chain/release/* \
+            --verify-tag --title "MetricShell $version" --generate-notes \
+            --notes "OCI digest: ${{ steps.image.outputs.digest }}"

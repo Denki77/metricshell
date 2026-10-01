@@ -21,12 +21,19 @@ case "$filter" in
     mkdir -p "$root/docker/standalone-copy/release"
     cp "$root/../dist/release/metricshell-linux-amd64" "$root/docker/standalone-copy/release/"
     cp "$root/../dist/release/SHA256SUMS" "$root/docker/standalone-copy/release/"
-    docker build -t metricshell-example-standalone "$root/docker/standalone-copy"
-    docker run -d --name metricshell-example-standalone -p 127.0.0.1:19100:9090 \
+    docker build --platform linux/amd64 -t metricshell-example-standalone "$root/docker/standalone-copy"
+    docker run --platform linux/amd64 -d --name metricshell-example-standalone -p 127.0.0.1:19100:9090 \
       --read-only --tmpfs /run/metricshell:uid=65532,gid=65532,mode=0700 \
       --cap-drop ALL --security-opt no-new-privileges metricshell-example-standalone >/dev/null
-    output=$(curl --fail --retry 30 --retry-connrefused --retry-delay 1 http://127.0.0.1:19100/metrics)
-    printf '%s\n' "$output" | grep -F 'example_jobs_total'
+    attempt=0
+    output=
+    until output=$(curl --fail --silent --show-error http://127.0.0.1:19100/metrics 2>/dev/null) && \
+      printf '%s\n' "$output" | grep -F 'example_jobs_total' >/dev/null; do
+      attempt=$((attempt + 1))
+      test "$attempt" -lt 30
+      sleep 1
+    done
+    printf '%s\n' "$output" | grep -F 'example_jobs_total' >/dev/null
     docker stop --time 32 metricshell-example-standalone >/dev/null
     docker rm metricshell-example-standalone >/dev/null
     ;;

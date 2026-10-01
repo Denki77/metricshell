@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration managed-e2e managed-validation fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 wave7 build release
+.PHONY: all fmt test integration managed-e2e managed-validation fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 wave7 build release release-artifact-verification examples kubernetes-validation documentation-validation production-gate
 
 all: ci
 
@@ -233,6 +233,26 @@ supply-chain-ci:
 
 ci: test integration fault benchmark supply-chain-ci
 
+release-artifact-verification: release
+	docker run --rm --platform linux/amd64 -v "$(CURDIR)/dist/release:/release:ro" alpine:3.22 \
+		sh -ec 'cd /release && sha256sum -c SHA256SUMS && test "$$(./metricshell-linux-amd64 --version)" = "metricshell version=$(VERSION) revision=$(REVISION)"'
+
+examples: release
+	./examples/test-examples.sh
+
+kubernetes-validation:
+	docker run --rm -v "$(CURDIR)/examples/kubernetes:/manifests:ro" alpine:3.22 \
+		sh -ec '! grep -R "sha256:00000000" /manifests; grep -R "TEMPLATE — NOT DIRECTLY DEPLOYABLE" /manifests >/dev/null'
+
+documentation-validation:
+	docker run --rm -v "$(PROJECT_ROOT):/src:ro" -w /src alpine:3.22 \
+		sh -ec 'test "$$(cat VERSION)" = "$(VERSION)"; grep -F "0.2.0" README.md >/dev/null; grep -F "0.2.0" README_RU.md >/dev/null; test -s docs/07-delivery/production-deployment.md; test -s docs-ru/07-delivery/production-deployment.md'
+
+# One fail-closed entry point used by both CI and release publication. The PASS line is printed only after every
+# prerequisite returns success; partial success is never release evidence.
+production-gate: test integration managed-e2e managed-validation fault benchmark supply-chain-ci release-artifact-verification examples kubernetes-validation documentation-validation
+	@printf '%s\n' 'PRODUCTION RELEASE GATE: PASS'
+
 wave1: ci
 
 wave2: ci
@@ -251,4 +271,4 @@ build:
 	docker build --target runtime --platform "$(PLATFORM)" --build-arg VERSION="$(VERSION)" --build-arg REVISION="$(REVISION)" -f "$(DOCKERFILE)" -t $(IMAGE):local "$(PROJECT_ROOT)"
 
 release:
-	docker build --target release --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
+	docker build --target release-artifacts --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"

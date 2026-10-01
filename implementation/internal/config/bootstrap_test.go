@@ -109,6 +109,24 @@ func TestParseManagedQueueCapacity(t *testing.T) {
 	}
 }
 
+func TestManagedModeAcceptsExpositionAndSharedCoreLimits(t *testing.T) {
+	t.Parallel()
+
+	configuration, err := Parse([]string{
+		"--mode=managed-registry",
+		"--exposition-listen=0.0.0.0:9090",
+		"--max-series=512",
+		"--",
+		"program",
+	}, testNow, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if configuration.Exposition.Listen != "0.0.0.0:9090" || configuration.Limits.Series != 512 {
+		t.Fatalf("configuration = %#v", configuration)
+	}
+}
+
 func TestManagedPublicationIntervalConfiguration(t *testing.T) {
 	t.Parallel()
 	configuration, err := Parse([]string{"--mode=managed-registry", "--managed-publication-interval=250ms", "--", "program"}, testNow, nil)

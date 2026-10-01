@@ -46,16 +46,19 @@ RUN version="$(cat /project/VERSION)" && \
 FROM source AS release
 ARG REVISION=unknown
 RUN version="$(cat /project/VERSION)" && \
-    mkdir -p /release/linux_amd64 /release/linux_arm64 && \
+    mkdir -p /release && \
     CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
-      -o /release/linux_amd64/metricshell ./cmd/metricshell && \
+      -o /release/metricshell-linux-amd64 ./cmd/metricshell && \
     CGO_ENABLED=0 GOOS=linux GOARCH=arm64 go build -trimpath -buildvcs=false \
       -ldflags="-s -w -buildid= -X=${REPO_URI}/implementation/internal/buildinfo.Version=${version} -X=${REPO_URI}/implementation/internal/buildinfo.Revision=${REVISION}" \
-      -o /release/linux_arm64/metricshell ./cmd/metricshell && \
-    (cd /release && sha256sum linux_amd64/metricshell linux_arm64/metricshell > SHA256SUMS) && \
+      -o /release/metricshell-linux-arm64 ./cmd/metricshell && \
+    (cd /release && sha256sum metricshell-linux-amd64 metricshell-linux-arm64 > SHA256SUMS) && \
     (cd /release && sha256sum -c SHA256SUMS) && \
     printf 'version=%s\nrevision=%s\n' "${version}" "${REVISION}" > /release/METADATA
+
+FROM scratch AS release-artifacts
+COPY --from=release /release /release
 
 FROM source AS benchmark
 ARG REVISION=unknown

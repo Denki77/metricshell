@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/Denki77/metricshell/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/ci.yml)
 [![Documentation](https://github.com/Denki77/metricshell/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/docs.yml)
- [![Release](https://github.com/Denki77/metricshell/actions/workflows/release.yml/badge.svg)](https://github.com/Denki77/metricshell/actions/workflows/release.yml)
+[![Release](https://github.com/Denki77/metricshell/actions/workflows/release.yml/badge.svg)](https://github.com/Denki77/metricshell/actions/workflows/release.yml)
 ![Version](https://img.shields.io/badge/version-0.2.0-blue)
 ![Go](https://img.shields.io/badge/go-1.26-00ADD8)
 ![Platforms](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)

@@ -14,6 +14,8 @@
 !implementation/cmd/**
 !implementation/internal/
 !implementation/internal/**
+implementation/dist/
+implementation/examples/docker/standalone-copy/release/
 !research/
 !research/INV-016/
 !research/INV-016/corecheck/
