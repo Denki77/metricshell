@@ -47,7 +47,7 @@ occurs before success headers; bind failure exits with endpoint_bind_failed; can
 ## Required test matrix
 
 Both formats and Accept variants; format-specific counter HELP/TYPE/sample names; component-name collisions; finite,
-`NaN`, `+Inf`, and `-Inf` gauge values; valid non-negative histogram snapshots; empty-family/zero-series exposition;
+`NaN`, `+Inf`, and `-Inf` gauge values; valid signed and special-value histogram snapshots; empty-family/zero-series exposition;
 every filtering rule/precedence case;
 self-metric presence; concurrent replacement during scrape; slow/cancelled clients; encoding and size failures;
 saturation;

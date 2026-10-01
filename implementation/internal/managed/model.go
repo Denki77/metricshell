@@ -237,22 +237,23 @@ func (model *Model) apply(operation Operation) error {
 		if exists {
 			return reject(ReasonAlreadyInitialized)
 		}
-		if !finiteNonNegative(operation.Value) {
+		if !counterOperand(operation.Value) {
 			return reject(ReasonInvalidNumber)
 		}
-		family.Series[key] = Series{Labels: labels, Value: operation.Value}
+		value := operation.Value
+		if value == 0 {
+			value = 0 // Match client_golang Counter.Add(-0): accepted, but stored as positive zero.
+		}
+		family.Series[key] = Series{Labels: labels, Value: value}
 		model.activeSeries++
 	case CounterAdd:
 		if family.Descriptor.Type != Counter {
 			return reject(ReasonWrongType)
 		}
-		if !finiteNonNegative(operation.Value) {
+		if !counterOperand(operation.Value) {
 			return reject(ReasonInvalidNumber)
 		}
 		next := series.Value + operation.Value
-		if math.IsInf(next, 0) {
-			return reject(ReasonOverflow)
-		}
 		if !exists {
 			series.Labels = labels
 			model.activeSeries++
@@ -273,10 +274,7 @@ func (model *Model) apply(operation Operation) error {
 		if family.Descriptor.Type != Histogram {
 			return reject(ReasonWrongType)
 		}
-		if math.IsNaN(operation.Value) || operation.Value < 0 || math.IsInf(operation.Value, -1) || math.Signbit(operation.Value) {
-			return reject(ReasonInvalidNumber)
-		}
-		if series.Count == ^uint64(0) || (!math.IsInf(operation.Value, 1) && series.Sum > math.MaxFloat64-operation.Value) {
+		if series.Count == ^uint64(0) {
 			return reject(ReasonOverflow)
 		}
 		if !exists {
@@ -285,14 +283,15 @@ func (model *Model) apply(operation Operation) error {
 			model.activeSeries++
 		}
 		for index, boundary := range family.Descriptor.Buckets {
-			if operation.Value <= boundary && series.BucketCounts[index] == ^uint64(0) {
+			inBucket := operation.Value <= boundary || math.IsNaN(operation.Value) && math.IsInf(boundary, 1)
+			if inBucket && series.BucketCounts[index] == ^uint64(0) {
 				return reject(ReasonOverflow)
 			}
 		}
 		series.Count++
 		series.Sum += operation.Value
 		for index, boundary := range family.Descriptor.Buckets {
-			if operation.Value <= boundary {
+			if operation.Value <= boundary || math.IsNaN(operation.Value) && math.IsInf(boundary, 1) {
 				series.BucketCounts[index]++
 			}
 		}
@@ -359,7 +358,7 @@ func canonicalDescriptor(descriptor Descriptor) (Descriptor, error) {
 			return Descriptor{}, reject(ReasonInvalidBuckets)
 		}
 		for index, boundary := range descriptor.Buckets {
-			if math.IsNaN(boundary) || boundary < 0 || math.Signbit(boundary) || (index > 0 && boundary <= descriptor.Buckets[index-1]) {
+			if math.IsNaN(boundary) || (index > 0 && boundary <= descriptor.Buckets[index-1]) {
 				return Descriptor{}, reject(ReasonInvalidBuckets)
 			}
 		}
@@ -379,7 +378,10 @@ func resolveLabels(schema []string, input map[string]string) (string, map[string
 			return "", nil, reject(ReasonLabelSchema)
 		}
 		labels[name] = value
-		fmt.Fprintf(&key, "%d:%s=%d:%s;", len(name), name, len(value), value)
+		_, err := fmt.Fprintf(&key, "%d:%s=%d:%s;", len(name), name, len(value), value)
+		if err != nil {
+			return "", nil, err
+		}
 	}
 	return key.String(), labels, nil
 }
@@ -410,8 +412,8 @@ func validLabelName(value string) bool {
 	return true
 }
 
-func finiteNonNegative(value float64) bool {
-	return !math.IsNaN(value) && !math.IsInf(value, 0) && value >= 0 && !math.Signbit(value)
+func counterOperand(value float64) bool {
+	return !math.IsNaN(value) && !math.IsInf(value, -1) && value >= 0
 }
 
 func derivedNames(descriptor Descriptor) []string {

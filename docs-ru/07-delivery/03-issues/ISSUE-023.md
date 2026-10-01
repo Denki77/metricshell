@@ -49,7 +49,7 @@ cancelled/partial writes не считаются success.
 ## Обязательная test matrix
 
 Оба формата и варианты Accept; format-specific counter HELP/TYPE/sample names; component-name collisions; finite,
-`NaN`, `+Inf` и `-Inf` gauge values; валидные non-negative histograms; exposition empty families/zero-series; каждое
+`NaN`, `+Inf` и `-Inf` gauge values; валидные signed и special-value histograms; exposition empty families/zero-series; каждое
 filtering rule/precedence case; наличие
 self-metrics; concurrent replacement во время scrape; slow/cancelled clients; encoding и size failures; saturation; bind
 failure; health/readiness в каждом runtime state; graceful drain; race detector.

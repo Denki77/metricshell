@@ -88,11 +88,16 @@ and the metricshell_ namespace are validated before activation.
 `family.name` is always the base metric-family name. Filtering, series identity, metadata conflict detection, and the
 lifetime name-to-type binding use this base name. Encoders derive metadata and sample names as follows:
 
-| Type        | Prometheus text 0.0.4 metadata / samples                  | OpenMetrics 1.0 metadata / samples                        |
-|-------------|-----------------------------------------------------------|-----------------------------------------------------------|
-| `counter`   | HELP/TYPE `base_total`; sample `base_total`               | HELP/TYPE `base`; sample `base_total`                     |
-| `gauge`     | HELP/TYPE `base`; sample `base`                           | HELP/TYPE `base`; sample `base`                           |
-| `histogram` | HELP/TYPE `base`; `base_bucket`, `base_sum`, `base_count` | HELP/TYPE `base`; `base_bucket`, `base_sum`, `base_count` |
+| Type        | Prometheus text 0.0.4 metadata / samples                  | OpenMetrics 1.0 metadata / samples                                 |
+|-------------|-----------------------------------------------------------|--------------------------------------------------------------------|
+| `counter`   | HELP/TYPE `base_total`; sample `base_total`               | HELP/TYPE `base`; sample `base_total`                              |
+| `gauge`     | HELP/TYPE `base`; sample `base`                           | HELP/TYPE `base`; sample `base`                                    |
+| `histogram` | HELP/TYPE `base`; `base_bucket`, `base_sum`, `base_count` | HELP/TYPE `base`; `base_bucket`, optional `base_sum`, `base_count` |
+
+The snapshot always stores histogram sum. Prometheus text always exposes it. To satisfy the advertised OpenMetrics 1.0
+typed contract, that encoder omits `_sum` for a MetricPoint with a negative threshold or a negative/`NaN` sum; `-Inf`
+is negative and omitted, while `+Inf` is permitted. Buckets and count are unchanged. See
+[Numeric Semantics](numeric-semantics.md#format-specific-exposition).
 
 A counter base name ending in `_total` is invalid. A histogram base name ending in `_bucket`, `_sum`, or `_count` is
 invalid. Before activation, the validator constructs every encoded sample name for both formats. Intersections between
@@ -113,13 +118,14 @@ Numeric values are JSON strings to avoid parser-dependent JSON number conversion
   `numeric_invalid`;
 - canonical finite rendering is exactly Go `strconv.FormatFloat(value, 'g', -1, 64)`; special values retain the tokens
   `NaN`, `+Inf`, and `-Inf`;
-- counter values are finite with a clear sign bit (`-0` is invalid); histogram counts are non-negative;
+- counter values are non-NaN and non-negative; `+Inf` is valid and `-0` is preserved as IEEE-754 zero;
 - counts are base-10 unsigned 64-bit integers without sign or leading zeroes, except 0;
 - gauge values are finite decimals or special float values; implementations preserve all four classes without
   interpreting their business meaning;
-- histogram sums are non-negative finite decimals or `+Inf`; negative zero, negative values, `NaN`, and `-Inf` are
-  `histogram_invalid`;
-- histogram `le` is a non-negative finite decimal or `+Inf`; negative zero and negative boundaries are invalid;
+- histogram sums accept finite decimals, `NaN`, `+Inf`, and `-Inf`. Signed sums are required because Prometheus
+  classic histograms support negative observations; IEEE-754 special sums can result from special observations;
+- histogram `le` accepts finite decimals plus `-Inf` and `+Inf`; `NaN` is invalid. Negative boundaries and `-0` are
+  preserved. The terminal boundary must be `+Inf`;
 - histogram buckets are strictly increasing, cumulative counts never decrease, the last bucket is +Inf, and its count
   equals histogram count. Boundaries are compared after binary64 conversion; duplicate or non-increasing converted
   values are `histogram_invalid`, even when their input strings differ.

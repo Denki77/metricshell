@@ -1,5 +1,10 @@
 # INV-016 Report — Managed Registry Semantics
 
+> **2026-09-28 amendment:** The numeric subset concluded below was unnecessarily narrower than Prometheus and is
+> superseded by amended ADR-016 and the
+> [Numeric Semantics specification](../../docs/04-specification/numeric-semantics.md). Historical measurements remain
+> reproducible; their former policy conclusion is no longer normative.
+
 Status: completed
 
 Run date: 2026-09-24
@@ -99,15 +104,15 @@ Both implementations update count, sum and cumulative buckets atomically. The si
 crossing zero, mixed observations, mixed boundaries and `-Inf`. NaN was rejected by the candidate; `+Inf` was accepted
 by the restrictive candidate.
 
-| Snapshot | Prototype | Core | Evidence |
-| --- | --- | --- | --- |
-| regular non-negative plus `+Inf` | accepted | accepted, 5 series / 646 bytes | compatible |
-| empty registry | accepted | accepted, 0 series / 35 bytes | compatible |
-| negative observation, sum `-0.5` | accepted | `histogram_invalid` | negative sum incompatible |
-| `-0.5`, then `1`, sum `0.5`, non-negative bounds | accepted | accepted, 1 series / 261 bytes | history absent from final snapshot |
-| negative and positive boundaries | accepted | `histogram_invalid` | negative bounds incompatible |
-| signed observations returning sum to zero, negative bound | accepted | `histogram_invalid` | bound incompatible |
-| `-Inf` observation/sum | accepted | `histogram_invalid` | incompatible |
+| Snapshot                                                  | Prototype | Core                           | Evidence                           |
+|-----------------------------------------------------------|-----------|--------------------------------|------------------------------------|
+| regular non-negative plus `+Inf`                          | accepted  | accepted, 5 series / 646 bytes | compatible                         |
+| empty registry                                            | accepted  | accepted, 0 series / 35 bytes  | compatible                         |
+| negative observation, sum `-0.5`                          | accepted  | `histogram_invalid`            | negative sum incompatible          |
+| `-0.5`, then `1`, sum `0.5`, non-negative bounds          | accepted  | accepted, 1 series / 261 bytes | history absent from final snapshot |
+| negative and positive boundaries                          | accepted  | `histogram_invalid`            | negative bounds incompatible       |
+| signed observations returning sum to zero, negative bound | accepted  | `histogram_invalid`            | bound incompatible                 |
+| `-Inf` observation/sum                                    | accepted  | `histogram_invalid`            | incompatible                       |
 
 ### Result
 
@@ -128,11 +133,11 @@ history. The registry must nevertheless reject state that cannot safely cross th
 
 ### Candidates
 
-| Candidate | Metadata | Conflicts | Legacy simplicity |
-| --- | --- | --- | --- |
-| explicit declaration | complete before mutation | deterministic | extra step |
-| implicit first use | defaults/inference required | later declarations can conflict | simplest first call |
-| explicit internal + convenience call | complete internally | deterministic | declaration hidden |
+| Candidate                            | Metadata                    | Conflicts                       | Legacy simplicity   |
+|--------------------------------------|-----------------------------|---------------------------------|---------------------|
+| explicit declaration                 | complete before mutation    | deterministic                   | extra step          |
+| implicit first use                   | defaults/inference required | later declarations can conflict | simplest first call |
+| explicit internal + convenience call | complete internally         | deterministic                   | declaration hidden  |
 
 ### Prototype evidence and result
 
@@ -174,22 +179,22 @@ alternative Core, and ADR-001–ADR-015 remain unchanged.
 
 Thirty five-series materializations took 144,125 ns total (4,804 ns each).
 
-| Series | Bytes | ns/snapshot |
-| ---: | ---: | ---: |
-| 0 | 35 | 245 |
-| 1 | 129 | 869 |
-| 10 | 435 | 5,594 |
-| 100 | 3,585 | 42,223 |
-| 1,000 | 35,985 | 497,380 |
-| 10,000 | 368,985 | 5,945,861 |
+| Series |   Bytes | ns/snapshot |
+|-------:|--------:|------------:|
+|      0 |      35 |         245 |
+|      1 |     129 |         869 |
+|     10 |     435 |       5,594 |
+|    100 |   3,585 |      42,223 |
+|  1,000 |  35,985 |     497,380 |
+| 10,000 | 368,985 |   5,945,861 |
 
 These are observations, not limits or performance decisions. INV-019 owns those conclusions.
 
 ## Portable Confirmation
 
-| Role | Environment | Docker | Result |
-| --- | --- | --- | --- |
-| Reference | macOS/LinuxKit, linux/aarch64 | 29.8.0 | 64/64 assertions; 7/7 Core outcomes |
+| Role         | Environment                   | Docker | Result                              |
+|--------------|-------------------------------|--------|-------------------------------------|
+| Reference    | macOS/LinuxKit, linux/aarch64 | 29.8.0 | 64/64 assertions; 7/7 Core outcomes |
 | Confirmation | Ubuntu/LinuxKit, linux/x86_64 | 27.4.0 | 64/64 assertions; 7/7 Core outcomes |
 
 Both runs have benchmark fingerprint

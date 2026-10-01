@@ -1,8 +1,10 @@
 package managedmaterialize
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
+	"math"
 	"strconv"
 	"sync"
 	"sync/atomic"
@@ -11,6 +13,50 @@ import (
 	"github.com/Denki77/metricshell/implementation/internal/managed"
 	"github.com/Denki77/metricshell/implementation/internal/snapshot"
 )
+
+func TestManagedAndDirectSnapshotNumericEquivalence(t *testing.T) {
+	registry := managed.NewRegistry()
+	for _, descriptor := range []managed.Descriptor{
+		{Name: "counter", Type: managed.Counter},
+		{Name: "gauge", Type: managed.Gauge},
+		{Name: "distribution", Type: managed.Histogram, Buckets: []float64{-10, -1, 0, 1, 10, math.Inf(1)}},
+	} {
+		if _, err := registry.Declare(descriptor); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if _, err := registry.Apply(managed.Operation{Kind: managed.CounterAdd, Name: "counter", Value: math.Inf(1)}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := registry.Apply(managed.Operation{Kind: managed.GaugeSet, Name: "gauge", Value: math.Copysign(0, -1)}); err != nil {
+		t.Fatal(err)
+	}
+	for _, value := range []float64{-20, -5, -1, 0, 0.5, 5, 20} {
+		if _, err := registry.Apply(managed.Operation{Kind: managed.HistogramObserve, Name: "distribution", Value: value}); err != nil {
+			t.Fatal(err)
+		}
+	}
+	managedBody, err := Encode(registry.Read())
+	if err != nil {
+		t.Fatal(err)
+	}
+	managedSnapshot, err := snapshot.Parse(managedBody, snapshot.DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	directSnapshot, err := snapshot.Parse([]byte(`{"schema_version":1,"families":[`+
+		`{"name":"counter","help":"","type":"counter","series":[{"labels":{},"value":"+Inf"}]},`+
+		`{"name":"gauge","help":"","type":"gauge","series":[{"labels":{},"value":"-0"}]},`+
+		`{"name":"distribution","help":"","type":"histogram","series":[{"labels":{},"histogram":{"count":"7","sum":"-0.5","buckets":[`+
+		`{"le":"-10","count":"1"},{"le":"-1","count":"3"},{"le":"0","count":"4"},{"le":"1","count":"5"},{"le":"10","count":"6"},{"le":"+Inf","count":"7"}]}}]}`+
+		`]}`), snapshot.DefaultLimits())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Equal(managedSnapshot.Canonical(), directSnapshot.Canonical()) {
+		t.Fatalf("managed and direct differ:\nmanaged %s\ndirect  %s", managedSnapshot.Canonical(), directSnapshot.Canonical())
+	}
+}
 
 func TestCacheHitStaleRebuildAndReaderOwnership(t *testing.T) {
 	registry := managed.NewRegistry()

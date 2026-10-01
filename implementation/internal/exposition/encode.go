@@ -2,6 +2,7 @@ package exposition
 
 import (
 	"bytes"
+	"math"
 	"strconv"
 	"strings"
 
@@ -19,7 +20,7 @@ func Encode(application snapshot.ValidatedSnapshot, metrics selfmetric.View, fil
 		if filter != nil && !filter(family) {
 			continue
 		}
-		writeApplicationFamily(&output, family)
+		writeApplicationFamily(&output, family, format)
 	}
 	self, err := selfmetric.Encode(metrics, metricFormat)
 	if err != nil {
@@ -46,14 +47,18 @@ func selfMetricFormat(format Format) (selfmetric.TextFormat, error) {
 	}
 }
 
-func writeApplicationFamily(output *bytes.Buffer, family snapshot.Family) {
+func writeApplicationFamily(output *bytes.Buffer, family snapshot.Family, format Format) {
+	metadataName := family.Name()
+	if family.Type() == snapshot.Counter && format == Prometheus {
+		metadataName += "_total"
+	}
 	output.WriteString("# HELP ")
-	output.WriteString(family.Name())
+	output.WriteString(metadataName)
 	output.WriteByte(' ')
 	output.WriteString(escapeHelp(family.Help()))
 	output.WriteByte('\n')
 	output.WriteString("# TYPE ")
-	output.WriteString(family.Name())
+	output.WriteString(metadataName)
 	output.WriteByte(' ')
 	output.WriteString(string(family.Type()))
 	output.WriteByte('\n')
@@ -71,11 +76,28 @@ func writeApplicationFamily(output *bytes.Buffer, family snapshot.Family) {
 			for _, bucket := range histogram.Buckets() {
 				writeApplicationSample(output, family.Name()+"_bucket", series.Labels(), "le", bucket.UpperBound(), strconv.FormatUint(bucket.Count(), 10))
 			}
-			writeApplicationSample(output, family.Name()+"_bucket", series.Labels(), "le", "+Inf", strconv.FormatUint(histogram.Count(), 10))
-			writeApplicationSample(output, family.Name()+"_sum", series.Labels(), "", "", histogram.Sum())
+			if format != OpenMetrics || openMetricsHistogramSumAllowed(histogram) {
+				writeApplicationSample(output, family.Name()+"_sum", series.Labels(), "", "", histogram.Sum())
+			}
 			writeApplicationSample(output, family.Name()+"_count", series.Labels(), "", "", strconv.FormatUint(histogram.Count(), 10))
 		}
 	}
+}
+
+// OpenMetrics 1.0 makes histogram Sum optional, but forbids it when a
+// threshold is negative and forbids negative or NaN Sum values.
+func openMetricsHistogramSumAllowed(histogram snapshot.HistogramValue) bool {
+	sum, err := strconv.ParseFloat(histogram.Sum(), 64)
+	if err != nil || math.IsNaN(sum) || sum < 0 {
+		return false
+	}
+	for _, bucket := range histogram.Buckets() {
+		bound, err := strconv.ParseFloat(bucket.UpperBound(), 64)
+		if err != nil || bound < 0 {
+			return false
+		}
+	}
+	return true
 }
 
 func writeApplicationSample(output *bytes.Buffer, name string, labels []snapshot.Label, extraName, extraValue, value string) {
