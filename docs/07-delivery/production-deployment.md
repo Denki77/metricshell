@@ -2,7 +2,7 @@
 
 [Russian version](../../docs-ru/07-delivery/production-deployment.md)
 
-This is the operational entry point for MetricShell 0.2.1. MetricShell runs as PID 1, owns one workload process tree,
+This is the operational entry point for MetricShell 0.2.2. MetricShell runs as PID 1, owns one workload process tree,
 accepts instrumentation locally and exposes `GET /metrics` for Prometheus. The workload never needs a monitoring
 destination: Prometheus discovery and scrape configuration belong to infrastructure.
 
@@ -11,10 +11,10 @@ destination: Prometheus discovery and scrape configuration belong to infrastruct
 Release assets contain `metricshell-linux-amd64`, `metricshell-linux-arm64`, `SHA256SUMS`, `SBOM.json`,
 `PROVENANCE.json`, signatures and public verification material. Download an asset and `SHA256SUMS` from the same
 release, run `sha256sum -c SHA256SUMS`, verify the signature as described by `VERIFY.md`, install as `metricshell`, and
-confirm `metricshell --version` reports `0.2.1`.
+confirm `metricshell --version` reports `0.2.2`.
 
-The official images are `ghcr.io/denki77/metricshell:0.2.1` and
-`ghcr.io/denki77/metricshell-artifact:0.2.1` for `linux/amd64` and `linux/arm64`. Tags are for discovery; production
+The official images are `ghcr.io/denki77/metricshell:0.2.2` and
+`ghcr.io/denki77/metricshell-artifact:0.2.2` for `linux/amd64` and `linux/arm64`. Tags are for discovery; production
 manifests must use the immutable `image@sha256:<release-digest>` recorded in the release notes. Never use `latest`.
 
 For Kubernetes, start from the Job, CronJob and Deployment manifests in `implementation/examples/kubernetes/production`.

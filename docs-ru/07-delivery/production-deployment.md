@@ -2,7 +2,7 @@
 
 [English version](../../docs/07-delivery/production-deployment.md)
 
-Это единая operational-точка входа для MetricShell 0.2.1. MetricShell работает как PID 1, управляет одним process tree,
+Это единая operational-точка входа для MetricShell 0.2.2. MetricShell работает как PID 1, управляет одним process tree,
 принимает instrumentation локально и отдаёт `GET /metrics` Prometheus. Workload не знает monitoring destination:
 discovery и scrape configuration принадлежат инфраструктуре.
 
@@ -11,10 +11,10 @@ discovery и scrape configuration принадлежат инфраструкт�
 В GitHub Release публикуются `metricshell-linux-amd64`, `metricshell-linux-arm64`, `SHA256SUMS`, `SBOM.json`,
 `PROVENANCE.json`, signatures и public verification material. Скачайте binary и checksum из одного release, выполните
 `sha256sum -c SHA256SUMS`, проверьте signature по `VERIFY.md`, установите binary как `metricshell` и убедитесь, что
-`metricshell --version` сообщает `0.2.1`.
+`metricshell --version` сообщает `0.2.2`.
 
-Официальные multi-arch images: `ghcr.io/denki77/metricshell:0.2.1` и
-`ghcr.io/denki77/metricshell-artifact:0.2.1`. Tags нужны для discovery, production pin использует только
+Официальные multi-arch images: `ghcr.io/denki77/metricshell:0.2.2` и
+`ghcr.io/denki77/metricshell-artifact:0.2.2`. Tags нужны для discovery, production pin использует только
 `image@sha256:<release-digest>` из release notes. `latest` не используется.
 
 Для Kubernetes возьмите Job, CronJob и Deployment из `implementation/examples/kubernetes/production`. В repository это

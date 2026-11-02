@@ -86,7 +86,9 @@ jobs:
         run: |
           cd dist/supply-chain/release
           sha256sum -c SHA256SUMS
-          test "$(./metricshell-linux-amd64 --version)" = "metricshell version=$(cat ../../../VERSION) revision=${GITHUB_SHA}"
+          expected="metricshell version=$(cat "$GITHUB_WORKSPACE/VERSION") revision=${GITHUB_SHA}"
+          actual="$(./metricshell-linux-amd64 --version)"
+          test "$actual" = "$expected"
       - name: Publish official multi-architecture images
         id: image
         working-directory: implementation
