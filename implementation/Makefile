@@ -246,7 +246,7 @@ kubernetes-validation:
 
 documentation-validation:
 	docker run --rm -v "$(PROJECT_ROOT):/src:ro" -w /src alpine:3.22 \
-		sh -ec 'test "$$(cat VERSION)" = "$(VERSION)"; grep -F "0.2.0" README.md >/dev/null; grep -F "0.2.0" README_RU.md >/dev/null; test -s docs/07-delivery/production-deployment.md; test -s docs-ru/07-delivery/production-deployment.md'
+		sh -ec 'test "$$(cat VERSION)" = "$(VERSION)"; grep -F "$(VERSION)" README.md >/dev/null; grep -F "$(VERSION)" README_RU.md >/dev/null; test -s docs/07-delivery/production-deployment.md; test -s docs-ru/07-delivery/production-deployment.md'
 
 # One fail-closed entry point used by both CI and release publication. The PASS line is printed only after every
 # prerequisite returns success; partial success is never release evidence.

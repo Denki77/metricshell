@@ -7,6 +7,10 @@ runtime-contract changes may appear in minor versions.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-02
+
+- Fixed the QEMU action commit, pinned documentation Actions, and added GitHub commit validation before CI and release jobs.
+
 ## [0.2.0] - 2026-10-01
 
 - Added the opt-in `managed-registry` ownership mode with bounded descriptor-driven counter, gauge and classic
