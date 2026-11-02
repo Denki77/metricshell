@@ -3,7 +3,7 @@
 [![CI](https://github.com/Denki77/metricshell/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/ci.yml)
 [![Documentation](https://github.com/Denki77/metricshell/actions/workflows/docs.yml/badge.svg?branch=main)](https://github.com/Denki77/metricshell/actions/workflows/docs.yml)
 [![Release](https://github.com/Denki77/metricshell/actions/workflows/release.yml/badge.svg)](https://github.com/Denki77/metricshell/actions/workflows/release.yml)
-![Version](https://img.shields.io/badge/version-0.2.1-blue)
+![Version](https://img.shields.io/badge/version-0.2.2-blue)
 ![Go](https://img.shields.io/badge/go-1.26-00ADD8)
 ![Platforms](https://img.shields.io/badge/platform-linux%2Famd64%20%7C%20linux%2Farm64-lightgrey)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
@@ -61,7 +61,7 @@ make build PLATFORM=linux/amd64 IMAGE=metricshell
 Добавить released binary в существующий application image:
 
 ```dockerfile
-FROM ghcr.io/denki77/metricshell-artifact:0.2.1 AS metricshell
+FROM ghcr.io/denki77/metricshell-artifact:0.2.2 AS metricshell
 FROM my-application
 COPY --from=metricshell /metricshell /usr/local/bin/metricshell
 ENTRYPOINT ["/usr/local/bin/metricshell", "--"]
@@ -116,7 +116,7 @@ Prometheus client и собственным `/metrics` MetricShell может в
 
 ## Версионирование
 
-Версия всего репозитория находится в [`VERSION`](VERSION). Текущая версия — `0.2.1`. Runtime artifacts также встраивают
+Версия всего репозитория находится в [`VERSION`](VERSION). Текущая версия — `0.2.2`. Runtime artifacts также встраивают
 source revision, переданный CI или Make.
 
 ## Участие
