@@ -8,7 +8,30 @@ permissions:
   contents: read
 
 jobs:
+  action-pins:
+    name: Verify external action availability
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # Bootstrap without actions: an invalid action SHA must not prevent this check.
+      - name: Fetch workflow sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git init .
+          git remote add origin "${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}.git"
+          auth=$(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)
+          git -c "http.extraHeader=AUTHORIZATION: basic $auth" fetch --depth=1 origin "$GITHUB_SHA"
+          git checkout --detach FETCH_HEAD
+      - name: Check external action commits and entrypoints
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 -m unittest discover -s .github/scripts -p 'test_*.py'
+          python3 .github/scripts/verify-actions.py
+
   implementation:
+    needs: action-pins
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:

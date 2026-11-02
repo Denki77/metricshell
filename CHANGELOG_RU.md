@@ -7,6 +7,10 @@ runtime contract могут появляться в minor versions.
 
 ## [Unreleased]
 
+## [0.2.1] - 2026-11-02
+
+- Исправлен SHA QEMU, закреплены Actions документации и добавлена проверка существования коммитов перед CI и релизом.
+
 ## [0.2.0] - 2026-10-01
 
 - Добавлен opt-in ownership mode `managed-registry` с bounded descriptor-driven operations для counter, gauge и classic
