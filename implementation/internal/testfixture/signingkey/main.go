@@ -24,7 +24,7 @@ func writeSigningKeys(privatePath, publicPath string) error {
 	if err != nil {
 		return err
 	}
-	if err := os.WriteFile(privatePath, []byte(hex.EncodeToString(privateKey.Seed())+"\n"), 0o644); err != nil {
+	if err := os.WriteFile(privatePath, []byte(hex.EncodeToString(privateKey.Seed())+"\n"), 0o600); err != nil {
 		return err
 	}
 	publicKey := privateKey.Public().(ed25519.PublicKey)

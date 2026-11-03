@@ -37,10 +37,13 @@ snapshot. Discovery, credentials и routing принадлежат инфрас�
 
 ## Текущий статус
 
-Core и optional Managed Aggregation profile реализованы и production-validated. Snapshot mode остаётся default
-complete-replacement contract; `managed-registry` добавляет bounded local operations для counter, gauge и histogram
-через private Unix socket. Проект всё ещё pre-1.0, поэтому публичный runtime contract может меняться между minor
-versions.
+Core и optional Managed Registry реализованы. Production gate пройден для опубликованной
+[production baseline v0.2.2](https://github.com/Denki77/metricshell/releases/tag/v0.2.2), Linux amd64/arm64.
+Snapshot mode сохраняет default complete-replacement contract; `managed-registry` предоставляет bounded local operations.
+Функциональный scope завершён: новые функциональные этапы не запланированы. Дальнейшие изменения ограничены
+исправлением дефектов, безопасностью, совместимостью и сопровождением. Версия 0.2.2 остаётся pre-1.0
+и не обещает неограниченной совместимости API.
+См. [release notes](docs-ru/07-delivery/releases/v0.2.2.md) и [аудит приёмки](docs/07-delivery/releases/v0.2.2-audit.md).
 
 ## Быстрый старт
 

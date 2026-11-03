@@ -74,13 +74,11 @@ jobs:
         run: |
           test -n "$RELEASE_SIGNING_KEY"
           test -n "$RELEASE_SIGNING_PUBLIC_KEY"
-          umask 077
-          printf '%s' "$RELEASE_SIGNING_KEY" > "$RUNNER_TEMP/release-key.hex"
-          printf '%s' "$RELEASE_SIGNING_PUBLIC_KEY" > "$RUNNER_TEMP/release-public.hex"
-          make supply-chain REVISION=${GITHUB_SHA} IMAGE=metricshell-release \
-            RELEASE_SIGNING_KEY_FILE="$RUNNER_TEMP/release-key.hex" \
-            RELEASE_SIGNING_PUBLIC_KEY_FILE="$RUNNER_TEMP/release-public.hex"
-          rm -f "$RUNNER_TEMP/release-key.hex" "$RUNNER_TEMP/release-public.hex"
+          docker build --target supply-chain-artifacts --no-cache-filter supply-chain \
+            --build-arg REVISION="$GITHUB_SHA" \
+            --secret id=release_signing_key,env=RELEASE_SIGNING_KEY \
+            --secret id=release_public_key,env=RELEASE_SIGNING_PUBLIC_KEY \
+            --output type=local,dest=dist/supply-chain -f Dockerfile ..
       - name: Independently verify files delivered to consumers
         working-directory: implementation
         run: |
@@ -101,15 +99,18 @@ jobs:
             --tag "${REGISTRY,,}/metricshell:$version" --tag "${REGISTRY,,}/metricshell-artifact:$version" \
             --metadata-file "$RUNNER_TEMP/image-metadata.json" --push -f Dockerfile ..
           digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/image-metadata.json")
-          test -n "$digest" && test "$digest" != null
+          [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           echo "digest=$digest" >> "$GITHUB_OUTPUT"
+          docker buildx build --check \
+            --build-arg METRICSHELL_IMAGE_REF="${REGISTRY,,}/metricshell@${digest}" \
+            -f examples/docker/base-image/Dockerfile examples/docker/base-image
           docker buildx build --platform linux/amd64,linux/arm64 \
             --build-arg METRICSHELL_IMAGE_REF="${REGISTRY,,}/metricshell@${digest}" \
             --tag "${REGISTRY,,}/metricshell-example:$version" \
             --metadata-file "$RUNNER_TEMP/example-image-metadata.json" --push \
             -f examples/docker/base-image/Dockerfile examples/docker/base-image
           example_digest=$(jq -r '."containerimage.digest"' "$RUNNER_TEMP/example-image-metadata.json")
-          test -n "$example_digest" && test "$example_digest" != null
+          [[ "$example_digest" =~ ^sha256:[0-9a-f]{64}$ ]]
           echo "example_digest=$example_digest" >> "$GITHUB_OUTPUT"
           printf 'metricshell=%s/metricshell@%s\nartifact=%s/metricshell-artifact@%s\nexample=%s/metricshell-example@%s\n' \
             "${REGISTRY,,}" "$digest" "${REGISTRY,,}" "$digest" "${REGISTRY,,}" "$example_digest" \
@@ -119,10 +120,34 @@ jobs:
         run: |
           ./scripts/render-kubernetes-release.sh '${{ steps.image.outputs.example_digest }}' dist/kubernetes-release
           tar -C dist -czf dist/supply-chain/release/metricshell-kubernetes-${GITHUB_REF_NAME}.tar.gz kubernetes-release
+      - name: Finalize and verify complete signed release manifest
+        env:
+          RELEASE_SIGNING_KEY: ${{ secrets.RELEASE_SIGNING_KEY }}
+          RELEASE_SIGNING_PUBLIC_KEY: ${{ vars.RELEASE_SIGNING_PUBLIC_KEY }}
+          RELEASE_RUNTIME_DIGEST: ${{ steps.image.outputs.digest }}
+          RELEASE_EXAMPLE_DIGEST: ${{ steps.image.outputs.example_digest }}
+        working-directory: implementation
+        run: |
+          set -eu
+          test -n "$RELEASE_SIGNING_KEY"
+          test -n "$RELEASE_SIGNING_PUBLIC_KEY"
+          docker build --target finalized-release-artifacts --no-cache-filter finalize-release \
+            --build-arg REVISION="$GITHUB_SHA" \
+            --build-arg RELEASE_RUNTIME_DIGEST="$RELEASE_RUNTIME_DIGEST" \
+            --build-arg RELEASE_EXAMPLE_DIGEST="$RELEASE_EXAMPLE_DIGEST" \
+            --build-context release-input=dist/supply-chain/release \
+            --secret id=release_signing_key,env=RELEASE_SIGNING_KEY \
+            --secret id=release_public_key,env=RELEASE_SIGNING_PUBLIC_KEY \
+            --output type=local,dest=dist/finalized -f Dockerfile ..
+          rm -rf dist/supply-chain/release
+          mv dist/finalized/release dist/supply-chain/release
+          cd dist/supply-chain/release
+          sha256sum -c SHA256SUMS
       - name: Generate GitHub artifact attestations
         uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8
         with:
-          subject-path: implementation/dist/supply-chain/release/metricshell-linux-*
+          subject-path: |
+            implementation/dist/supply-chain/release/*
       - name: Publish immutable GitHub Release
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
