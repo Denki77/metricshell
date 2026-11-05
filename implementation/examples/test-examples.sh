@@ -123,6 +123,10 @@ scenario_multistage() {
 }
 
 scenario_base_image() {
+  docker build --check "$root/docker/base-image"
+  if docker build --check --build-arg METRICSHELL_IMAGE_REF= "$root/docker/base-image"; then
+    fail "empty base image reference unexpectedly passed build checks"
+  fi
   docker build --platform linux/amd64 --build-arg METRICSHELL_IMAGE_REF="$runtime_image" \
     -t "$base_image" "$root/docker/base-image"
   docker run --platform linux/amd64 -d --name "metricshell-base-$suffix" -p 127.0.0.1:19102:9090 "$base_image" >/dev/null

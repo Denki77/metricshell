@@ -8,17 +8,96 @@ destination: Prometheus discovery and scrape configuration belong to infrastruct
 
 ## Install
 
-Release assets contain `metricshell-linux-amd64`, `metricshell-linux-arm64`, `SHA256SUMS`, `SBOM.json`,
-`PROVENANCE.json`, signatures and public verification material. Download an asset and `SHA256SUMS` from the same
-release, run `sha256sum -c SHA256SUMS`, verify the signature as described by `VERIFY.md`, install as `metricshell`, and
-confirm `metricshell --version` reports `0.2.2`.
+Use Linux amd64 or arm64, `curl`, Python 3, and OpenSSL 3 with Ed25519 support. The release's
+[VERIFYING.md](https://github.com/Denki77/metricshell/releases/download/v0.2.2/VERIFYING.md)
+describes the offline evidence checks. The executable procedure below implements its signature and binary checks.
+For the complete evidence audit, download all release files before running `sha256sum -c SHA256SUMS`.
 
-The official images are `ghcr.io/denki77/metricshell:0.2.2` and
-`ghcr.io/denki77/metricshell-artifact:0.2.2` for `linux/amd64` and `linux/arm64`. Tags are for discovery; production
-manifests must use the immutable `image@sha256:<release-digest>` recorded in the release notes. Never use `latest`.
+First obtain the release public key from the maintainer through an independently authenticated channel
+(for example, a previously verified signed message or a direct channel whose identity you already verified).
+Confirm the full 32-byte Ed25519 key, then export `TRUSTED_RELEASE_PUBLIC_KEY_HEX` with its 64 hexadecimal characters.
+A key downloaded from the same release is only a candidate; neither that key nor its same-origin checksum
+establishes independent trust. If no independent key confirmation is available, stop before installation.
 
-For Kubernetes, start from the Job, CronJob and Deployment manifests in `implementation/examples/kubernetes/production`.
-The checked-in files are clearly marked templates; the release pipeline substitutes and validates the published digest.
+```sh
+set -eu
+version=0.2.2
+revision=4b19f7e20b2aab366c5cb69edd9e831bc7c89d58
+case "$(uname -m)" in
+  x86_64) arch=amd64 ;;
+  aarch64|arm64) arch=arm64 ;;
+  *) echo "Unsupported architecture" >&2; exit 1 ;;
+esac
+: "${TRUSTED_RELEASE_PUBLIC_KEY_HEX:?Set the independently confirmed Ed25519 public key}"
+work=$(mktemp -d)
+trap 'rm -rf "$work"' EXIT
+cd "$work"
+base="https://github.com/Denki77/metricshell/releases/download/v$version"
+asset="metricshell-linux-$arch"
+for file in "$asset" SHA256SUMS SHA256SUMS.sig RELEASE_PUBLIC_KEY VERIFYING.md; do
+  curl --fail --location --show-error --connect-timeout 10 --max-time 120 \
+    "$base/$file" --output "$file"
+done
+python3 - <<'VERIFY_KEY'
+import os
+from pathlib import Path
+trusted = bytes.fromhex(os.environ['TRUSTED_RELEASE_PUBLIC_KEY_HEX'])
+published = bytes.fromhex(Path('RELEASE_PUBLIC_KEY').read_text().strip())
+if len(trusted) != 32 or trusted != published:
+    raise SystemExit('Release public key does not match independent trust anchor')
+# RFC 8410 SubjectPublicKeyInfo for Ed25519, then the raw 32-byte key.
+Path('release-key.der').write_bytes(bytes.fromhex('302a300506032b6570032100') + trusted)
+signature = bytes.fromhex(Path('SHA256SUMS.sig').read_text().strip())
+if len(signature) != 64:
+    raise SystemExit('Invalid Ed25519 signature length')
+Path('signature.bin').write_bytes(signature)
+VERIFY_KEY
+openssl pkeyutl -verify -pubin -keyform DER -inkey release-key.der \
+  -rawin -in SHA256SUMS -sigfile signature.bin
+# Verify exactly the selected asset, without requiring other release files.
+python3 - "$asset" <<'VERIFY_HASH'
+import hashlib
+from pathlib import Path
+import sys
+asset = sys.argv[1]
+lines = [line.split() for line in Path('SHA256SUMS').read_text().splitlines()]
+selected = [fields[0] for fields in lines if len(fields) == 2 and fields[1] == asset]
+if len(selected) != 1 or hashlib.sha256(Path(asset).read_bytes()).hexdigest() != selected[0]:
+    raise SystemExit('Missing, duplicate or mismatched binary checksum')
+VERIFY_HASH
+chmod 0755 "$asset"
+test "$(./"$asset" --version)" = "metricshell version=$version revision=$revision"
+sudo install -m 0755 "$asset" /usr/local/bin/metricshell
+metricshell --version
+```
+
+Tags `ghcr.io/denki77/metricshell:0.2.2`, `metricshell-artifact:0.2.2` and `metricshell-example:0.2.2`
+are discovery references for `linux/amd64` and `linux/arm64`. Use immutable digests in production:
+
+```sh
+docker pull ghcr.io/denki77/metricshell@sha256:20d5b0cec5195d677f49b65bf315637bf0fed6899a936de527392f85df57f8ec
+docker run --rm ghcr.io/denki77/metricshell@sha256:20d5b0cec5195d677f49b65bf315637bf0fed6899a936de527392f85df57f8ec --version
+```
+
+The artifact image has the same digest and contains `/metricshell` for multi-stage copying. The runtime image
+is minimal and contains no shell; supply your workload in your application image. The published example is
+`ghcr.io/denki77/metricshell-example@sha256:56fd77bb5534549a12b1e1a7948a3cd2d63a08de4ee79bb32bbbb8b2a13e0f6b`.
+Never use `latest` for production.
+
+For Kubernetes use the release asset `metricshell-kubernetes-v0.2.2.tar.gz`, which already contains the example
+digest. The checked-in Job/CronJob/Deployment files in `implementation/examples/kubernetes/production` are templates.
+In v0.2.2, `OCI_DIGESTS`, `METADATA` and the Kubernetes bundle are outside the Ed25519-signed manifest;
+see the [artifact audit](releases/v0.2.2-audit.md) before relying on them. This is not retroactively repaired.
+
+Reproduce anonymous consumer acceptance from the repository (Python 3, Docker, native/QEMU support for both architectures):
+
+```sh
+make -C implementation published-release-smoke
+```
+
+The test uses isolated credentials, exact published digests, both architectures, bounded waits and cleanup.
+It never builds MetricShell from local source. Private package visibility is a failing result requiring the owner
+to change the relevant GHCR package to Public; authentication is not a workaround.
 
 ## Runtime contract
 

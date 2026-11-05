@@ -37,10 +37,12 @@ usually adds no value. It is not a replacement for normal in-process instrumenta
 
 ## Current status
 
-Core and the optional Managed Aggregation profile are implemented and production-validated. Snapshot mode remains the
-default complete-replacement contract; `managed-registry` adds bounded local counter, gauge and histogram operations
-through a private Unix socket. The project is still pre-1.0, so the public runtime contract may change between minor
-versions.
+Core and optional Managed Registry are implemented. The production gate passed for the published
+[v0.2.2 production baseline](https://github.com/Denki77/metricshell/releases/tag/v0.2.2), supporting Linux amd64/arm64.
+Snapshot mode retains the default complete-replacement contract; `managed-registry` provides bounded local operations.
+The functional scope is complete: no new functional stages are planned. Further changes are limited to defects,
+security, compatibility and maintenance. Version 0.2.2 is pre-1.0 and does not promise unlimited API compatibility.
+See the [release notes](docs/07-delivery/releases/v0.2.2.md) and [acceptance audit](docs/07-delivery/releases/v0.2.2-audit.md).
 
 ## Quick start
 

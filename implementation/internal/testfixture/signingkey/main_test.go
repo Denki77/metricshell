@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-func TestWriteSigningKeysAreReadableByBuildKit(t *testing.T) {
+func TestWriteSigningKeysProtectPrivateSeed(t *testing.T) {
 	directory := t.TempDir()
 	privatePath := filepath.Join(directory, "private.hex")
 	publicPath := filepath.Join(directory, "public.hex")
@@ -16,7 +16,7 @@ func TestWriteSigningKeysAreReadableByBuildKit(t *testing.T) {
 	if err := writeSigningKeys(privatePath, publicPath); err != nil {
 		t.Fatal(err)
 	}
-	assertMode(t, privatePath, 0o644)
+	assertMode(t, privatePath, 0o600)
 	assertMode(t, publicPath, 0o644)
 
 	seed, err := readHex(privatePath)

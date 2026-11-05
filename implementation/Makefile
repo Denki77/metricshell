@@ -6,7 +6,7 @@ IMAGE ?= metricshell
 PLATFORM ?= linux/amd64
 GO_IMAGE ?= golang:1.26@sha256:26326682769ca980f8f1d3b1f52be2dd1c1d25270e3de3fe0c97d6bb65df3556
 
-.PHONY: all fmt test integration managed-e2e managed-validation fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 wave7 build release release-artifact-verification examples kubernetes-validation documentation-validation production-gate
+.PHONY: all fmt test integration managed-e2e managed-validation fault benchmark supply-chain supply-chain-ci ci wave1 wave2 wave3 wave4 wave5 wave6 wave7 build release release-artifact-verification examples kubernetes-validation documentation-validation published-release-smoke release-documentation-tests production-gate
 
 all: ci
 
@@ -216,20 +216,34 @@ benchmark:
 supply-chain:
 	@test -n "$(RELEASE_SIGNING_KEY_FILE)"
 	@test -n "$(RELEASE_SIGNING_PUBLIC_KEY_FILE)"
-	docker build --target supply-chain-artifacts --build-arg REVISION="$(REVISION)" \
+	docker build --target supply-chain-artifacts --no-cache-filter supply-chain --build-arg REVISION="$(REVISION)" \
 		--secret id=release_signing_key,src="$(RELEASE_SIGNING_KEY_FILE)" \
 		--secret id=release_public_key,src="$(RELEASE_SIGNING_PUBLIC_KEY_FILE)" \
 		--output type=local,dest="$(CURDIR)/dist/supply-chain" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
 
 supply-chain-ci:
-	@temp="$$(mktemp -d)"; \
+	@set -eu; temp="$$(mktemp -d)"; \
 		cleanup() { rm -rf "$$temp"; }; \
-		trap cleanup EXIT INT TERM; \
-		docker run --rm -v "$(CURDIR):/src" -v "$$temp:/keys" -w /src $(GO_IMAGE) \
+		trap cleanup EXIT; trap 'exit 130' INT; trap 'exit 143' TERM; \
+		docker run --rm --user "$$(id -u):$$(id -g)" -e GOCACHE=/tmp/go-build \
+			-v "$(CURDIR):/src:ro" -v "$$temp:/keys" -w /src $(GO_IMAGE) \
 			go run ./internal/testfixture/signingkey /keys/private.hex /keys/public.hex; \
 		$(MAKE) supply-chain IMAGE="$(IMAGE)" REVISION="$(REVISION)" \
 			RELEASE_SIGNING_KEY_FILE="$$temp/private.hex" \
-			RELEASE_SIGNING_PUBLIC_KEY_FILE="$$temp/public.hex"
+			RELEASE_SIGNING_PUBLIC_KEY_FILE="$$temp/public.hex"; \
+		mkdir -p "$$temp/release-input"; \
+		cp dist/supply-chain/release/* "$$temp/release-input/"; \
+		runtime="sha256:$$(printf '%064d' 1)"; example="sha256:$$(printf '%064d' 2)"; \
+		printf 'metricshell=ghcr.io/denki77/metricshell@%s\nartifact=ghcr.io/denki77/metricshell-artifact@%s\nexample=ghcr.io/denki77/metricshell-example@%s\n' \
+			"$$runtime" "$$runtime" "$$example" > "$$temp/release-input/OCI_DIGESTS"; \
+		./scripts/render-kubernetes-release.sh "$$example" "$$temp/kubernetes-release"; \
+		COPYFILE_DISABLE=1 tar -czf "$$temp/release-input/metricshell-kubernetes-v$(VERSION).tar.gz" -C "$$temp" kubernetes-release; \
+		docker build --target finalized-release-artifacts --no-cache-filter finalize-release --build-arg REVISION="$(REVISION)" \
+			--build-arg RELEASE_RUNTIME_DIGEST="$$runtime" --build-arg RELEASE_EXAMPLE_DIGEST="$$example" \
+			--build-context release-input="$$temp/release-input" \
+			--secret id=release_signing_key,src="$$temp/private.hex" \
+			--secret id=release_public_key,src="$$temp/public.hex" \
+			--output type=local,dest="$(CURDIR)/dist/finalization-test" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
 
 ci: test integration fault benchmark supply-chain-ci
 
@@ -244,7 +258,11 @@ kubernetes-validation:
 	docker run --rm -v "$(CURDIR)/examples/kubernetes:/manifests:ro" alpine:3.22 \
 		sh -ec '! grep -R "sha256:00000000" /manifests; grep -R "TEMPLATE — NOT DIRECTLY DEPLOYABLE" /manifests >/dev/null'
 
+published-release-smoke:
+	python3 ./scripts/smoke-published-release.py
+
 documentation-validation:
+	$(MAKE) release-documentation-tests
 	docker run --rm -v "$(PROJECT_ROOT):/src:ro" -w /src alpine:3.22 \
 		sh -ec 'test "$$(cat VERSION)" = "$(VERSION)"; grep -F "$(VERSION)" README.md >/dev/null; grep -F "$(VERSION)" README_RU.md >/dev/null; test -s docs/07-delivery/production-deployment.md; test -s docs-ru/07-delivery/production-deployment.md'
 
@@ -272,3 +290,7 @@ build:
 
 release:
 	docker build --target release-artifacts --build-arg REVISION="$(REVISION)" --output type=local,dest="$(CURDIR)/dist" -f "$(DOCKERFILE)" "$(PROJECT_ROOT)"
+
+release-documentation-tests:
+	docker run --rm -v "$(PROJECT_ROOT):/project:ro" -w /project/implementation $(GO_IMAGE) \
+		go test -count=1 ./internal/releaseverify

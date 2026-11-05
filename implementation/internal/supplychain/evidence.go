@@ -199,7 +199,7 @@ func Verify(directory, expectedRevision, expectedPublicKeyHex string) error {
 func signingKeys(privateHex, publicHex string) (ed25519.PrivateKey, ed25519.PublicKey, error) {
 	privateBytes, err := hex.DecodeString(strings.TrimSpace(privateHex))
 	if err != nil {
-		return nil, nil, fmt.Errorf("invalid signing key encoding: %w", err)
+		return nil, nil, errors.New("invalid signing key encoding")
 	}
 	var privateKey ed25519.PrivateKey
 	switch len(privateBytes) {
@@ -244,15 +244,41 @@ func readChecksums(directory string) (map[string]string, error) {
 		if len(fields) != 2 {
 			return nil, fmt.Errorf("invalid checksum line: %q", scanner.Text())
 		}
-		checksums[strings.TrimPrefix(fields[1], "./")] = fields[0]
+		name := strings.TrimPrefix(fields[1], "./")
+		if filepath.Base(name) != name || name == "." || name == ".." || name == "SHA256SUMS" || name == "SHA256SUMS.sig" {
+			return nil, errors.New("unsafe or cyclic checksum subject")
+		}
+		if _, exists := checksums[name]; exists {
+			return nil, fmt.Errorf("duplicate checksum subject: %s", name)
+		}
+		decoded, err := hex.DecodeString(fields[0])
+		if err != nil || len(decoded) != sha256.Size {
+			return nil, errors.New("invalid checksum digest")
+		}
+		checksums[name] = fields[0]
 	}
 	return checksums, scanner.Err()
 }
 
 func buildManifest(directory string) ([]byte, error) {
-	paths := append([]string(nil), releaseSubjects...)
-	paths = append(paths, "go.mod")
-	paths = append(paths, signedEvidenceFiles...)
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return nil, err
+	}
+	var paths []string
+	for _, entry := range entries {
+		if entry.Name() == "SHA256SUMS" || entry.Name() == "SHA256SUMS.sig" {
+			continue
+		}
+		info, err := entry.Info()
+		if err != nil {
+			return nil, err
+		}
+		if !info.Mode().IsRegular() {
+			return nil, fmt.Errorf("non-regular release asset: %s", entry.Name())
+		}
+		paths = append(paths, entry.Name())
+	}
 	var builder strings.Builder
 	for _, path := range paths {
 		digest, err := digestFile(filepath.Join(directory, path))
@@ -501,3 +527,91 @@ const offlineInstructions = `# Offline release verification
 6. Confirm SBOM components cover every binary subject and every Go module in signed ` + "`MODULES.jsonl`" + ` with matching versions and sums.
 7. Confirm ` + "`VULNERABILITIES.json`" + ` was produced from signed ` + "`GOVULNCHECK.json`" + ` input, has decision ` + "`pass`" + `, and no policy-blocking findings.
 `
+
+// Finalize signs the complete, already assembled upload directory for future releases.
+// SHA256SUMS and its detached signature are the only manifest exclusions.
+func Finalize(directory, version, revision, privateHex, publicHex, runtimeDigest, exampleDigest, templates string) error {
+	if err := Verify(directory, revision, publicHex); err != nil {
+		return err
+	}
+	for _, name := range []string{"METADATA", "OCI_DIGESTS", "metricshell-kubernetes-v" + version + ".tar.gz"} {
+		info, err := os.Lstat(filepath.Join(directory, name))
+		if err != nil {
+			return err
+		}
+		if !info.Mode().IsRegular() || info.Size() == 0 {
+			return fmt.Errorf("invalid final release asset: %s", name)
+		}
+	}
+	oci, err := os.ReadFile(filepath.Join(directory, "OCI_DIGESTS"))
+	if err != nil {
+		return err
+	}
+	if err := validateOCI(oci, runtimeDigest, exampleDigest); err != nil {
+		return err
+	}
+	if err := validateBundle(filepath.Join(directory, "metricshell-kubernetes-v"+version+".tar.gz"), templates, exampleDigest); err != nil {
+		return err
+	}
+	if err := CheckReleaseFiles(directory, version); err != nil {
+		return err
+	}
+	privateKey, _, err := signingKeys(privateHex, publicHex)
+	if err != nil {
+		return err
+	}
+	manifest, err := buildManifest(directory)
+	if err != nil {
+		return err
+	}
+	if err := os.WriteFile(filepath.Join(directory, "SHA256SUMS"), manifest, 0o600); err != nil {
+		return err
+	}
+	signature := ed25519.Sign(privateKey, manifest)
+	if err := os.WriteFile(filepath.Join(directory, "SHA256SUMS.sig"), []byte(hex.EncodeToString(signature)+"\n"), 0o600); err != nil {
+		return err
+	}
+	return VerifyComplete(directory, revision, publicHex)
+}
+
+func VerifyComplete(directory, revision, publicHex string) error {
+	if err := Verify(directory, revision, publicHex); err != nil {
+		return err
+	}
+	actual, err := os.ReadFile(filepath.Join(directory, "SHA256SUMS"))
+	if err != nil {
+		return err
+	}
+	expected, err := buildManifest(directory)
+	if err != nil {
+		return err
+	}
+	if !bytes.Equal(actual, expected) {
+		return errors.New("release manifest omits files or is not canonical")
+	}
+	return nil
+}
+
+// CheckReleaseFiles guards Docker exports against unexpected files, including
+// accidentally staged key material. An empty version selects the initial set.
+func CheckReleaseFiles(directory, version string) error {
+	names := append([]string{"go.mod", "METADATA", "SHA256SUMS", "SHA256SUMS.sig"}, releaseSubjects...)
+	names = append(names, signedEvidenceFiles...)
+	if version != "" {
+		names = append(names, "OCI_DIGESTS", "metricshell-kubernetes-v"+version+".tar.gz")
+	}
+	entries, err := os.ReadDir(directory)
+	if err != nil {
+		return err
+	}
+	if len(entries) != len(names) {
+		return errors.New("unexpected release file count")
+	}
+	for _, name := range names {
+		info, err := os.Lstat(filepath.Join(directory, name))
+		if err != nil || !info.Mode().IsRegular() {
+			return fmt.Errorf("missing or non-regular release file %s", name)
+		}
+	}
+	return nil
+}

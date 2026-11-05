@@ -17,7 +17,7 @@ COPY ["VERSION", "/project/VERSION"]
 COPY ["README.md", "README_RU.md", "CHANGELOG.md", "CHANGELOG_RU.md", "/project/"]
 COPY ["docs", "/project/docs"]
 COPY ["docs-ru", "/project/docs-ru"]
-COPY [".github/workflows/release.yml", "/project/.github/workflows/release.yml"]
+COPY [".github/workflows", "/project/.github/workflows"]
 
 FROM ${PHP54_IMAGE} AS php54-client
 COPY ["implementation/examples/clients/php54/metricshell.php", "/clients/metricshell.php"]
@@ -164,6 +164,19 @@ RUN mkdir -p /validation && \
 
 FROM scratch AS managed-validation-artifacts
 COPY --from=managed-validation /validation /validation
+
+# Named context contains only the assembled release output, never repository secrets.
+FROM source AS finalize-release
+ARG REVISION=unknown
+ARG RELEASE_RUNTIME_DIGEST
+ARG RELEASE_EXAMPLE_DIGEST
+COPY --from=release-input / /final/release/
+RUN --mount=type=secret,id=release_signing_key,required=true \
+    --mount=type=secret,id=release_public_key,required=true \
+    go run ./internal/testfixture/supplychain --finalize /final/release "$(cat /project/VERSION)" "${REVISION}" \
+      /run/secrets/release_signing_key /run/secrets/release_public_key "$RELEASE_RUNTIME_DIGEST" "$RELEASE_EXAMPLE_DIGEST"
+FROM scratch AS finalized-release-artifacts
+COPY --from=finalize-release /final/release /release
 
 FROM scratch AS runtime
 ARG VERSION=dev

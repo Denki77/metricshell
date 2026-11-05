@@ -1,0 +1,18 @@
+name: Published v0.2.2 baseline
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  published-baseline:
+    name: Anonymous published v0.2.2 consumer smoke
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      - uses: docker/setup-qemu-action@99012661954931238ded8c8b007157a8430204e1
+      - name: Verify both published architectures without registry credentials
+        run: make -C implementation published-release-smoke

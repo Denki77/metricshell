@@ -9,6 +9,23 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 9 && os.Args[1] == "--finalize" {
+		privateKey, err := readSecret(os.Args[5])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		publicKey, err := readSecret(os.Args[6])
+		if err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		if err := supplychain.Finalize(os.Args[2], os.Args[3], os.Args[4], privateKey, publicKey, os.Args[7], os.Args[8], "examples/kubernetes/production"); err != nil {
+			fmt.Fprintln(os.Stderr, err)
+			os.Exit(1)
+		}
+		return
+	}
 	if len(os.Args) != 8 {
 		fmt.Fprintln(os.Stderr, "usage: supplychain RELEASE_DIR VERSION REVISION PRIVATE_KEY_FILE PUBLIC_KEY_FILE MODULES_JSONL GOVULNCHECK_JSON")
 		os.Exit(2)
@@ -35,6 +52,11 @@ func main() {
 		fmt.Fprintln(os.Stderr, err)
 		os.Exit(1)
 	}
+	if err := supplychain.CheckReleaseFiles(os.Args[1], ""); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		os.Exit(1)
+	}
+
 }
 
 func readSecret(path string) (string, error) {

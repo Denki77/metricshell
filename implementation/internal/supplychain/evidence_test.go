@@ -198,11 +198,11 @@ func preparedRelease(t *testing.T) (string, Inputs) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	modulesPath := filepath.Join(directory, "modules.jsonl")
+	modulesPath := filepath.Join(t.TempDir(), "modules.jsonl")
 	if err := os.WriteFile(modulesPath, []byte(`{"Path":"github.com/Denki77/metricshell/implementation","Main":true}`+"\n"+`{"Path":"example.test/dependency","Version":"v1.2.3","Sum":"h1:test"}`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	vulnerabilitiesPath := filepath.Join(directory, "govulncheck.json")
+	vulnerabilitiesPath := filepath.Join(t.TempDir(), "govulncheck.json")
 	if err := os.WriteFile(vulnerabilitiesPath, []byte(`{"config":{"scanner_name":"govulncheck"}}`+"\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
@@ -265,4 +265,90 @@ func mustDigest(t *testing.T, path string) string {
 		t.Fatal(err)
 	}
 	return digest
+}
+
+func TestFinalManifestCoversEveryUploadedAsset(t *testing.T) {
+	directory, inputs := preparedRelease(t)
+	if err := Generate(directory, inputs); err != nil {
+		t.Fatal(err)
+	}
+	writeDeliveryFixture(t, directory, inputs.Version)
+	if err := VerifyComplete(directory, inputs.Revision, inputs.PublicSigningKeyHex); err == nil {
+		t.Fatal("accepted omitted late assets")
+	}
+	if err := Finalize(directory, inputs.Version, inputs.Revision, inputs.PrivateSigningKeyHex, inputs.PublicSigningKeyHex, testRuntimeDigest, testExampleDigest, testTemplates); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyComplete(directory, inputs.Revision, inputs.PublicSigningKeyHex); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"METADATA", "OCI_DIGESTS", "metricshell-kubernetes-v" + inputs.Version + ".tar.gz"} {
+		t.Run(name, func(t *testing.T) {
+			path := filepath.Join(directory, name)
+			original, err := os.ReadFile(path)
+			if err != nil {
+				t.Fatal(err)
+			}
+			appendFile(t, path, "tampered")
+			if err := VerifyComplete(directory, inputs.Revision, inputs.PublicSigningKeyHex); err == nil {
+				t.Fatal("accepted tampered late asset")
+			}
+			if err := os.WriteFile(path, original, 0600); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+	if err := os.WriteFile(filepath.Join(directory, "unmanifested"), []byte("extra"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := VerifyComplete(directory, inputs.Revision, inputs.PublicSigningKeyHex); err == nil {
+		t.Fatal("accepted additional upload")
+	}
+}
+
+func TestManifestRejectsUnsafeDuplicateAndCyclicSubjects(t *testing.T) {
+	for _, name := range []string{"../outside", "SHA256SUMS", "SHA256SUMS.sig", "metricshell-linux-amd64"} {
+		t.Run(name, func(t *testing.T) {
+			directory, inputs := preparedRelease(t)
+			if err := Generate(directory, inputs); err != nil {
+				t.Fatal(err)
+			}
+			appendFile(t, filepath.Join(directory, "SHA256SUMS"), strings.Repeat("0", 64)+"  "+name+"\n")
+			if _, err := readChecksums(directory); err == nil {
+				t.Fatal("accepted unsafe or duplicate entry")
+			}
+		})
+	}
+}
+
+func TestFinalizationRequiresLateAssetsAndRejectsSymlinks(t *testing.T) {
+	directory, inputs := preparedRelease(t)
+	if err := Generate(directory, inputs); err != nil {
+		t.Fatal(err)
+	}
+	if err := Finalize(directory, inputs.Version, inputs.Revision, inputs.PrivateSigningKeyHex, inputs.PublicSigningKeyHex, testRuntimeDigest, testExampleDigest, testTemplates); err == nil {
+		t.Fatal("accepted missing late assets")
+	}
+	if err := os.Symlink("metricshell-linux-amd64", filepath.Join(directory, "link")); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := buildManifest(directory); err == nil {
+		t.Fatal("accepted symbolic link")
+	}
+}
+
+func TestInstallerDownloadsAreRealReleaseOutputs(t *testing.T) {
+	directory, inputs := preparedRelease(t)
+	if err := Generate(directory, inputs); err != nil {
+		t.Fatal(err)
+	}
+	for _, name := range []string{"metricshell-linux-amd64", "metricshell-linux-arm64", "SHA256SUMS", "SHA256SUMS.sig", "RELEASE_PUBLIC_KEY", "VERIFYING.md"} {
+		info, err := os.Stat(filepath.Join(directory, name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if info.Size() == 0 {
+			t.Fatalf("empty installation asset: %s", name)
+		}
+	}
 }

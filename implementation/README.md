@@ -3,6 +3,13 @@
 This directory is the production Go module. Code under `research/` is evidence and is deliberately outside the module
 and dependency graph.
 
+## Production baseline
+
+Core and optional Managed Registry are implemented. The published production baseline is `v0.2.2` for Linux amd64/arm64;
+its production gate passed. No new functional stages are planned. Further changes are limited to defects, security,
+compatibility and maintenance. This pre-1.0 baseline does not promise unlimited public API compatibility.
+See the [release audit](../docs/07-delivery/releases/v0.2.2-audit.md).
+
 ## Current scope
 
 Core through Wave 6 is complete and ready for operational use in the complete-snapshot profile. Publishers replace the

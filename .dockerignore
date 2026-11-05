@@ -24,3 +24,5 @@ implementation/examples/docker/standalone-copy/release/
 !research/INV-016/corecheck/
 !research/INV-016/corecheck/main.go
 !research/INV-016/corecheck/docker.go.mod
+
+!.github/workflows/**

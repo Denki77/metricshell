@@ -7,7 +7,11 @@ runtime-contract changes may appear in minor versions.
 
 ## [Unreleased]
 
+- Release infrastructure and bilingual documentation hardening for the v0.2.2 production baseline; no runtime changes.
+
 ## [0.2.2] - 2026-11-02
+
+First successful production publication; 0.2.0 and 0.2.1 publication attempts failed. Their historical entries remain below.
 
 - Fixed the path to version file.
 
